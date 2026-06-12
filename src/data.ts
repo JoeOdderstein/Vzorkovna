@@ -43,8 +43,9 @@ export const SITE_DATA = {
   // ── Hero Video ───────────────────────────────────────────
   // Swap the file at public/videos/hero.mp4 — no code changes needed.
   heroVideoUrl: '/videos/hero.mp4',
-  // Fallback poster image shown before video loads
-  heroPosterUrl: 'https://images.pexels.com/photos/1054218/pexels-photo-1054218.jpeg?auto=compress&cs=tinysrgb&w=1920',
+  // Fallback poster shown before video loads (solid black, matches site background)
+  heroPosterUrl:
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1920' height='1080'%3E%3Crect width='100%25' height='100%25' fill='%23050505'/%3E%3C/svg%3E",
 
   // ── Navigation ───────────────────────────────────────────
   navLinks: ['Projects', 'About', 'Contact'],

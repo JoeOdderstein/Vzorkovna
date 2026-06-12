@@ -21,12 +21,12 @@ export default function Hero() {
   return (
     <section
       id="hero"
-      className="relative w-full h-screen overflow-hidden flex items-center justify-center"
+      className="relative w-full h-screen overflow-hidden flex items-center justify-center bg-[#050505]"
     >
       {/* Background video: replace public/videos/hero.mp4 to update */}
       <video
         ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-cover bg-[#050505]"
         style={{ transform: `translateY(${parallaxOffset}px) scale(1.1)` }}
         src={SITE_DATA.heroVideoUrl}
         poster={SITE_DATA.heroPosterUrl}
