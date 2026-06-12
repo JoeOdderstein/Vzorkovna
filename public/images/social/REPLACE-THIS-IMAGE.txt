@@ -1,0 +1,12 @@
+Link preview image (WhatsApp, iMessage, Twitter, etc.)
+
+Replace this file with your own image:
+  share-preview.jpg
+
+Recommended size: 1200 × 630 pixels
+Format: JPG or PNG (if PNG, update index.html to use .png)
+
+Keep the filename share-preview.jpg so you do not need to edit any code.
+
+After deploying, WhatsApp may cache the old preview. To refresh:
+https://developers.facebook.com/tools/debug/
