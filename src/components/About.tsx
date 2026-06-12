@@ -17,8 +17,8 @@ function AboutPortrait({
   return (
     <div
       ref={portraitRef}
-      className={`reveal ${inView ? 'visible' : ''} relative w-full shrink-0 ${
-        isLeft ? 'lg:col-start-1' : 'lg:col-start-3 lg:justify-self-end'
+      className={`reveal ${inView ? 'visible' : ''} relative w-full max-w-[56vw] lg:max-w-none shrink-0 row-start-1 ${
+        isLeft ? 'col-start-1' : 'col-start-3 justify-self-end'
       }`}
       style={{ aspectRatio: '1350 / 1724' }}
     >
@@ -64,7 +64,7 @@ export default function About() {
         }}
       />
 
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-[44vw_1fr_44vw] lg:items-center">
+      <div className="relative z-10 grid grid-cols-[minmax(75px,56vw)_1fr_minmax(75px,56vw)] lg:grid-cols-[44vw_1fr_44vw] items-center">
         <AboutPortrait
           src={SITE_DATA.about.portraitUrl}
           side="left"
@@ -72,26 +72,26 @@ export default function About() {
           portraitRef={leftPortraitRef}
         />
 
-        {/* Text — center column, can overlap portrait black areas */}
+        {/* Text — full-width centered overlay on mobile; grid column on desktop */}
         <div
           ref={textRef}
-          className={`reveal ${textInView ? 'visible' : ''} relative z-20 px-8 py-10 text-center lg:col-start-2 lg:row-start-1 lg:flex lg:items-center lg:justify-center lg:px-6 lg:-mx-10 xl:-mx-16 lg:py-0`}
+          className={`reveal ${textInView ? 'visible' : ''} absolute inset-x-0 top-0 bottom-0 z-20 flex items-center justify-center overflow-hidden max-lg:pointer-events-none lg:relative lg:col-start-2 lg:row-start-1 lg:flex lg:items-center lg:justify-center lg:overflow-visible lg:px-6 lg:py-0 lg:-mx-10 xl:-mx-16`}
         >
-          <div className="mx-auto max-w-md sm:max-w-lg lg:max-w-xl">
-            <span className="font-sans text-[0.65rem] tracking-[0.3em] uppercase text-[var(--color-accent)] block mb-6">
+          <div className="pointer-events-auto text-center max-lg:w-[8.25rem] max-lg:px-1 sm:max-lg:w-[9.5rem] lg:mx-auto lg:w-auto lg:max-w-xl">
+            <span className="font-sans uppercase text-[var(--color-accent)] block max-lg:text-[0.4rem] max-lg:tracking-[0.18em] max-lg:mb-1.5 lg:text-[0.65rem] lg:tracking-[0.3em] lg:mb-6">
               About
             </span>
             <h2
-              className="font-serif text-[clamp(1.75rem,3.5vw,3.5rem)] font-light leading-tight text-white/90 mb-8"
-              style={{ fontFamily: 'var(--font-serif)', lineHeight: '1.15' }}
+              className="font-serif font-light text-white/90 max-lg:text-[clamp(0.72rem,2.1vw,3.5rem)] max-lg:leading-[1.1] max-lg:mb-2 lg:text-[clamp(1.75rem,3.5vw,3.5rem)] lg:leading-[1.15] lg:mb-8"
+              style={{ fontFamily: 'var(--font-serif)' }}
             >
               {SITE_DATA.about.heading}
             </h2>
-            <div className="space-y-5">
+            <div className="max-lg:space-y-1.5 lg:space-y-5">
               {SITE_DATA.about.body.map((para, i) => (
                 <p
                   key={i}
-                  className="font-sans text-sm leading-[1.85] text-white/50"
+                  className="font-sans text-white/50 max-lg:text-[0.52rem] max-lg:leading-[1.55] lg:text-sm lg:leading-[1.85]"
                 >
                   {para}
                 </p>
