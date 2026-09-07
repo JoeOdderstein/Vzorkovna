@@ -15,8 +15,23 @@ export default function Nav({ activeSection }: NavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isScrolled = scrollY > 80 || location.pathname !== '/';
 
-  const goToSection = (id: string) => {
+  const goToNavLink = (link: string) => {
     setMenuOpen(false);
+
+    if (link === 'Login') {
+      navigate('/login');
+      return;
+    }
+
+    goToSection(link);
+  };
+
+  const isLinkActive = (link: string) => {
+    if (link === 'Login') return location.pathname === '/login';
+    return location.pathname === '/' && activeSection === link.toLowerCase();
+  };
+
+  const goToSection = (id: string) => {
     const sectionId = id.toLowerCase();
 
     if (location.pathname !== '/') {
@@ -75,9 +90,9 @@ export default function Nav({ activeSection }: NavProps) {
             {SITE_DATA.navLinks.map((link) => (
               <button
                 key={link}
-                onClick={() => goToSection(link)}
+                onClick={() => goToNavLink(link)}
                 className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
-                  activeSection === link.toLowerCase()
+                  isLinkActive(link)
                     ? 'text-[var(--color-accent)]'
                     : 'text-white/60 hover:text-white'
                 }`}
@@ -116,7 +131,7 @@ export default function Nav({ activeSection }: NavProps) {
           {SITE_DATA.navLinks.map((link, i) => (
             <button
               key={link}
-              onClick={() => goToSection(link)}
+              onClick={() => goToNavLink(link)}
               className="font-serif text-4xl text-white/80 hover:text-white transition-colors duration-300 tracking-wide"
               style={{
                 fontFamily: 'var(--font-serif)',

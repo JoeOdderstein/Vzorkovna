@@ -53,7 +53,7 @@ export const SITE_DATA = {
   sharePreviewUrl: '/images/social/share-preview.jpg',
 
   // ── Navigation ───────────────────────────────────────────
-  navLinks: ['Projects', 'About', 'Contact'],
+  navLinks: ['Projects', 'About', 'Contact', 'Login'],
 
   // ── About Section ────────────────────────────────────────
   about: {
