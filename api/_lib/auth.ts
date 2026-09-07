@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify } from 'jose';
+import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 const COOKIE_NAME = 'taskboard_session';
@@ -9,26 +9,59 @@ function getJwtSecret() {
     process.env.SUPABASE_JWT_SECRET ||
     (process.env.NODE_ENV !== 'production' ? 'local-dev-jwt-secret-min-32-chars!!' : undefined);
   if (!secret) throw new Error('SUPABASE_JWT_SECRET is not configured');
-  return new TextEncoder().encode(secret);
+  return secret;
+}
+
+function base64url(value: string | Buffer) {
+  return Buffer.from(value).toString('base64url');
+}
+
+function signJwt(payload: Record<string, unknown>) {
+  const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
+  const body = base64url(JSON.stringify(payload));
+  const data = `${header}.${body}`;
+  const signature = createHmac('sha256', getJwtSecret()).update(data).digest('base64url');
+  return `${data}.${signature}`;
 }
 
 export async function createSessionToken() {
   const sub = process.env.TASKBOARD_USER_ID ?? '00000000-0000-0000-0000-000000000001';
+  const now = Math.floor(Date.now() / 1000);
 
-  return new SignJWT({ role: 'authenticated' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setSubject(sub)
-    .setAudience('authenticated')
-    .setIssuedAt()
-    .setExpirationTime(`${SESSION_DAYS}d`)
-    .sign(getJwtSecret());
+  return signJwt({
+    role: 'authenticated',
+    sub,
+    aud: 'authenticated',
+    iat: now,
+    exp: now + SESSION_DAYS * 24 * 60 * 60,
+  });
 }
 
 export async function verifySessionToken(token: string) {
-  const { payload } = await jwtVerify(token, getJwtSecret(), {
-    audience: 'authenticated',
-  });
-  return payload;
+  const parts = token.split('.');
+  if (parts.length !== 3) throw new Error('Invalid token');
+
+  const [header, payload, signature] = parts;
+  const data = `${header}.${payload}`;
+  const expected = createHmac('sha256', getJwtSecret()).update(data).digest('base64url');
+
+  const sigBuf = Buffer.from(signature);
+  const expBuf = Buffer.from(expected);
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
+    throw new Error('Invalid token signature');
+  }
+
+  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
+    aud?: string;
+    exp?: number;
+  };
+
+  if (claims.aud !== 'authenticated') throw new Error('Invalid token audience');
+  if (claims.exp != null && claims.exp < Math.floor(Date.now() / 1000)) {
+    throw new Error('Token expired');
+  }
+
+  return claims;
 }
 
 export function setSessionCookie(res: VercelResponse, token: string) {

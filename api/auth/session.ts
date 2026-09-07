@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import {
-  createSessionToken,
   getTokenFromRequest,
   verifySessionToken,
 } from '../_lib/auth';

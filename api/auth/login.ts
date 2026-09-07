@@ -31,7 +31,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     setSessionCookie(res, token);
 
     return res.status(200).json({ ok: true, accessToken: token });
-  } catch {
+  } catch (err) {
+    console.error('Login error:', err);
     return res.status(500).json({ error: 'Login failed' });
   }
 }
