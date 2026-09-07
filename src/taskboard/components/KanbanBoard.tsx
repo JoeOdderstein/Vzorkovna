@@ -196,7 +196,14 @@ function Column({
         <h3 className="tb-label">{label}</h3>
       </div>
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
-        <div ref={setNodeRef} className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[80px]">
+        <div
+          ref={setNodeRef}
+          className={
+            groups.length > 0
+              ? 'flex-1 overflow-y-auto space-y-2 pr-1 min-h-[80px]'
+              : 'pr-1'
+          }
+        >
           {groups.map((group) => (
             <SortableGroup
               key={group.parent.id}
@@ -214,7 +221,7 @@ function Column({
         type="button"
         onClick={() => onCreateTask(categoryId)}
         disabled={creating}
-        className="mt-2 w-full py-3 text-sm text-[#80868b] border border-dashed border-[#dadce0]/70 rounded-lg bg-white/30 hover:bg-white/60 hover:border-[#dadce0] hover:text-[#5f6368] disabled:opacity-50 transition-colors"
+        className={`${groups.length > 0 ? 'mt-2' : 'mt-0'} w-full py-3 text-sm text-[#80868b] border border-dashed border-[#dadce0]/70 rounded-lg bg-white/30 hover:bg-white/60 hover:border-[#dadce0] hover:text-[#5f6368] disabled:opacity-50 transition-colors`}
       >
         {creating ? 'Creating…' : '+ new task'}
       </button>
@@ -332,7 +339,7 @@ export default function KanbanBoard({
         setOverNestId(null);
       }}
     >
-      <div className="flex gap-4 md:gap-6 overflow-x-auto px-1">
+      <div className="flex items-start gap-4 md:gap-6 overflow-x-auto px-1">
         {visibleCategories.map(({ id, label }) => (
           <div key={id} id={id} data-category={id}>
             <Column
