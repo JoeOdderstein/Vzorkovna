@@ -1,5 +1,4 @@
-import { createHmac, timingSafeEqual } from 'node:crypto';
-import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createHmac, timingSafeEqual } from 'crypto';
 
 const COOKIE_NAME = 'taskboard_session';
 const SESSION_DAYS = 7;
@@ -12,11 +11,11 @@ function getJwtSecret() {
   return secret;
 }
 
-function base64url(value: string | Buffer) {
+function base64url(value) {
   return Buffer.from(value).toString('base64url');
 }
 
-function signJwt(payload: Record<string, unknown>) {
+function signJwt(payload) {
   const header = base64url(JSON.stringify({ alg: 'HS256', typ: 'JWT' }));
   const body = base64url(JSON.stringify(payload));
   const data = `${header}.${body}`;
@@ -37,7 +36,7 @@ export async function createSessionToken() {
   });
 }
 
-export async function verifySessionToken(token: string) {
+export async function verifySessionToken(token) {
   const parts = token.split('.');
   if (parts.length !== 3) throw new Error('Invalid token');
 
@@ -51,10 +50,7 @@ export async function verifySessionToken(token: string) {
     throw new Error('Invalid token signature');
   }
 
-  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as {
-    aud?: string;
-    exp?: number;
-  };
+  const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
 
   if (claims.aud !== 'authenticated') throw new Error('Invalid token audience');
   if (claims.exp != null && claims.exp < Math.floor(Date.now() / 1000)) {
@@ -64,7 +60,7 @@ export async function verifySessionToken(token: string) {
   return claims;
 }
 
-export function setSessionCookie(res: VercelResponse, token: string) {
+export function setSessionCookie(res, token) {
   const maxAge = SESSION_DAYS * 24 * 60 * 60;
   const secure = process.env.NODE_ENV === 'production';
   res.setHeader(
@@ -73,7 +69,7 @@ export function setSessionCookie(res: VercelResponse, token: string) {
   );
 }
 
-export function clearSessionCookie(res: VercelResponse) {
+export function clearSessionCookie(res) {
   const secure = process.env.NODE_ENV === 'production';
   res.setHeader(
     'Set-Cookie',
@@ -81,13 +77,13 @@ export function clearSessionCookie(res: VercelResponse) {
   );
 }
 
-export function getTokenFromRequest(req: VercelRequest): string | null {
+export function getTokenFromRequest(req) {
   const cookie = req.headers.cookie ?? '';
   const match = cookie.match(new RegExp(`${COOKIE_NAME}=([^;]+)`));
   return match?.[1] ?? null;
 }
 
-export function validateCredentials(username: string, password: string) {
+export function validateCredentials(username, password) {
   const expectedUser = process.env.TASKBOARD_USERNAME ?? 'vzorkovna';
   const expectedPass =
     process.env.TASKBOARD_PASSWORD ??
@@ -97,7 +93,7 @@ export function validateCredentials(username: string, password: string) {
   return username === expectedUser && password === expectedPass;
 }
 
-export function getAuthConfigError(): string | null {
+export function getAuthConfigError() {
   if (!process.env.TASKBOARD_PASSWORD && process.env.NODE_ENV === 'production') {
     return 'TASKBOARD_PASSWORD is not configured on the server.';
   }

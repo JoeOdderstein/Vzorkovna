@@ -9,7 +9,7 @@ import {
   setSessionCookie,
   validateCredentials,
   verifySessionToken,
-} from './api/_lib/auth';
+} from './api/_lib/auth.js';
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
