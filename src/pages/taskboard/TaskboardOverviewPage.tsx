@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { countProjectTasksForFilter } from '../../lib/taskboard/filterUtils';
+import { withRetry } from '../../lib/taskboard/loadUtils';
 import {
   fetchAllActiveTasks,
   fetchProjects,
@@ -17,14 +18,26 @@ export default function TaskboardOverviewPage() {
   const { assigneeFilter } = useTaskboardFilter();
 
   useEffect(() => {
-    Promise.all([fetchProjects(), fetchAllActiveTasks()])
+    let cancelled = false;
+
+    withRetry(() => Promise.all([fetchProjects(), fetchAllActiveTasks()]))
       .then(([projectList, tasks]) => {
+        if (cancelled) return;
         setProjects(projectList);
         setAllTasks(tasks);
         setError('');
       })
-      .catch(() => setError('Could not load projects.'))
-      .finally(() => setLoading(false));
+      .catch(() => {
+        if (cancelled) return;
+        setError('Could not load projects. Please try again.');
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const taskCounts = useMemo(() => {

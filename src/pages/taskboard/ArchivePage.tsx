@@ -5,6 +5,7 @@ import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
 import type { Task } from '../../lib/taskboard/types';
 import { fetchArchivedTasks, subscribeToArchive } from '../../lib/taskboard/taskService';
+import { withRetry } from '../../lib/taskboard/loadUtils';
 import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
 import { formatDeadline, getDeadlineStatus, deadlineClasses } from '../../lib/taskboard/deadlineUtils';
 import { priorityLabels } from '../../lib/taskboard/priorityUtils';
@@ -23,7 +24,7 @@ export default function ArchivePage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchArchivedTasks(search);
+      const data = await withRetry(() => fetchArchivedTasks(search));
       setTasks(data);
       setError('');
     } catch {

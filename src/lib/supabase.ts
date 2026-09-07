@@ -24,7 +24,11 @@ export function getSupabase() {
 export async function setSupabaseSession(accessToken: string) {
   sessionToken = accessToken;
   const supabase = getSupabase();
-  await supabase.realtime.setAuth(accessToken);
+  try {
+    await supabase.realtime.setAuth(accessToken);
+  } catch {
+    // Realtime auth is optional — REST queries still work
+  }
 }
 
 export async function clearSupabaseSession() {

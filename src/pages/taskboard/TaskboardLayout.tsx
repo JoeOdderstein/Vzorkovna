@@ -3,14 +3,16 @@ import Nav from '../../components/Nav';
 import { TaskboardFilterProvider } from '../../context/TaskboardFilterContext';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
+import { isSupabaseConfigured } from '../../lib/taskboard/config';
 import AssigneeFilterBar from '../../taskboard/components/AssigneeFilterBar';
 import TaskboardHeaderActions from '../../taskboard/components/TaskboardHeaderActions';
 
 function TaskboardShell() {
-  const { authenticated, loading } = useTaskboardAuth();
+  const { authenticated, loading, sessionReady } = useTaskboardAuth();
   const location = useLocation();
+  const waitingForSession = authenticated && isSupabaseConfigured() && !sessionReady;
 
-  if (loading) {
+  if (loading || waitingForSession) {
     return (
       <>
         <Nav activeSection="login" />

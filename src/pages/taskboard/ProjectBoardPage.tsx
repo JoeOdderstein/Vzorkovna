@@ -18,6 +18,7 @@ import {
   subscribeToProjectTasks,
   updateTask,
 } from '../../lib/taskboard/taskService';
+import { withRetry } from '../../lib/taskboard/loadUtils';
 import type { Project } from '../../lib/taskboard/types';
 
 export default function ProjectBoardPage() {
@@ -39,9 +40,9 @@ export default function ProjectBoardPage() {
   const load = useCallback(async () => {
     if (!slug) return;
     try {
-      const proj = await fetchProjectBySlug(slug);
+      const proj = await withRetry(() => fetchProjectBySlug(slug));
       setProject(proj);
-      const data = await fetchActiveTasks(proj.id);
+      const data = await withRetry(() => fetchActiveTasks(proj.id));
       setTasks(data);
       setError('');
     } catch {
