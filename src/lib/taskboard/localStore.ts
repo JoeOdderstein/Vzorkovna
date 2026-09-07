@@ -1,8 +1,10 @@
-import type { Priority, TaskCategory } from './constants';
+import type { TaskCategory } from './constants';
 import type { Project, Task, TaskInsert, TaskUpdate } from './types';
 import { normalizeTask } from './assigneeUtils';
+import { ensureUniqueSlug, slugifyProjectName } from './projectUtils';
 
 const STORAGE_KEY = 'taskboard_local_tasks_v1';
+const PROJECTS_STORAGE_KEY = 'taskboard_local_projects_v1';
 
 const SEED_PROJECTS: Project[] = [
   { id: 'p1', name: 'Tank Shots', slug: 'tank-shots', sort_order: 1, created_at: '' },
@@ -29,6 +31,20 @@ function saveTasks(tasks: Task[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
 }
 
+function loadProjects(): Project[] {
+  try {
+    const raw = localStorage.getItem(PROJECTS_STORAGE_KEY);
+    if (!raw) return [...SEED_PROJECTS];
+    return JSON.parse(raw) as Project[];
+  } catch {
+    return [...SEED_PROJECTS];
+  }
+}
+
+function saveProjects(projects: Project[]) {
+  localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
+}
+
 function newId() {
   return crypto.randomUUID();
 }
@@ -38,9 +54,59 @@ function now() {
 }
 
 export const localStore = {
-  getProjects: () => SEED_PROJECTS,
+  getProjects: () => loadProjects(),
 
-  getProjectBySlug: (slug: string) => SEED_PROJECTS.find((p) => p.slug === slug) ?? null,
+  getProjectBySlug: (slug: string) => loadProjects().find((p) => p.slug === slug) ?? null,
+
+  createProject: (name: string): Project => {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Project name is required');
+
+    const projects = loadProjects();
+    const slug = ensureUniqueSlug(
+      slugifyProjectName(trimmed),
+      projects.map((p) => p.slug)
+    );
+    const sort_order = projects.reduce((max, p) => Math.max(max, p.sort_order), 0) + 1;
+
+    const project: Project = {
+      id: newId(),
+      name: trimmed,
+      slug,
+      sort_order,
+      created_at: now(),
+    };
+
+    saveProjects([...projects, project]);
+    return project;
+  },
+
+  updateProject: (id: string, name: string): Project => {
+    const trimmed = name.trim();
+    if (!trimmed) throw new Error('Project name is required');
+
+    const projects = loadProjects();
+    const idx = projects.findIndex((p) => p.id === id);
+    if (idx < 0) throw new Error('Project not found');
+
+    const slug = ensureUniqueSlug(
+      slugifyProjectName(trimmed),
+      projects.filter((p) => p.id !== id).map((p) => p.slug)
+    );
+
+    const updated: Project = { ...projects[idx], name: trimmed, slug };
+    projects[idx] = updated;
+    saveProjects(projects);
+    return updated;
+  },
+
+  deleteProject: (id: string): void => {
+    const projects = loadProjects();
+    if (!projects.some((p) => p.id === id)) throw new Error('Project not found');
+
+    saveProjects(projects.filter((p) => p.id !== id));
+    saveTasks(loadTasks().filter((t) => t.project_id !== id));
+  },
 
   getActiveTasks: (projectId: string) =>
     loadTasks().filter((t) => t.project_id === projectId && !t.completed),
@@ -48,7 +114,7 @@ export const localStore = {
   getAllActiveTasks: () => loadTasks().filter((t) => !t.completed),
 
   getActiveTaskCountsByProject: () => {
-    const counts = Object.fromEntries(SEED_PROJECTS.map((p) => [p.id, 0]));
+    const counts = Object.fromEntries(loadProjects().map((p) => [p.id, 0]));
     for (const task of loadTasks()) {
       if (!task.completed) {
         counts[task.project_id] = (counts[task.project_id] ?? 0) + 1;
@@ -65,7 +131,7 @@ export const localStore = {
     }
     return tasks.map((t) => ({
       ...t,
-      project: SEED_PROJECTS.find((p) => p.id === t.project_id),
+      project: loadProjects().find((p) => p.id === t.project_id),
     }));
   },
 
@@ -94,9 +160,9 @@ export const localStore = {
       category: parent?.category ?? input.category,
       task_name: input.task_name ?? 'New task',
       description: input.description ?? '',
-      assignees: input.assignees ?? parent?.assignees ?? [],
-      priority: (input.priority as Priority) ?? 'normal',
-      deadline: input.deadline ?? null,
+      assignees: input.assignees ?? [...(parent?.assignees ?? [])],
+      priority: input.priority ?? parent?.priority ?? 'normal',
+      deadline: input.deadline !== undefined ? input.deadline : (parent?.deadline ?? null),
       completed: false,
       completed_at: null,
       google_drive_url: null,

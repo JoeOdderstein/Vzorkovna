@@ -7,7 +7,7 @@ export const TASK_CATEGORIES = [
 
 export type TaskCategory = (typeof TASK_CATEGORIES)[number]['id'];
 
-export const ASSIGNEES = ['Gus', 'Joost', 'Pasha'] as const;
+export const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha'] as const;
 export type Assignee = (typeof ASSIGNEES)[number];
 
 export const PRIORITIES = ['high', 'normal', 'low'] as const;

@@ -19,7 +19,7 @@ import { useMemo, useState } from 'react';
 import type { Task, TaskGroup } from '../../lib/taskboard/types';
 import type { TaskCategory } from '../../lib/taskboard/constants';
 import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
-import { getVisibleCategories } from '../../lib/taskboard/categoryUtils';
+import { buildGroupsByCategory } from '../../lib/taskboard/categoryUtils';
 import TaskCard from './TaskCard';
 
 const nestId = (taskId: string) => `nest-${taskId}`;
@@ -44,6 +44,8 @@ interface KanbanBoardProps {
   onMoveGroup: (group: TaskGroup, toCategory: TaskCategory, toIndex: number) => void;
   onNestTask: (taskId: string, targetParentId: string) => void;
   onPromoteTask: (taskId: string, category: TaskCategory) => void;
+  onCreateTask: (category: TaskCategory) => void;
+  creatingCategory?: TaskCategory | null;
 }
 
 function NestDropTarget({
@@ -171,6 +173,8 @@ function Column({
   onToggleCollapse,
   onTaskClick,
   onCompleteTask,
+  onCreateTask,
+  creating,
 }: {
   categoryId: TaskCategory;
   label: string;
@@ -180,13 +184,17 @@ function Column({
   onToggleCollapse: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
+  onCreateTask: (category: TaskCategory) => void;
+  creating: boolean;
 }) {
   const { setNodeRef } = useDroppable({ id: categoryId });
   const ids = groups.map((g) => g.parent.id);
 
   return (
     <div className="flex-shrink-0 w-[280px] md:w-[300px] flex flex-col max-h-[calc(100vh-12rem)]">
-      <h3 className="tb-label mb-4 px-1">{label}</h3>
+      <div className="px-1 py-4">
+        <h3 className="tb-label">{label}</h3>
+      </div>
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <div ref={setNodeRef} className="flex-1 overflow-y-auto space-y-2 pr-1 min-h-[80px]">
           {groups.map((group) => (
@@ -202,6 +210,14 @@ function Column({
           ))}
         </div>
       </SortableContext>
+      <button
+        type="button"
+        onClick={() => onCreateTask(categoryId)}
+        disabled={creating}
+        className="mt-2 w-full py-3 text-sm text-[#80868b] border border-dashed border-[#dadce0]/70 rounded-lg bg-white/30 hover:bg-white/60 hover:border-[#dadce0] hover:text-[#5f6368] disabled:opacity-50 transition-colors"
+      >
+        {creating ? 'Creating…' : '+ new task'}
+      </button>
     </div>
   );
 }
@@ -215,36 +231,19 @@ export default function KanbanBoard({
   onCompleteTask,
   onNestTask,
   onPromoteTask,
+  onCreateTask,
+  creatingCategory = null,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [overNestId, setOverNestId] = useState<string | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
-  const visibleCategories = useMemo(() => getVisibleCategories(tasks), [tasks]);
-
-  const groupsByCategory = useMemo(() => {
-    const map: Record<TaskCategory, TaskGroup[]> = {
-      quotations: [],
-      designing: [],
-      installation: [],
-      repairs: [],
-    };
-
-    TASK_CATEGORIES.forEach(({ id }) => {
-      const parents = tasks
-        .filter((t) => t.category === id && !t.parent_task_id)
-        .sort((a, b) => a.sort_order - b.sort_order);
-      map[id] = parents.map((parent) => ({
-        parent,
-        subtasks: tasks
-          .filter((t) => t.parent_task_id === parent.id)
-          .sort((a, b) => a.sort_order - b.sort_order),
-      }));
-    });
-
-    return map;
-  }, [tasks]);
+  const groupsByCategory = useMemo(() => buildGroupsByCategory(tasks), [tasks]);
+  const visibleCategories = useMemo(() => {
+    const withTasks = TASK_CATEGORIES.filter(({ id }) => groupsByCategory[id].length > 0);
+    return withTasks.length > 0 ? withTasks : TASK_CATEGORIES;
+  }, [groupsByCategory]);
 
   const activeTask = activeId ? taskById.get(activeId) : null;
 
@@ -333,7 +332,7 @@ export default function KanbanBoard({
         setOverNestId(null);
       }}
     >
-      <div className="flex gap-4 md:gap-6 overflow-x-auto pb-4 px-1">
+      <div className="flex gap-4 md:gap-6 overflow-x-auto px-1">
         {visibleCategories.map(({ id, label }) => (
           <div key={id} id={id} data-category={id}>
             <Column
@@ -345,6 +344,8 @@ export default function KanbanBoard({
               onToggleCollapse={onToggleCollapse}
               onTaskClick={onTaskClick}
               onCompleteTask={onCompleteTask}
+              onCreateTask={onCreateTask}
+              creating={creatingCategory === id}
             />
           </div>
         ))}

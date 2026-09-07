@@ -1,4 +1,4 @@
-import type { Task, TaskGroup, TaskInsert, TaskUpdate } from './types';
+import type { Project, Task, TaskGroup, TaskInsert, TaskUpdate } from './types';
 import type { TaskCategory } from './constants';
 import { isSupabaseConfigured } from './config';
 import { localStore } from './localStore';
@@ -9,6 +9,7 @@ import {
 } from './localTasksStorage';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { normalizeAssignees, normalizeTask } from './assigneeUtils';
+import { ensureUniqueSlug, slugifyProjectName } from './projectUtils';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -33,6 +34,79 @@ export async function fetchProjects() {
 
   if (error) throw error;
   return data;
+}
+
+export async function createProject(name: string): Promise<Project> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Project name is required');
+
+  if (isLocalTaskboardMode()) return localStore.createProject(trimmed);
+
+  const supabase = await db();
+  const { data: existing, error: fetchError } = await supabase.from('projects').select('slug');
+  if (fetchError) throw fetchError;
+
+  const slug = ensureUniqueSlug(
+    slugifyProjectName(trimmed),
+    (existing ?? []).map((p) => p.slug)
+  );
+
+  const { data: lastProject } = await supabase
+    .from('projects')
+    .select('sort_order')
+    .order('sort_order', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const sort_order = (lastProject?.sort_order ?? 0) + 1;
+
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({ name: trimmed, slug, sort_order })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data as Project;
+}
+
+export async function updateProject(id: string, name: string): Promise<Project> {
+  const trimmed = name.trim();
+  if (!trimmed) throw new Error('Project name is required');
+
+  if (isLocalTaskboardMode()) return localStore.updateProject(id, trimmed);
+
+  const supabase = await db();
+  const { data: existing, error: fetchError } = await supabase
+    .from('projects')
+    .select('slug, id')
+    .neq('id', id);
+  if (fetchError) throw fetchError;
+
+  const slug = ensureUniqueSlug(
+    slugifyProjectName(trimmed),
+    (existing ?? []).map((p) => p.slug)
+  );
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ name: trimmed, slug })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) throw error;
+  return data as Project;
+}
+
+export async function deleteProject(id: string): Promise<void> {
+  if (isLocalTaskboardMode()) {
+    localStore.deleteProject(id);
+    return;
+  }
+
+  const { error } = await (await db()).from('projects').delete().eq('id', id);
+  if (error) throw error;
 }
 
 export async function fetchActiveTaskCountsByProject() {
@@ -133,13 +207,24 @@ export async function createTask(input: TaskInsert) {
   const supabase = await db();
 
   let assignees = input.assignees;
-  if (input.parent_task_id && assignees === undefined) {
+  let priority = input.priority;
+  let deadline = input.deadline;
+
+  if (
+    input.parent_task_id &&
+    (assignees === undefined || priority === undefined || deadline === undefined)
+  ) {
     const { data: parent } = await supabase
       .from('tasks')
-      .select('assignees, assigned_to')
+      .select('assignees, priority, deadline')
       .eq('id', input.parent_task_id)
       .single();
-    assignees = normalizeAssignees(parent?.assignees ?? parent?.assigned_to);
+
+    if (parent) {
+      if (assignees === undefined) assignees = normalizeAssignees(parent.assignees);
+      if (priority === undefined) priority = parent.priority ?? 'normal';
+      if (deadline === undefined) deadline = parent.deadline ?? null;
+    }
   }
 
   const { data: existing } = await supabase
@@ -163,8 +248,8 @@ export async function createTask(input: TaskInsert) {
       task_name: input.task_name ?? 'New task',
       description: input.description ?? '',
       assignees: assignees ?? [],
-      priority: input.priority ?? 'normal',
-      deadline: input.deadline ?? null,
+      priority: priority ?? 'normal',
+      deadline: deadline ?? null,
       sort_order,
     })
     .select('*')

@@ -1,6 +1,7 @@
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import Nav from '../../components/Nav';
 import { TaskboardFilterProvider } from '../../context/TaskboardFilterContext';
+import { TaskboardRefreshProvider } from '../../context/TaskboardRefreshContext';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
 import { isSupabaseConfigured } from '../../lib/taskboard/config';
@@ -68,7 +69,9 @@ function TaskboardShell() {
 export default function TaskboardLayout() {
   return (
     <TaskboardFilterProvider>
-      <TaskboardShell />
+      <TaskboardRefreshProvider>
+        <TaskboardShell />
+      </TaskboardRefreshProvider>
     </TaskboardFilterProvider>
   );
 }
