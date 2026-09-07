@@ -1,5 +1,6 @@
 import type { Assignee } from './constants';
 import type { Task } from './types';
+import { taskHasAssignee } from './assigneeUtils';
 
 export type AssigneeFilter = 'all' | Assignee;
 
@@ -14,10 +15,10 @@ export function filterTasksByAssignee(tasks: Task[], filter: AssigneeFilter): Ta
   if (filter === 'all') return tasks;
 
   return tasks.filter((task) => {
-    if (task.assigned_to === filter) return true;
+    if (taskHasAssignee(task, filter)) return true;
     if (!task.parent_task_id) {
       return tasks.some(
-        (sub) => sub.parent_task_id === task.id && sub.assigned_to === filter
+        (sub) => sub.parent_task_id === task.id && taskHasAssignee(sub, filter)
       );
     }
     return false;
@@ -27,5 +28,5 @@ export function filterTasksByAssignee(tasks: Task[], filter: AssigneeFilter): Ta
 export function countProjectTasksForFilter(tasks: Task[], projectId: string, filter: AssigneeFilter) {
   const projectTasks = tasks.filter((t) => t.project_id === projectId && !t.completed);
   if (filter === 'all') return projectTasks.length;
-  return projectTasks.filter((t) => t.assigned_to === filter).length;
+  return projectTasks.filter((t) => taskHasAssignee(t, filter)).length;
 }

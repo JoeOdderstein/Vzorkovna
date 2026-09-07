@@ -1,4 +1,5 @@
 import type { Task } from '../../lib/taskboard/types';
+import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
 import { deadlineClasses, formatDeadline, getDeadlineStatus } from '../../lib/taskboard/deadlineUtils';
 import { priorityBorderClasses, priorityDotClasses, priorityLabels } from '../../lib/taskboard/priorityUtils';
 
@@ -64,8 +65,8 @@ export default function TaskCard({
                 {formatDeadline(task.deadline)}
               </span>
             )}
-            {task.assigned_to && (
-              <span className="text-xs tb-text-secondary">{task.assigned_to}</span>
+            {task.assignees.length > 0 && (
+              <span className="text-xs tb-text-secondary">{formatAssignees(task.assignees)}</span>
             )}
           </div>
         </button>

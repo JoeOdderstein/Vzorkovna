@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
-import type { Assignee, Priority, TaskCategory } from '../../lib/taskboard/constants';
+import type { Priority, TaskCategory } from '../../lib/taskboard/constants';
 import { ASSIGNEES, PRIORITIES, TASK_CATEGORIES } from '../../lib/taskboard/constants';
+import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
 import {
   getAttachmentUrl,
   updateTask,
@@ -129,20 +130,29 @@ export default function TaskDrawer({
           </Field>
 
           <Field label="Assigned to">
-            <select
-              value={form.assigned_to ?? ''}
-              onChange={(e) => {
-                const val = (e.target.value || null) as Assignee | null;
-                setForm({ ...form, assigned_to: val });
-                save({ assigned_to: val });
-              }}
-              className="field-input"
-            >
-              <option value="">Unassigned</option>
-              {ASSIGNEES.map((a) => (
-                <option key={a} value={a}>{a}</option>
-              ))}
-            </select>
+            <div className="flex flex-wrap gap-2">
+              {ASSIGNEES.map((a) => {
+                const selected = (form.assignees ?? []).includes(a);
+                return (
+                  <button
+                    key={a}
+                    type="button"
+                    onClick={() => {
+                      const next = toggleAssignee(form.assignees ?? [], a);
+                      setForm({ ...form, assignees: next });
+                      save({ assignees: next });
+                    }}
+                    className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
+                      selected
+                        ? 'border-[#1a73e8] bg-[#e8f0fe] text-[#1a73e8] font-medium'
+                        : 'border-[#dadce0] bg-white tb-text hover:bg-[#f8f9fa]'
+                    }`}
+                  >
+                    {a}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
 
           <Field label="Priority">

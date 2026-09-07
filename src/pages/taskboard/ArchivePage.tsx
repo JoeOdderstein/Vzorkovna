@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
+import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
 import type { Task } from '../../lib/taskboard/types';
 import { fetchArchivedTasks, subscribeToArchive } from '../../lib/taskboard/taskService';
@@ -84,7 +85,7 @@ export default function ArchivePage() {
                 <span>{task.project?.name}</span>
                 <span>{categoryLabel(task.category)}</span>
                 <span>{priorityLabels[task.priority]}</span>
-                {task.assigned_to && <span>{task.assigned_to}</span>}
+                {task.assignees.length > 0 && <span>{formatAssignees(task.assignees)}</span>}
                 {task.deadline && (
                   <span className={deadlineClasses[dl]}>{formatDeadline(task.deadline)}</span>
                 )}

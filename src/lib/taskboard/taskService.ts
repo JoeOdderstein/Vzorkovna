@@ -8,6 +8,7 @@ import {
   readLocalTasks,
 } from './localTasksStorage';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
+import { normalizeAssignees, normalizeTask } from './assigneeUtils';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -16,6 +17,10 @@ export function isLocalTaskboardMode() {
 async function db() {
   await ensureSupabaseSession();
   return getSupabase();
+}
+
+function mapTasks(rows: Record<string, unknown>[]): Task[] {
+  return rows.map(normalizeTask);
 }
 
 export async function fetchProjects() {
@@ -75,7 +80,7 @@ export async function fetchActiveTasks(projectId: string) {
     .order('sort_order', { ascending: true });
 
   if (error) throw error;
-  return data as Task[];
+  return mapTasks(data ?? []);
 }
 
 export async function fetchAllActiveTasks() {
@@ -88,7 +93,7 @@ export async function fetchAllActiveTasks() {
     .order('sort_order', { ascending: true });
 
   if (error) throw error;
-  return data as Task[];
+  return mapTasks(data ?? []);
 }
 
 export async function fetchArchivedTasks(search = '') {
@@ -106,7 +111,7 @@ export async function fetchArchivedTasks(search = '') {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data as Task[];
+  return mapTasks(data ?? []);
 }
 
 export function groupTasksByCategory(tasks: Task[], category: TaskCategory): TaskGroup[] {
@@ -126,6 +131,17 @@ export async function createTask(input: TaskInsert) {
   if (isLocalTaskboardMode()) return localStore.createTask(input);
 
   const supabase = await db();
+
+  let assignees = input.assignees;
+  if (input.parent_task_id && assignees === undefined) {
+    const { data: parent } = await supabase
+      .from('tasks')
+      .select('assignees, assigned_to')
+      .eq('id', input.parent_task_id)
+      .single();
+    assignees = normalizeAssignees(parent?.assignees ?? parent?.assigned_to);
+  }
+
   const { data: existing } = await supabase
     .from('tasks')
     .select('sort_order')
@@ -140,12 +156,22 @@ export async function createTask(input: TaskInsert) {
 
   const { data, error } = await supabase
     .from('tasks')
-    .insert({ ...input, sort_order, task_name: input.task_name ?? 'New task' })
+    .insert({
+      project_id: input.project_id,
+      category: input.category,
+      parent_task_id: input.parent_task_id ?? null,
+      task_name: input.task_name ?? 'New task',
+      description: input.description ?? '',
+      assignees: assignees ?? [],
+      priority: input.priority ?? 'normal',
+      deadline: input.deadline ?? null,
+      sort_order,
+    })
     .select('*')
     .single();
 
   if (error) throw error;
-  return data as Task;
+  return normalizeTask(data);
 }
 
 export async function updateTask(id: string, updates: TaskUpdate) {
@@ -167,7 +193,7 @@ export async function updateTask(id: string, updates: TaskUpdate) {
     .single();
 
   if (error) throw error;
-  return data as Task;
+  return normalizeTask(data);
 }
 
 export async function deleteTask(id: string) {
@@ -216,7 +242,7 @@ export async function nestTaskUnderParent(taskId: string, targetParentId: string
     .eq('completed', false);
   if (listError || !projectTasks) throw listError ?? new Error('Could not load tasks');
 
-  const tasks = projectTasks as Task[];
+  const tasks = mapTasks(projectTasks as Record<string, unknown>[]);
   const target = tasks.find((t) => t.id === targetParentId);
   if (!target) throw new Error('Target task not found');
   if (taskId === targetParentId) return dragged as Task;
@@ -445,7 +471,7 @@ export async function importLocalTasksToSupabase() {
       category: task.category,
       task_name: task.task_name || 'Untitled task',
       description: task.description ?? '',
-      assigned_to: task.assigned_to,
+      assignees: normalizeAssignees(task.assignees ?? (task as { assigned_to?: unknown }).assigned_to),
       priority: task.priority,
       deadline: task.deadline,
       completed: task.completed,

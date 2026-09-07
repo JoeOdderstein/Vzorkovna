@@ -27,7 +27,7 @@ CREATE TABLE tasks (
   category task_category NOT NULL,
   task_name TEXT NOT NULL DEFAULT '',
   description TEXT NOT NULL DEFAULT '',
-  assigned_to task_assignee,
+  assignees task_assignee[] NOT NULL DEFAULT '{}',
   priority task_priority NOT NULL DEFAULT 'normal',
   deadline DATE,
   completed BOOLEAN NOT NULL DEFAULT false,

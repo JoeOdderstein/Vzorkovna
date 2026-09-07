@@ -15,7 +15,7 @@ export interface Task {
   category: TaskCategory;
   task_name: string;
   description: string;
-  assigned_to: Assignee | null;
+  assignees: Assignee[];
   priority: Priority;
   deadline: string | null;
   completed: boolean;
@@ -36,7 +36,7 @@ export type TaskInsert = Pick<Task, 'project_id' | 'category'> &
       | 'parent_task_id'
       | 'task_name'
       | 'description'
-      | 'assigned_to'
+      | 'assignees'
       | 'priority'
       | 'deadline'
       | 'sort_order'
@@ -49,7 +49,7 @@ export type TaskUpdate = Partial<
     | 'category'
     | 'task_name'
     | 'description'
-    | 'assigned_to'
+    | 'assignees'
     | 'priority'
     | 'deadline'
     | 'completed'

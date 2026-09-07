@@ -1,5 +1,6 @@
-import type { Assignee, Priority, TaskCategory } from './constants';
+import type { Priority, TaskCategory } from './constants';
 import type { Project, Task, TaskInsert, TaskUpdate } from './types';
+import { normalizeTask } from './assigneeUtils';
 
 const STORAGE_KEY = 'taskboard_local_tasks_v1';
 
@@ -17,7 +18,8 @@ const SEED_PROJECTS: Project[] = [
 function loadTasks(): Task[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Task[]) : [];
+    if (!raw) return [];
+    return (JSON.parse(raw) as Record<string, unknown>[]).map(normalizeTask);
   } catch {
     return [];
   }
@@ -92,7 +94,7 @@ export const localStore = {
       category: parent?.category ?? input.category,
       task_name: input.task_name ?? 'New task',
       description: input.description ?? '',
-      assigned_to: (input.assigned_to as Assignee) ?? null,
+      assignees: input.assignees ?? parent?.assignees ?? [],
       priority: (input.priority as Priority) ?? 'normal',
       deadline: input.deadline ?? null,
       completed: false,
