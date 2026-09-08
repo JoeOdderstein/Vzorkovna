@@ -14,6 +14,7 @@ export default function Nav({ activeSection }: NavProps) {
   const scrollY = useScrollY();
   const [menuOpen, setMenuOpen] = useState(false);
   const isScrolled = scrollY > 80 || location.pathname !== '/';
+  const isTaskboardPage = location.pathname.startsWith('/taskboard');
 
   const goToNavLink = (link: string) => {
     setMenuOpen(false);
@@ -62,11 +63,13 @@ export default function Nav({ activeSection }: NavProps) {
     <>
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
-          isScrolled ? 'py-4' : 'py-6'
+          isTaskboardPage ? 'site-nav--taskboard py-4' : isScrolled ? 'py-4' : 'py-6'
         }`}
-        style={{
-          background: isScrolled ? 'var(--site-nav-bg-scrolled)' : 'var(--site-nav-bg)',
-        }}
+        style={
+          isTaskboardPage
+            ? undefined
+            : { background: isScrolled ? 'var(--site-nav-bg-scrolled)' : 'var(--site-nav-bg)' }
+        }
       >
         <div className="max-w-screen-xl mx-auto px-8 flex items-center justify-between">
           {/* Logo: same file as hero — replace public/images/logo.png */}

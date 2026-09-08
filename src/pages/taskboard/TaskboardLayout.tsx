@@ -12,11 +12,12 @@ import AssigneeFilterBar from '../../taskboard/components/AssigneeFilterBar';
 import TaskDrawerHost from '../../taskboard/components/TaskDrawerHost';
 import TaskboardHeaderActions from '../../taskboard/components/TaskboardHeaderActions';
 import TaskboardThemeToggle from '../../taskboard/components/TaskboardThemeToggle';
-import { TaskboardSelectionProvider } from '../../context/TaskboardSelectionContext';
+import { TaskboardSelectionProvider, useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 
 function TaskboardShell() {
   const { authenticated, loading, sessionReady } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
+  const { selected } = useTaskboardSelection();
   const location = useLocation();
   const waitingForSession = authenticated && isSupabaseConfigured() && !sessionReady;
 
@@ -63,7 +64,10 @@ function TaskboardShell() {
             <AssigneeFilterBar />
           </div>
         </div>
-        <div data-taskboard-interactive>
+        <div
+          data-taskboard-interactive
+          className={selected ? 'tb-taskboard-content--drawer-open' : undefined}
+        >
           <Outlet />
         </div>
         <AddTaskFab />

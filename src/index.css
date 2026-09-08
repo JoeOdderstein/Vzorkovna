@@ -90,6 +90,11 @@ body {
   color: var(--site-text);
 }
 
+.site-nav--taskboard {
+  background-color: var(--site-bg);
+  border-bottom: 1px solid var(--site-border);
+}
+
 .group:hover .site-text-muted {
   color: var(--site-text);
 }
@@ -518,7 +523,17 @@ body {
 }
 
 @media (max-width: 767px) {
+  .taskboard {
+    --tb-drawer-mobile-height: 28vh;
+  }
+
+  .taskboard .tb-taskboard-content--drawer-open {
+    padding-bottom: calc(var(--tb-drawer-mobile-height) + env(safe-area-inset-bottom, 0px) + 5rem);
+  }
+
   .taskboard.tb-drawer-shell {
+    top: auto;
+    height: auto;
     justify-content: center;
     align-items: flex-end;
   }
@@ -527,7 +542,7 @@ body {
     width: 100%;
     max-width: none;
     height: auto;
-    max-height: min(58vh, 32rem);
+    max-height: min(var(--tb-drawer-mobile-height), 32rem);
     border-radius: 16px 16px 0 0;
     box-shadow: 0 -8px 24px var(--tb-shadow);
     padding-bottom: env(safe-area-inset-bottom, 0px);

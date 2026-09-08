@@ -129,7 +129,7 @@ export default function TaskDrawer({
 
   return createPortal(
     <div
-      className="taskboard tb-drawer-shell fixed inset-0 z-[70] pointer-events-none"
+      className="taskboard tb-drawer-shell fixed inset-x-0 bottom-0 z-[70] pointer-events-none md:inset-0 md:top-0"
       data-theme={theme}
     >
       <aside
