@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import KanbanBoard from './KanbanBoard';
-import TaskDrawer from './TaskDrawer';
 import { useCompleteUndo } from '../../context/CompleteUndoContext';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
+import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
 import type { Task, TaskGroup, Project } from '../../lib/taskboard/types';
 import type { TaskCategory } from '../../lib/taskboard/constants';
@@ -16,6 +16,7 @@ import {
   updateTask,
 } from '../../lib/taskboard/taskService';
 import { withRetry } from '../../lib/taskboard/loadUtils';
+import { applyTaskUpdates, computeMoveGroupUpdates } from '../../lib/taskboard/dragUtils';
 
 interface ProjectBoardPanelProps {
   project: Project;
@@ -31,11 +32,12 @@ export default function ProjectBoardPanel({
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [creatingCategory, setCreatingCategory] = useState<TaskCategory | null>(null);
   const { assigneeFilter } = useTaskboardFilter();
   const { showCompleteUndo, dismissCompleteUndo } = useCompleteUndo();
+  const { openTask, closeTask, selected, taskChangeToken, notifyTaskChange } =
+    useTaskboardSelection();
 
   const filteredTasks = useMemo(
     () => filterTasksByAssignee(tasks, assigneeFilter),
@@ -63,14 +65,20 @@ export default function ProjectBoardPanel({
   useEffect(() => subscribeToProjectTasks(project.id, load), [project.id, load]);
 
   useEffect(() => {
+    if (taskChangeToken === 0) return;
+    load();
+  }, [taskChangeToken, load]);
+
+  useEffect(() => {
     if (!initialTaskId || tasks.length === 0) return;
     const match = tasks.find((t) => t.id === initialTaskId);
-    if (match) setSelectedTask(match);
-  }, [initialTaskId, tasks]);
+    if (match) openTask(match, project.id);
+  }, [initialTaskId, tasks, project.id, openTask]);
 
   const handleAddTask = async (category: TaskCategory) => {
     const task = await createTask({ project_id: project.id, category });
-    setSelectedTask(task);
+    openTask(task, project.id);
+    notifyTaskChange();
     await load();
   };
 
@@ -86,51 +94,21 @@ export default function ProjectBoardPanel({
     }
   };
 
-  const handleCategoryChange = async (taskId: string, category: TaskCategory) => {
-    await updateTask(taskId, { category });
-    const subtasks = tasks.filter((t) => t.parent_task_id === taskId);
-    await Promise.all(subtasks.map((sub) => updateTask(sub.id, { category })));
-    await load();
-  };
+  const handleMoveGroup = async (
+    group: TaskGroup,
+    toCategory: TaskCategory,
+    overTaskId: string | null
+  ) => {
+    const updates = computeMoveGroupUpdates(tasks, group, toCategory, overTaskId);
+    const previousTasks = tasks;
 
-  const handleAddSubtask = async (parentId: string) => {
-    try {
-      const parent = tasks.find((t) => t.id === parentId);
-      if (!parent) return;
-      const sub = await createTask({
-        project_id: project.id,
-        category: parent.category,
-        parent_task_id: parentId,
-        assignees: [...parent.assignees],
-        priority: parent.priority,
-        deadline: parent.deadline,
-      });
-      setSelectedTask(sub);
-      await load();
-    } catch {
-      setError('Could not create subtask.');
-    }
-  };
-
-  const handleMoveGroup = async (group: TaskGroup, toCategory: TaskCategory, toIndex: number) => {
-    const parentsInTarget = tasks
-      .filter((t) => t.category === toCategory && !t.parent_task_id && t.id !== group.parent.id)
-      .sort((a, b) => a.sort_order - b.sort_order);
-
-    const updates: { id: string; category: TaskCategory; sort_order: number }[] = [];
-    updates.push({ id: group.parent.id, category: toCategory, sort_order: toIndex });
-    group.subtasks.forEach((sub) => {
-      updates.push({ id: sub.id, category: toCategory, sort_order: sub.sort_order });
-    });
-    parentsInTarget.forEach((p, i) => {
-      const order = i >= toIndex ? i + 1 : i;
-      updates.push({ id: p.id, category: toCategory, sort_order: order });
-    });
+    setTasks((prev) => applyTaskUpdates(prev, updates));
 
     try {
       await reorderTasks(updates);
-      await load();
+      onTasksChange?.();
     } catch {
+      setTasks(previousTasks);
       setError('Could not move task.');
     }
   };
@@ -140,7 +118,7 @@ export default function ProjectBoardPanel({
     if (!task) return;
 
     setTasks((prev) => prev.filter((t) => t.id !== taskId));
-    if (selectedTask?.id === taskId) setSelectedTask(null);
+    if (selected?.taskId === taskId) closeTask();
 
     showCompleteUndo({
       taskName: task.task_name || 'Untitled task',
@@ -148,12 +126,14 @@ export default function ProjectBoardPanel({
         setTasks((prev) => [...prev, task]);
         await updateTask(task.id, { completed: false });
         onTasksChange?.();
+        notifyTaskChange();
       },
     });
 
     try {
       await updateTask(taskId, { completed: true });
       onTasksChange?.();
+      notifyTaskChange();
     } catch {
       dismissCompleteUndo();
       setTasks((prev) => [...prev, task]);
@@ -165,7 +145,7 @@ export default function ProjectBoardPanel({
     try {
       await nestTaskUnderParent(taskId, targetParentId);
       setCollapsed((c) => ({ ...c, [targetParentId]: false }));
-      if (selectedTask?.id === taskId) setSelectedTask(null);
+      if (selected?.taskId === taskId) closeTask();
       await load();
     } catch {
       setError('Could not nest task.');
@@ -192,12 +172,12 @@ export default function ProjectBoardPanel({
       {filteredTasks.length === 0 && tasks.length > 0 ? (
         <p className="py-4 text-sm tb-muted">No tasks match the current filter.</p>
       ) : (
-        <div className="-mx-2 overflow-x-auto">
+        <div className="-mx-2">
           <KanbanBoard
             tasks={filteredTasks}
             collapsed={collapsed}
             onToggleCollapse={(id) => setCollapsed((c) => ({ ...c, [id]: !c[id] }))}
-            onTaskClick={setSelectedTask}
+            onTaskClick={(task) => openTask(task, project.id)}
             onCompleteTask={handleCompleteTask}
             onMoveGroup={handleMoveGroup}
             onNestTask={handleNestTask}
@@ -206,19 +186,6 @@ export default function ProjectBoardPanel({
             creatingCategory={creatingCategory}
           />
         </div>
-      )}
-
-      {selectedTask && (
-        <TaskDrawer
-          task={selectedTask}
-          projectId={project.id}
-          category={selectedTask.category}
-          onClose={() => setSelectedTask(null)}
-          onSaved={load}
-          onAddSubtask={handleAddSubtask}
-          onCategoryChange={handleCategoryChange}
-          onComplete={handleCompleteTask}
-        />
       )}
     </div>
   );

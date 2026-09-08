@@ -7,9 +7,12 @@ import { TaskboardThemeProvider, useTaskboardTheme } from '../../context/Taskboa
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
 import { isSupabaseConfigured } from '../../lib/taskboard/config';
+import AddTaskFab from '../../taskboard/components/AddTaskFab';
 import AssigneeFilterBar from '../../taskboard/components/AssigneeFilterBar';
+import TaskDrawerHost from '../../taskboard/components/TaskDrawerHost';
 import TaskboardHeaderActions from '../../taskboard/components/TaskboardHeaderActions';
 import TaskboardThemeToggle from '../../taskboard/components/TaskboardThemeToggle';
+import { TaskboardSelectionProvider } from '../../context/TaskboardSelectionContext';
 
 function TaskboardShell() {
   const { authenticated, loading, sessionReady } = useTaskboardAuth();
@@ -60,7 +63,11 @@ function TaskboardShell() {
             <AssigneeFilterBar />
           </div>
         </div>
-        <Outlet />
+        <div data-taskboard-interactive>
+          <Outlet />
+        </div>
+        <AddTaskFab />
+        <TaskDrawerHost />
         {isLocalTaskboardMode() && (
           <p className="max-w-screen-2xl mx-auto px-6 md:px-10 mt-8 text-xs tb-muted">
             Local mode — tasks are saved in this browser. Add Supabase keys to .env for shared storage and realtime sync.
@@ -77,7 +84,9 @@ export default function TaskboardLayout() {
       <TaskboardFilterProvider>
         <CompleteUndoProvider>
           <TaskboardRefreshProvider>
-            <TaskboardShell />
+            <TaskboardSelectionProvider>
+              <TaskboardShell />
+            </TaskboardSelectionProvider>
           </TaskboardRefreshProvider>
         </CompleteUndoProvider>
       </TaskboardFilterProvider>

@@ -17,7 +17,7 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [restoringId, setRestoringId] = useState<string | null>(null);
-  const { assigneeFilter } = useTaskboardFilter();
+  const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
 
   const filteredTasks = useMemo(
     () => filterTasksByAssignee(tasks, assigneeFilter),
@@ -42,6 +42,10 @@ export default function ArchivePage() {
   }, [load]);
 
   useEffect(() => subscribeToArchive(load), [load]);
+
+  useEffect(() => {
+    setTasksForCounts(tasks);
+  }, [tasks, setTasksForCounts]);
 
   const handleRestore = async (taskId: string) => {
     setRestoringId(taskId);

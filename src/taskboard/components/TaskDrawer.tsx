@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
 import type { Priority, TaskCategory } from '../../lib/taskboard/constants';
@@ -10,6 +11,7 @@ import {
   uploadAttachment,
 } from '../../lib/taskboard/taskService';
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES } from '../../lib/taskboard/constants';
+import { useTaskboardTheme } from '../../context/TaskboardThemeContext';
 
 interface TaskDrawerProps {
   task: Task | null;
@@ -32,6 +34,7 @@ export default function TaskDrawer({
   onCategoryChange,
   onComplete,
 }: TaskDrawerProps) {
+  const { theme } = useTaskboardTheme();
   const [form, setForm] = useState<Partial<Task>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -42,14 +45,41 @@ export default function TaskDrawer({
   }, [task]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
-    document.body.style.overflow = 'hidden';
-    return () => {
-      window.removeEventListener('keydown', onKey);
-      document.body.style.overflow = '';
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key !== 'Enter' || e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      const target = e.target as HTMLElement;
+      if (target.closest('[data-task-description]')) return;
+
+      e.preventDefault();
+      if (target instanceof HTMLElement && 'blur' in target) {
+        target.blur();
+      }
+      onClose();
     };
+
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    if (!task) return;
+
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Element;
+      if (target.closest('[data-task-drawer]')) return;
+      if (target.closest('[data-taskboard-interactive]')) return;
+      onClose();
+    };
+
+    document.addEventListener('pointerdown', onPointerDown);
+    return () => document.removeEventListener('pointerdown', onPointerDown);
+  }, [task, onClose]);
 
   if (!task) return null;
 
@@ -97,13 +127,17 @@ export default function TaskDrawer({
 
   const isParent = !task.parent_task_id;
 
-  return (
-    <div className="taskboard fixed inset-0 z-[70] flex justify-end">
-      <div className="absolute inset-0 tb-overlay" onClick={onClose} />
+  return createPortal(
+    <div
+      className="taskboard tb-drawer-shell fixed inset-0 z-[70] pointer-events-none"
+      data-theme={theme}
+    >
       <aside
-        className="relative w-full max-w-md h-full tb-drawer overflow-y-auto"
+        data-task-drawer
+        className="tb-drawer tb-drawer-panel overflow-y-auto pointer-events-auto"
         onClick={(e) => e.stopPropagation()}
       >
+        <div className="tb-drawer-edge" aria-hidden="true" />
         <div className="sticky top-0 tb-drawer-header px-6 py-4 flex items-center justify-between">
           <span className="tb-label">{isParent ? 'Task' : 'Subtask'}</span>
           <button onClick={onClose} className="text-[#80868b] hover:text-[#202124] transition-colors" aria-label="Close">
@@ -123,6 +157,7 @@ export default function TaskDrawer({
 
           <Field label="Description">
             <textarea
+              data-task-description
               value={form.description ?? ''}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               onBlur={() => form.description !== task.description && save({ description: form.description ?? '' })}
@@ -283,7 +318,8 @@ export default function TaskDrawer({
           {saving && <p className="text-xs tb-muted">Saving…</p>}
         </div>
       </aside>
-    </div>
+    </div>,
+    document.body
   );
 }
 

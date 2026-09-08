@@ -18,7 +18,7 @@ export default function TaskboardOverviewPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { assigneeFilter } = useTaskboardFilter();
+  const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
   const { projectsToken, expandProjectId } = useTaskboardRefresh();
   const [searchParams] = useSearchParams();
 
@@ -50,6 +50,10 @@ export default function TaskboardOverviewPage() {
       cancelled = true;
     };
   }, [projectsToken]);
+
+  useEffect(() => {
+    setTasksForCounts(allTasks);
+  }, [allTasks, setTasksForCounts]);
 
   useEffect(() => {
     if (!expandProjectId) return;

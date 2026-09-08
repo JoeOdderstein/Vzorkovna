@@ -8,32 +8,72 @@ import {
   useSensor,
   useSensors,
   closestCorners,
-  pointerWithin,
   useDraggable,
   useDroppable,
-  type CollisionDetection,
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Task, TaskGroup } from '../../lib/taskboard/types';
 import type { TaskCategory } from '../../lib/taskboard/constants';
 import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
 import { buildGroupsByCategory } from '../../lib/taskboard/categoryUtils';
+import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import TaskCard from './TaskCard';
 
-const nestId = (taskId: string) => `nest-${taskId}`;
+const NEST_DWELL_MS = 750;
+const NEST_MOVEMENT_THRESHOLD = 6;
 
-function parseNestId(id: string) {
-  return id.startsWith('nest-') ? id.slice(5) : null;
+type DwellAction =
+  | { kind: 'nest'; id: string }
+  | { kind: 'promote'; category: TaskCategory };
+
+function getNestCandidate(
+  overId: string,
+  activeTaskId: string,
+  taskById: Map<string, Task>
+): string | null {
+  if (overId === activeTaskId) return null;
+  if (TASK_CATEGORIES.some((c) => c.id === overId)) return null;
+
+  const overTask = taskById.get(overId);
+  const activeTask = taskById.get(activeTaskId);
+  if (!overTask || !activeTask) return null;
+  if (overTask.parent_task_id) return null;
+  if (activeTask.parent_task_id === overId) return null;
+
+  const isChildOfActive = [...taskById.values()].some(
+    (t) => t.parent_task_id === activeTaskId && t.id === overId
+  );
+  if (isChildOfActive) return null;
+
+  return overId;
 }
 
-const nestCollisionDetection: CollisionDetection = (args) => {
-  const pointerCollisions = pointerWithin(args);
-  const nestCollision = pointerCollisions.find((c) => String(c.id).startsWith('nest-'));
-  if (nestCollision) return [nestCollision];
-  return closestCorners(args);
-};
+function getPromoteCandidate(
+  overId: string,
+  activeTaskId: string,
+  taskById: Map<string, Task>,
+  groupsByCategory: Record<TaskCategory, TaskGroup[]>
+): TaskCategory | null {
+  const activeTask = taskById.get(activeTaskId);
+  if (!activeTask?.parent_task_id) return null;
+
+  if (TASK_CATEGORIES.some((c) => c.id === overId)) {
+    return overId as TaskCategory;
+  }
+
+  if (getNestCandidate(overId, activeTaskId, taskById)) return null;
+
+  for (const cat of TASK_CATEGORIES) {
+    const inColumn = groupsByCategory[cat.id].some(
+      (g) => g.parent.id === overId || g.subtasks.some((s) => s.id === overId)
+    );
+    if (inColumn) return cat.id;
+  }
+
+  return null;
+}
 
 interface KanbanBoardProps {
   tasks: Task[];
@@ -41,7 +81,7 @@ interface KanbanBoardProps {
   onToggleCollapse: (parentId: string) => void;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
-  onMoveGroup: (group: TaskGroup, toCategory: TaskCategory, toIndex: number) => void;
+  onMoveGroup: (group: TaskGroup, toCategory: TaskCategory, overTaskId: string | null) => void;
   onNestTask: (taskId: string, targetParentId: string) => void;
   onPromoteTask: (taskId: string, category: TaskCategory) => void;
   onCreateTask: (category: TaskCategory) => void;
@@ -49,21 +89,15 @@ interface KanbanBoardProps {
 }
 
 function NestDropTarget({
-  taskId,
-  isOver,
+  showNestHint,
   children,
 }: {
-  taskId: string;
-  isOver: boolean;
+  showNestHint: boolean;
   children: React.ReactNode;
 }) {
-  const { setNodeRef } = useDroppable({ id: nestId(taskId) });
-
   return (
-    <div
-      ref={setNodeRef}
-      className={`rounded-lg transition-colors ${isOver ? 'tb-nest-over ring-2 ring-[var(--tb-accent)]' : ''}`}
-    >
+    <div className={`relative rounded-lg transition-colors ${showNestHint ? 'tb-nest-ready' : ''}`}>
+      {showNestHint && <span className="tb-nest-hint">Add as subtask</span>}
       {children}
     </div>
   );
@@ -90,7 +124,7 @@ function DraggableSubtask({
     <div
       ref={setNodeRef}
       style={style}
-      className={isDragging ? 'opacity-40' : undefined}
+      className={`touch-none ${isDragging ? 'opacity-40' : undefined}`}
       {...listeners}
       {...attributes}
     >
@@ -107,14 +141,14 @@ function DraggableSubtask({
 function SortableGroup({
   group,
   collapsed,
-  overNestId,
+  nestReadyId,
   onToggleCollapse,
   onTaskClick,
   onCompleteTask,
 }: {
   group: TaskGroup;
   collapsed: boolean;
-  overNestId: string | null;
+  nestReadyId: string | null;
   onToggleCollapse: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
@@ -130,9 +164,9 @@ function SortableGroup({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="space-y-1">
-      <div className="flex-1" {...attributes} {...listeners}>
-        <NestDropTarget taskId={group.parent.id} isOver={overNestId === group.parent.id}>
+    <div ref={setNodeRef} style={style} className="space-y-1 touch-none">
+      <div className="flex-1 cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+        <NestDropTarget showNestHint={nestReadyId === group.parent.id}>
           <TaskCard
             task={group.parent}
             onClick={() => onTaskClick(group.parent)}
@@ -169,7 +203,11 @@ function Column({
   label,
   groups,
   collapsed,
-  overNestId,
+  nestReadyId,
+  promoteReadyCategory,
+  isDraggingSubtask,
+  isDragOver,
+  isDragging,
   onToggleCollapse,
   onTaskClick,
   onCompleteTask,
@@ -180,36 +218,56 @@ function Column({
   label: string;
   groups: TaskGroup[];
   collapsed: Record<string, boolean>;
-  overNestId: string | null;
+  nestReadyId: string | null;
+  promoteReadyCategory: TaskCategory | null;
+  isDraggingSubtask: boolean;
+  isDragOver: boolean;
+  isDragging: boolean;
   onToggleCollapse: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
   onCreateTask: (category: TaskCategory) => void;
   creating: boolean;
 }) {
-  const { setNodeRef } = useDroppable({ id: categoryId });
+  const { setNodeRef, isOver } = useDroppable({ id: categoryId });
   const ids = groups.map((g) => g.parent.id);
+  const taskCount = groups.reduce((sum, group) => sum + 1 + group.subtasks.length, 0);
+  const showPromoteHint = promoteReadyCategory === categoryId;
+  const showDropHint = isDragging && !showPromoteHint && (isDragOver || isOver);
 
   return (
     <div className="flex-shrink-0 w-[280px] md:w-[300px] flex flex-col max-h-[calc(100vh-12rem)]">
       <div className="px-1 py-4">
-        <h3 className="tb-label">{label}</h3>
+        <div className="tb-category-header">
+          <h3 className="tb-label">{label}</h3>
+          {taskCount > 0 && (
+            <span className="tb-category-count" aria-label={`${taskCount} task${taskCount === 1 ? '' : 's'}`}>
+              {taskCount}
+            </span>
+          )}
+        </div>
       </div>
       <SortableContext items={ids} strategy={verticalListSortingStrategy}>
         <div
           ref={setNodeRef}
-          className={
-            groups.length > 0
-              ? 'flex-1 overflow-y-auto space-y-2 pr-1 min-h-[80px]'
-              : 'pr-1'
-          }
+          className={`relative flex-1 overflow-y-auto space-y-2 pr-1 min-h-[120px] rounded-lg transition-colors ${
+            showPromoteHint ? 'tb-column-promote-ready' : showDropHint ? 'tb-column-over' : ''
+          } ${groups.length === 0 && isDragging ? 'border border-dashed border-[var(--tb-border)]' : ''}`}
         >
+          {showPromoteHint && (
+            <div className="tb-promote-hint">Make top-level task</div>
+          )}
+          {groups.length === 0 && isDragging && !showPromoteHint && (
+            <p className="px-2 py-6 text-xs text-center tb-text-muted pointer-events-none">
+              {isDraggingSubtask ? 'Hold to make top-level task' : 'Drop task here'}
+            </p>
+          )}
           {groups.map((group) => (
             <SortableGroup
               key={group.parent.id}
               group={group}
-              collapsed={collapsed[group.parent.id] ?? false}
-              overNestId={overNestId}
+              collapsed={collapsed[group.parent.id] ?? true}
+              nestReadyId={nestReadyId}
               onToggleCollapse={onToggleCollapse}
               onTaskClick={onTaskClick}
               onCompleteTask={onCompleteTask}
@@ -241,56 +299,166 @@ export default function KanbanBoard({
   onCreateTask,
   creatingCategory = null,
 }: KanbanBoardProps) {
+  const { selected } = useTaskboardSelection();
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [overNestId, setOverNestId] = useState<string | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
+  const [nestReadyId, setNestReadyId] = useState<string | null>(null);
+  const [promoteReadyCategory, setPromoteReadyCategory] = useState<TaskCategory | null>(null);
+  const [overColumnId, setOverColumnId] = useState<TaskCategory | null>(null);
+  const dwellTimerRef = useRef<number | null>(null);
+  const dwellActionRef = useRef<DwellAction | null>(null);
+  const dwellReadyRef = useRef<DwellAction | null>(null);
+  const pinnedCategoriesRef = useRef<TaskCategory[]>([]);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const groupsByCategory = useMemo(() => buildGroupsByCategory(tasks), [tasks]);
-  const visibleCategories = useMemo(() => {
-    const withTasks = TASK_CATEGORIES.filter(({ id }) => groupsByCategory[id].length > 0);
-    return withTasks.length > 0 ? withTasks : TASK_CATEGORIES;
-  }, [groupsByCategory]);
 
   const activeTask = activeId ? taskById.get(activeId) : null;
+  const isDragging = activeId !== null;
+  const isDraggingSubtask = Boolean(activeTask?.parent_task_id);
+
+  const visibleCategories = useMemo(() => {
+    const withTasks = TASK_CATEGORIES.filter(({ id }) => groupsByCategory[id].length > 0);
+
+    if (!isDragging) {
+      return withTasks.length > 0 ? withTasks : TASK_CATEGORIES;
+    }
+
+    const pinned = pinnedCategoriesRef.current;
+    const pinnedItems = TASK_CATEGORIES.filter(({ id }) => pinned.includes(id)).sort(
+      (a, b) => pinned.indexOf(a.id) - pinned.indexOf(b.id)
+    );
+    const rest = TASK_CATEGORIES.filter(({ id }) => !pinned.includes(id));
+    return [...pinnedItems, ...rest];
+  }, [groupsByCategory, isDragging]);
+
+  const snapshotPinnedCategories = () => {
+    const withTasks = TASK_CATEGORIES.filter(({ id }) => groupsByCategory[id].length > 0).map(
+      ({ id }) => id
+    );
+    pinnedCategoriesRef.current =
+      withTasks.length > 0 ? withTasks : TASK_CATEGORIES.map(({ id }) => id);
+  };
+
+  const clearPinnedCategories = () => {
+    pinnedCategoriesRef.current = [];
+  };
+
+  const clearDwellTimer = () => {
+    if (dwellTimerRef.current !== null) {
+      window.clearTimeout(dwellTimerRef.current);
+      dwellTimerRef.current = null;
+    }
+  };
+
+  const resetDwell = () => {
+    clearDwellTimer();
+    dwellActionRef.current = null;
+    dwellReadyRef.current = null;
+    setNestReadyId(null);
+    setPromoteReadyCategory(null);
+  };
+
+  const scheduleDwell = (action: DwellAction) => {
+    const samePending =
+      dwellActionRef.current?.kind === action.kind &&
+      (action.kind === 'nest'
+        ? dwellActionRef.current.kind === 'nest' && dwellActionRef.current.id === action.id
+        : dwellActionRef.current.kind === 'promote' &&
+          dwellActionRef.current.category === action.category) &&
+      dwellTimerRef.current !== null;
+    if (samePending) return;
+
+    clearDwellTimer();
+    dwellActionRef.current = action;
+    dwellTimerRef.current = window.setTimeout(() => {
+      dwellReadyRef.current = action;
+      if (action.kind === 'nest') {
+        setNestReadyId(action.id);
+        setPromoteReadyCategory(null);
+      } else {
+        setPromoteReadyCategory(action.category);
+        setNestReadyId(null);
+      }
+      dwellTimerRef.current = null;
+    }, NEST_DWELL_MS);
+  };
+
+  const isSameDwellReady = (action: DwellAction) => {
+    const ready = dwellReadyRef.current;
+    if (!ready || ready.kind !== action.kind) return false;
+    return action.kind === 'nest' ? ready.id === action.id : ready.category === action.category;
+  };
+
+  const resolveColumnForOverId = (overId: string): TaskCategory | null => {
+    if (TASK_CATEGORIES.some((c) => c.id === overId)) return overId as TaskCategory;
+    for (const cat of TASK_CATEGORIES) {
+      const inColumn = groupsByCategory[cat.id].some(
+        (g) => g.parent.id === overId || g.subtasks.some((s) => s.id === overId)
+      );
+      if (inColumn) return cat.id;
+    }
+    return null;
+  };
 
   const handleDragOver = (event: DragOverEvent) => {
     const overId = event.over ? String(event.over.id) : null;
-    setOverNestId(overId ? parseNestId(overId) : null);
+    const activeTaskId = String(event.active.id);
+
+    setOverColumnId(overId ? resolveColumnForOverId(overId) : null);
+
+    const movement = Math.hypot(event.delta.x, event.delta.y);
+    if (movement > NEST_MOVEMENT_THRESHOLD) {
+      resetDwell();
+    }
+
+    const nestCandidate = overId ? getNestCandidate(overId, activeTaskId, taskById) : null;
+    if (nestCandidate) {
+      const action: DwellAction = { kind: 'nest', id: nestCandidate };
+      if (isSameDwellReady(action)) return;
+      scheduleDwell(action);
+      return;
+    }
+
+    const promoteCandidate = overId
+      ? getPromoteCandidate(overId, activeTaskId, taskById, groupsByCategory)
+      : null;
+    if (promoteCandidate) {
+      const action: DwellAction = { kind: 'promote', category: promoteCandidate };
+      if (isSameDwellReady(action)) return;
+      scheduleDwell(action);
+      return;
+    }
+
+    resetDwell();
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
+    const readyAction = dwellReadyRef.current;
+    resetDwell();
+    clearPinnedCategories();
     setActiveId(null);
-    setOverNestId(null);
+    setOverColumnId(null);
 
     const { active, over } = event;
     if (!over) return;
 
     const activeTaskId = String(active.id);
-    const overId = String(over.id);
     const dragged = taskById.get(activeTaskId);
     if (!dragged) return;
 
-    const nestTargetId = parseNestId(overId);
-    if (nestTargetId && activeTaskId !== nestTargetId) {
-      onNestTask(activeTaskId, nestTargetId);
+    if (readyAction?.kind === 'nest' && activeTaskId !== readyAction.id) {
+      onNestTask(activeTaskId, readyAction.id);
+      return;
+    }
+
+    if (readyAction?.kind === 'promote') {
+      onPromoteTask(activeTaskId, readyAction.category);
       return;
     }
 
     const isSubtask = Boolean(dragged.parent_task_id);
-
-    if (isSubtask) {
-      if (TASK_CATEGORIES.some((c) => c.id === overId)) {
-        onPromoteTask(activeTaskId, overId as TaskCategory);
-        return;
-      }
-
-      const targetParent = taskById.get(overId);
-      if (targetParent && !targetParent.parent_task_id && activeTaskId !== overId) {
-        onNestTask(activeTaskId, overId);
-      }
-      return;
-    }
+    if (isSubtask) return;
 
     let sourceGroup: TaskGroup | undefined;
     let sourceCategory: TaskCategory | undefined;
@@ -305,49 +473,62 @@ export default function KanbanBoard({
     }
     if (!sourceGroup || !sourceCategory) return;
 
+    const overId = String(over.id);
     let targetCategory = sourceCategory;
-    let targetIndex = groupsByCategory[sourceCategory].findIndex((g) => g.parent.id === overId);
+    let overTaskId: string | null = null;
 
-    for (const cat of TASK_CATEGORIES) {
-      if (cat.id === overId) {
-        targetCategory = cat.id;
-        targetIndex = groupsByCategory[cat.id].length;
-        break;
-      }
-      const idx = groupsByCategory[cat.id].findIndex((g) => g.parent.id === overId);
-      if (idx >= 0) {
-        targetCategory = cat.id;
-        targetIndex = idx;
-        break;
+    if (TASK_CATEGORIES.some((c) => c.id === overId)) {
+      targetCategory = overId as TaskCategory;
+      overTaskId = null;
+    } else {
+      for (const cat of TASK_CATEGORIES) {
+        const match = groupsByCategory[cat.id].find((g) => g.parent.id === overId);
+        if (match) {
+          targetCategory = cat.id;
+          overTaskId = overId;
+          break;
+        }
       }
     }
 
-    if (targetIndex < 0) targetIndex = groupsByCategory[targetCategory].length;
-
-    onMoveGroup(sourceGroup, targetCategory, targetIndex);
+    onMoveGroup(sourceGroup, targetCategory, overTaskId);
   };
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={nestCollisionDetection}
-      onDragStart={(e: DragStartEvent) => setActiveId(String(e.active.id))}
+      collisionDetection={closestCorners}
+      onDragStart={(e: DragStartEvent) => {
+        resetDwell();
+        snapshotPinnedCategories();
+        setActiveId(String(e.active.id));
+      }}
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
       onDragCancel={() => {
+        resetDwell();
+        clearPinnedCategories();
         setActiveId(null);
-        setOverNestId(null);
+        setOverColumnId(null);
       }}
     >
-      <div className="flex items-start gap-4 md:gap-6 overflow-x-auto px-1">
+      <div
+        className={`tb-kanban-scroll flex items-start gap-4 md:gap-6 overflow-x-auto px-1 pb-2 ${
+          selected ? 'tb-kanban-scroll--drawer-open' : ''
+        }`}
+      >
         {visibleCategories.map(({ id, label }) => (
-          <div key={id} id={id} data-category={id}>
+          <div key={id} data-category={id}>
             <Column
               categoryId={id}
               label={label}
               groups={groupsByCategory[id]}
               collapsed={collapsed}
-              overNestId={overNestId}
+              nestReadyId={nestReadyId}
+              promoteReadyCategory={promoteReadyCategory}
+              isDraggingSubtask={isDraggingSubtask}
+              isDragOver={overColumnId === id}
+              isDragging={isDragging}
               onToggleCollapse={onToggleCollapse}
               onTaskClick={onTaskClick}
               onCompleteTask={onCompleteTask}

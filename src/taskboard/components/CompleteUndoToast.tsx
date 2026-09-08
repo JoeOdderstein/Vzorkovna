@@ -11,7 +11,7 @@ export default function CompleteUndoToast({
 }: CompleteUndoToastProps) {
   return (
     <div
-        className="taskboard fixed bottom-4 right-4 z-[90] w-[min(100vw-2rem,320px)] tb-card shadow-lg px-4 py-3"
+        className="taskboard fixed bottom-6 left-6 z-[90] w-[min(100vw-2rem,320px)] tb-card shadow-lg px-4 py-3"
       role="status"
       aria-live="polite"
     >

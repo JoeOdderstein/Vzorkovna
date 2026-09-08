@@ -25,6 +25,7 @@ export default function TaskCard({
 
   return (
     <div
+      data-task-card
       className={`w-full tb-card border-l-2 ${priorityBorderClasses[task.priority]} px-3 py-3`}
     >
       <div className="flex items-start gap-2">
@@ -36,7 +37,7 @@ export default function TaskCard({
               expandControl.onToggle();
             }}
             onPointerDown={(e) => e.stopPropagation()}
-            className="text-xs text-[#80868b] hover:text-[#5f6368] w-4 shrink-0 mt-0.5"
+            className="tb-expand-btn shrink-0 -ml-2 -mr-1"
             aria-label={expandControl.collapsed ? 'Expand subtasks' : 'Collapse subtasks'}
           >
             {expandControl.collapsed ? '▶' : '▼'}

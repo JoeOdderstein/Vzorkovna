@@ -2,33 +2,15 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import AddTaskDialog from './AddTaskDialog';
 import ManageProjectsDialog from './ManageProjectsDialog';
+import { useAddTaskFlow } from '../hooks/useAddTaskFlow';
 import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
-import { createTask, fetchProjects } from '../../lib/taskboard/taskService';
-import type { TaskCategory } from '../../lib/taskboard/constants';
 import type { Project } from '../../lib/taskboard/types';
 
 export default function TaskboardHeaderActions() {
   const navigate = useNavigate();
   const { refreshProjects, openProject } = useTaskboardRefresh();
-  const [addTaskOpen, setAddTaskOpen] = useState(false);
+  const { addTaskOpen, setAddTaskOpen, handleCreateTask } = useAddTaskFlow();
   const [manageProjectsOpen, setManageProjectsOpen] = useState(false);
-
-  const handleCreateTask = async ({
-    category,
-    projectId,
-  }: {
-    category: TaskCategory;
-    projectId: string;
-  }) => {
-    const task = await createTask({ project_id: projectId, category });
-    const projects = await fetchProjects();
-    const project = projects.find((p) => p.id === projectId);
-    if (project) {
-      navigate(`/taskboard?open=${project.slug}&task=${task.id}`);
-    } else {
-      window.location.reload();
-    }
-  };
 
   const handleProjectsChanged = () => {
     refreshProjects();
