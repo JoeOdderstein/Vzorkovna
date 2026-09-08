@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import KanbanBoard from './KanbanBoard';
 import TaskDrawer from './TaskDrawer';
+import { useCompleteUndo } from '../../context/CompleteUndoContext';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
 import type { Task, TaskGroup, Project } from '../../lib/taskboard/types';
@@ -34,6 +35,7 @@ export default function ProjectBoardPanel({
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [creatingCategory, setCreatingCategory] = useState<TaskCategory | null>(null);
   const { assigneeFilter } = useTaskboardFilter();
+  const { showCompleteUndo, dismissCompleteUndo } = useCompleteUndo();
 
   const filteredTasks = useMemo(
     () => filterTasksByAssignee(tasks, assigneeFilter),
@@ -134,11 +136,27 @@ export default function ProjectBoardPanel({
   };
 
   const handleCompleteTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    setTasks((prev) => prev.filter((t) => t.id !== taskId));
+    if (selectedTask?.id === taskId) setSelectedTask(null);
+
+    showCompleteUndo({
+      taskName: task.task_name || 'Untitled task',
+      onUndo: async () => {
+        setTasks((prev) => [...prev, task]);
+        await updateTask(task.id, { completed: false });
+        onTasksChange?.();
+      },
+    });
+
     try {
       await updateTask(taskId, { completed: true });
-      if (selectedTask?.id === taskId) setSelectedTask(null);
-      await load();
+      onTasksChange?.();
     } catch {
+      dismissCompleteUndo();
+      setTasks((prev) => [...prev, task]);
       setError('Could not complete task.');
     }
   };
@@ -199,6 +217,7 @@ export default function ProjectBoardPanel({
           onSaved={load}
           onAddSubtask={handleAddSubtask}
           onCategoryChange={handleCategoryChange}
+          onComplete={handleCompleteTask}
         />
       )}
     </div>

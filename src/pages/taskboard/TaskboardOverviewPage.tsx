@@ -109,7 +109,7 @@ export default function TaskboardOverviewPage() {
                 <button
                   type="button"
                   onClick={() => toggleProject(project.id)}
-                  className="group w-full flex items-center gap-4 py-4 text-left transition-colors hover:bg-[#f8f9fa]"
+                  className="group w-full flex items-center gap-4 py-4 text-left transition-colors tb-project-row"
                   aria-expanded={isOpen}
                 >
                   <span
@@ -129,7 +129,7 @@ export default function TaskboardOverviewPage() {
                 </button>
 
                 {isOpen && (
-                  <div className="pl-2 sm:pl-14 pr-2 border-t border-[#e8eaed] bg-[#fafafa]">
+                  <div className="pl-2 sm:pl-14 pr-2 border-t tb-project-panel">
                     <ProjectBoardPanel
                       project={project}
                       initialTaskId={initialTaskForProject(project)}

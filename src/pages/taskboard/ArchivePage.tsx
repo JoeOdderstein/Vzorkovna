@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Undo2 } from 'lucide-react';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
 import type { Task } from '../../lib/taskboard/types';
-import { fetchArchivedTasks, subscribeToArchive } from '../../lib/taskboard/taskService';
+import { fetchArchivedTasks, subscribeToArchive, updateTask } from '../../lib/taskboard/taskService';
 import { withRetry } from '../../lib/taskboard/loadUtils';
 import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
 import { formatDeadline, getDeadlineStatus, deadlineClasses } from '../../lib/taskboard/deadlineUtils';
@@ -16,6 +16,7 @@ export default function ArchivePage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [restoringId, setRestoringId] = useState<string | null>(null);
   const { assigneeFilter } = useTaskboardFilter();
 
   const filteredTasks = useMemo(
@@ -41,6 +42,19 @@ export default function ArchivePage() {
   }, [load]);
 
   useEffect(() => subscribeToArchive(load), [load]);
+
+  const handleRestore = async (taskId: string) => {
+    setRestoringId(taskId);
+    setError('');
+    try {
+      await updateTask(taskId, { completed: false });
+      await load();
+    } catch {
+      setError('Could not restore task.');
+    } finally {
+      setRestoringId(null);
+    }
+  };
 
   const categoryLabel = (id: string) =>
     TASK_CATEGORIES.find((c) => c.id === id)?.label ?? id;
@@ -77,24 +91,35 @@ export default function ArchivePage() {
         {filteredTasks.map((task) => {
           const dl = getDeadlineStatus(task.deadline, true);
           return (
-            <li key={task.id} className="tb-archive-card px-4 py-4">
-              <p className="text-sm tb-text">
-                {task.parent_task_id ? '↳ ' : ''}{task.task_name}
-              </p>
-              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs tb-text-secondary">
-                <span>{task.project?.name}</span>
-                <span>{categoryLabel(task.category)}</span>
-                <span>{priorityLabels[task.priority]}</span>
-                {task.assignees.length > 0 && <span>{formatAssignees(task.assignees)}</span>}
-                {task.deadline && (
-                  <span className={deadlineClasses[dl]}>{formatDeadline(task.deadline)}</span>
-                )}
-                {task.completed_at && (
-                  <span className="text-green-700">
-                    Done {new Date(task.completed_at).toLocaleDateString()}
-                  </span>
-                )}
+            <li key={task.id} className="tb-archive-card px-4 py-4 flex items-start justify-between gap-4">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm tb-text">
+                  {task.parent_task_id ? '↳ ' : ''}{task.task_name}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs tb-text-secondary">
+                  <span>{task.project?.name}</span>
+                  <span>{categoryLabel(task.category)}</span>
+                  <span>{priorityLabels[task.priority]}</span>
+                  {task.assignees.length > 0 && <span>{formatAssignees(task.assignees)}</span>}
+                  {task.deadline && (
+                    <span className={deadlineClasses[dl]}>{formatDeadline(task.deadline)}</span>
+                  )}
+                  {task.completed_at && (
+                    <span className="text-green-700">
+                      Done {new Date(task.completed_at).toLocaleDateString()}
+                    </span>
+                  )}
+                </div>
               </div>
+              <button
+                type="button"
+                onClick={() => handleRestore(task.id)}
+                disabled={restoringId === task.id}
+                className="inline-flex items-center gap-1.5 tb-link text-sm shrink-0 disabled:opacity-50"
+              >
+                <Undo2 size={14} />
+                {restoringId === task.id ? 'Restoring…' : 'Undo'}
+              </button>
             </li>
           );
         })}

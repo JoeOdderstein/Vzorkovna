@@ -13,7 +13,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <TaskboardAuthProvider>
-        <div className="relative" style={{ backgroundColor: 'var(--color-black)' }}>
+        <div className="relative min-h-screen" style={{ backgroundColor: 'var(--site-bg)' }}>
           <Cursor />
           <Routes>
             <Route path="/" element={<HomePage />} />

@@ -46,11 +46,11 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-md border border-white/10 bg-[#0a0a0a] px-8 py-10"
+        className="relative w-full max-w-md border site-border site-surface px-8 py-10"
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          className="absolute top-5 right-5 text-white/40 hover:text-white transition-colors"
+          className="absolute top-5 right-5 site-link-subtle transition-colors"
           onClick={onClose}
           aria-label="Close login"
         >
@@ -61,7 +61,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           Login
         </span>
         <h2
-          className="font-serif text-3xl font-light text-white/90 mb-8"
+          className="font-serif text-3xl font-light site-text mb-8"
           style={{ fontFamily: 'var(--font-serif)' }}
         >
           Taskboard
@@ -71,7 +71,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           <div>
             <label
               htmlFor="login-username"
-              className="font-sans text-[0.65rem] tracking-[0.2em] uppercase text-white/40 block mb-2"
+              className="font-sans text-[0.65rem] tracking-[0.2em] uppercase site-text-subtle block mb-2"
             >
               Username
             </label>
@@ -81,7 +81,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              className="w-full bg-transparent border border-white/15 px-4 py-3 font-sans text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+              className="w-full bg-transparent border site-border px-4 py-3 font-sans text-sm site-text placeholder:site-text-faint focus:outline-none focus:border-[var(--color-accent)] transition-colors"
               placeholder="Enter username"
             />
           </div>
@@ -89,7 +89,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           <div>
             <label
               htmlFor="login-password"
-              className="font-sans text-[0.65rem] tracking-[0.2em] uppercase text-white/40 block mb-2"
+              className="font-sans text-[0.65rem] tracking-[0.2em] uppercase site-text-subtle block mb-2"
             >
               Password
             </label>
@@ -99,7 +99,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="current-password"
-              className="w-full bg-transparent border border-white/15 px-4 py-3 font-sans text-sm text-white/90 placeholder:text-white/25 focus:outline-none focus:border-[var(--color-accent)] transition-colors"
+              className="w-full bg-transparent border site-border px-4 py-3 font-sans text-sm site-text placeholder:site-text-faint focus:outline-none focus:border-[var(--color-accent)] transition-colors"
               placeholder="Enter password"
             />
           </div>
@@ -111,7 +111,7 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
           <button
             type="submit"
             disabled={submitting}
-            className="w-full py-3 font-sans text-xs tracking-[0.25em] uppercase border border-white/25 text-white/80 hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors duration-300 disabled:opacity-50"
+            className="w-full py-3 font-sans text-xs tracking-[0.25em] uppercase border site-border site-link-muted hover:border-[var(--color-accent)] hover:text-[var(--color-accent)] transition-colors duration-300 disabled:opacity-50"
           >
             {submitting ? 'Signing in…' : 'Sign in'}
           </button>

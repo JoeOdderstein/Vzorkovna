@@ -24,8 +24,8 @@ export default function LoginPage() {
     return (
       <>
         <Nav activeSection="login" />
-        <main className="min-h-screen pt-28 px-8" style={{ backgroundColor: 'var(--color-black)' }}>
-          <p className="font-sans text-sm text-white/40">Loading…</p>
+        <main className="min-h-screen pt-28 px-8" style={{ backgroundColor: 'var(--site-bg)' }}>
+          <p className="font-sans text-sm site-text-subtle">Loading…</p>
         </main>
       </>
     );
@@ -44,12 +44,12 @@ export default function LoginPage() {
 
       <main
         className="relative min-h-screen pt-28 pb-24 px-8 md:px-16"
-        style={{ backgroundColor: 'var(--color-black)' }}
+        style={{ backgroundColor: 'var(--site-bg)' }}
       >
         <div className="max-w-screen-md mx-auto">
           <Link
             to="/"
-            className="inline-flex items-center gap-2 font-sans text-xs tracking-[0.2em] uppercase text-white/40 hover:text-white/70 transition-colors duration-300 mb-12"
+            className="inline-flex items-center gap-2 font-sans text-xs tracking-[0.2em] uppercase site-link-subtle mb-12"
           >
             <ArrowLeft size={14} strokeWidth={1.5} />
             Back to site
@@ -59,7 +59,7 @@ export default function LoginPage() {
             Login
           </span>
           <h1
-            className="font-serif text-[clamp(2rem,5vw,3.5rem)] font-light leading-tight text-white/90 mb-6"
+            className="font-serif text-[clamp(2rem,5vw,3.5rem)] font-light leading-tight site-text mb-6"
             style={{ fontFamily: 'var(--font-serif)' }}
           >
             Taskboard
@@ -68,7 +68,7 @@ export default function LoginPage() {
           {!showModal && (
             <button
               onClick={() => setShowModal(true)}
-              className="font-sans text-xs tracking-[0.2em] uppercase text-[var(--color-accent)] hover:text-white transition-colors duration-300"
+              className="font-sans text-xs tracking-[0.2em] uppercase text-[var(--color-accent)] site-link-muted"
             >
               Open login
             </button>

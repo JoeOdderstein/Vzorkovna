@@ -124,9 +124,7 @@ export default function AddTaskDialog({
                         type="button"
                         onClick={() => setProjectId(p.id)}
                         className={`w-full text-left px-3 py-2.5 rounded-lg border text-sm transition-colors ${
-                          selected
-                            ? 'border-[#1a73e8] bg-[#e8f0fe] text-[#1a73e8] font-medium'
-                            : 'border-[#dadce0] bg-white tb-text hover:bg-[#f8f9fa]'
+                          selected ? 'tb-pill-selected font-medium' : 'tb-pill hover:bg-[var(--tb-surface)]'
                         }`}
                       >
                         {p.name}
@@ -165,7 +163,7 @@ export default function AddTaskDialog({
             <button
               type="submit"
               disabled={submitting || loadingProjects || !projectId}
-              className="px-4 py-2 text-sm font-medium text-white bg-[#1a73e8] rounded hover:bg-[#1557b0] disabled:opacity-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white tb-btn-primary rounded disabled:opacity-50 transition-colors"
             >
               {submitting ? 'Creating…' : 'Create task'}
             </button>

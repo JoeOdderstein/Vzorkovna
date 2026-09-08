@@ -62,7 +62,7 @@ function NestDropTarget({
   return (
     <div
       ref={setNodeRef}
-      className={`rounded-lg transition-colors ${isOver ? 'ring-2 ring-[#1a73e8] bg-[#e8f0fe]' : ''}`}
+      className={`rounded-lg transition-colors ${isOver ? 'tb-nest-over ring-2 ring-[var(--tb-accent)]' : ''}`}
     >
       {children}
     </div>
@@ -221,7 +221,7 @@ function Column({
         type="button"
         onClick={() => onCreateTask(categoryId)}
         disabled={creating}
-        className={`${groups.length > 0 ? 'mt-2' : 'mt-0'} w-full py-3 text-sm text-[#80868b] border border-dashed border-[#dadce0]/70 rounded-lg bg-white/30 hover:bg-white/60 hover:border-[#dadce0] hover:text-[#5f6368] disabled:opacity-50 transition-colors`}
+        className={`${groups.length > 0 ? 'mt-2' : 'mt-0'} w-full py-3 text-sm tb-new-task-btn tb-text-muted border border-dashed rounded-lg disabled:opacity-50 transition-colors`}
       >
         {creating ? 'Creating…' : '+ new task'}
       </button>

@@ -65,9 +65,7 @@ export default function Nav({ activeSection }: NavProps) {
           isScrolled ? 'py-4' : 'py-6'
         }`}
         style={{
-          background: isScrolled
-            ? 'linear-gradient(to bottom, rgba(5,5,5,0.95) 0%, rgba(5,5,5,0) 100%)'
-            : 'linear-gradient(to bottom, rgba(5,5,5,0.6) 0%, rgba(5,5,5,0) 100%)',
+          background: isScrolled ? 'var(--site-nav-bg-scrolled)' : 'var(--site-nav-bg)',
         }}
       >
         <div className="max-w-screen-xl mx-auto px-8 flex items-center justify-between">
@@ -94,7 +92,7 @@ export default function Nav({ activeSection }: NavProps) {
                 className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
                   isLinkActive(link)
                     ? 'text-[var(--color-accent)]'
-                    : 'text-white/60 hover:text-white'
+                    : 'site-link-muted'
                 }`}
               >
                 {link}
@@ -102,9 +100,8 @@ export default function Nav({ activeSection }: NavProps) {
             ))}
           </div>
 
-          {/* Mobile Hamburger */}
           <button
-            className="md:hidden text-white/80 hover:text-white transition-colors"
+            className="md:hidden site-link-muted transition-colors"
             onClick={() => setMenuOpen(true)}
             aria-label="Open menu"
           >
@@ -120,7 +117,7 @@ export default function Nav({ activeSection }: NavProps) {
         }`}
       >
         <button
-          className="absolute top-6 right-8 text-white/60 hover:text-white transition-colors"
+          className="absolute top-6 right-8 site-link-subtle transition-colors"
           onClick={() => setMenuOpen(false)}
           aria-label="Close menu"
         >
@@ -132,7 +129,7 @@ export default function Nav({ activeSection }: NavProps) {
             <button
               key={link}
               onClick={() => goToNavLink(link)}
-              className="font-serif text-4xl text-white/80 hover:text-white transition-colors duration-300 tracking-wide"
+              className="font-serif text-4xl site-link-muted transition-colors duration-300 tracking-wide"
               style={{
                 fontFamily: 'var(--font-serif)',
                 transitionDelay: menuOpen ? `${i * 60}ms` : '0ms',

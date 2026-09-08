@@ -19,6 +19,7 @@ interface TaskDrawerProps {
   onSaved: () => void;
   onAddSubtask: (parentId: string) => void;
   onCategoryChange?: (taskId: string, category: TaskCategory) => Promise<void>;
+  onComplete?: (taskId: string) => void;
 }
 
 export default function TaskDrawer({
@@ -29,6 +30,7 @@ export default function TaskDrawer({
   onSaved,
   onAddSubtask,
   onCategoryChange,
+  onComplete,
 }: TaskDrawerProps) {
   const [form, setForm] = useState<Partial<Task>>({});
   const [saving, setSaving] = useState(false);
@@ -143,9 +145,7 @@ export default function TaskDrawer({
                       save({ assignees: next });
                     }}
                     className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                      selected
-                        ? 'border-[#1a73e8] bg-[#e8f0fe] text-[#1a73e8] font-medium'
-                        : 'border-[#dadce0] bg-white tb-text hover:bg-[#f8f9fa]'
+                      selected ? 'tb-pill-selected font-medium' : 'tb-pill'
                     }`}
                   >
                     {a}
@@ -211,6 +211,11 @@ export default function TaskDrawer({
                 checked={form.completed ?? false}
                 onChange={(e) => {
                   const completed = e.target.checked;
+                  if (completed && onComplete) {
+                    onComplete(task.id);
+                    onClose();
+                    return;
+                  }
                   setForm({ ...form, completed });
                   save({ completed });
                   if (completed) onClose();

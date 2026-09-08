@@ -36,8 +36,8 @@ function AboutPortrait({
         }`}
         style={{
           background: isLeft
-            ? 'linear-gradient(to right, transparent, var(--color-black))'
-            : 'linear-gradient(to left, transparent, var(--color-black))',
+            ? 'linear-gradient(to right, transparent, var(--site-bg))'
+            : 'linear-gradient(to left, transparent, var(--site-bg))',
         }}
       />
     </div>
@@ -53,7 +53,7 @@ export default function About() {
     <section
       id="about"
       className="relative w-full py-16 md:py-20 overflow-hidden"
-      style={{ backgroundColor: 'var(--color-black)' }}
+      style={{ backgroundColor: 'var(--site-bg)' }}
     >
       {/* Subtle background texture */}
       <div
