@@ -582,6 +582,22 @@ body {
   }
 }
 
+@media (max-width: 767px) {
+  .taskboard .tb-kanban-scroll {
+    touch-action: pan-x pan-y;
+  }
+
+  .taskboard .tb-task-draggable {
+    touch-action: pan-y;
+  }
+}
+
+@media (min-width: 768px) {
+  .taskboard .tb-task-draggable {
+    touch-action: none;
+  }
+}
+
 .taskboard .tb-overlay {
   background: var(--tb-overlay);
 }

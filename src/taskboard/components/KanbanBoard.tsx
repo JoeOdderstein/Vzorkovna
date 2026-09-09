@@ -125,7 +125,7 @@ function DraggableSubtask({
     <div
       ref={setNodeRef}
       style={style}
-      className={`touch-none ${isDragging ? 'opacity-40' : undefined}`}
+      className={`tb-task-draggable ${isDragging ? 'opacity-40' : ''}`}
       {...listeners}
       {...attributes}
     >
@@ -165,8 +165,8 @@ function SortableGroup({
   };
 
   return (
-    <div ref={setNodeRef} style={style} className="space-y-1 touch-none">
-      <div className="flex-1 cursor-grab active:cursor-grabbing" {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style} className="space-y-1">
+      <div className="flex-1 cursor-grab active:cursor-grabbing tb-task-draggable" {...attributes} {...listeners}>
         <NestDropTarget showNestHint={nestReadyId === group.parent.id}>
           <TaskCard
             task={group.parent}
