@@ -4,7 +4,8 @@ import {
   DragOverEvent,
   DragOverlay,
   DragStartEvent,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   closestCorners,
@@ -308,7 +309,12 @@ export default function KanbanBoard({
   const dwellActionRef = useRef<DwellAction | null>(null);
   const dwellReadyRef = useRef<DwellAction | null>(null);
   const pinnedCategoriesRef = useRef<TaskCategory[]>([]);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 320, tolerance: 8 },
+    })
+  );
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
   const groupsByCategory = useMemo(() => buildGroupsByCategory(tasks), [tasks]);
