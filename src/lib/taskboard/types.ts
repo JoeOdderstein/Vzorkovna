@@ -1,5 +1,20 @@
 import type { Assignee, Priority, TaskCategory } from './constants';
 
+export interface CategoryOption {
+  id: TaskCategory;
+  label: string;
+  isCustom?: boolean;
+}
+
+export interface ProjectCategory {
+  id: string;
+  project_id: string;
+  slug: string;
+  label: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface Project {
   id: string;
   name: string;

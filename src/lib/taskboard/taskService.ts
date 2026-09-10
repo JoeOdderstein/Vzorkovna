@@ -15,6 +15,7 @@ import {
   filterProjectsForUser,
   normalizeProjectVisibleTo,
 } from './projectVisibility';
+import { seedDefaultCategoriesForProject } from './categoryService';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -120,7 +121,14 @@ export async function createProject(
     }
     throw error;
   }
-  return normalizeProject(data as Record<string, unknown>);
+
+  const project = normalizeProject(data as Record<string, unknown>);
+  try {
+    await seedDefaultCategoriesForProject(project.id);
+  } catch {
+    // Project was created; categories can be seeded on first open.
+  }
+  return project;
 }
 
 export async function updateProject(

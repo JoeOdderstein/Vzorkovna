@@ -14,11 +14,10 @@ import {
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { useMemo, useRef, useState } from 'react';
-import type { Task, TaskGroup } from '../../lib/taskboard/types';
+import { FormEvent, useMemo, useRef, useState } from 'react';
+import type { Task, TaskGroup, CategoryOption } from '../../lib/taskboard/types';
 import type { TaskCategory } from '../../lib/taskboard/constants';
-import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
-import { buildGroupsByCategory } from '../../lib/taskboard/categoryUtils';
+import { buildGroupsByCategory, isCategoryColumnId } from '../../lib/taskboard/categoryUtils';
 import TaskCard from './TaskCard';
 
 const NEST_DWELL_MS = 750;
@@ -31,10 +30,11 @@ type DwellAction =
 function getNestCandidate(
   overId: string,
   activeTaskId: string,
-  taskById: Map<string, Task>
+  taskById: Map<string, Task>,
+  categories: CategoryOption[]
 ): string | null {
   if (overId === activeTaskId) return null;
-  if (TASK_CATEGORIES.some((c) => c.id === overId)) return null;
+  if (isCategoryColumnId(overId, categories)) return null;
 
   const overTask = taskById.get(overId);
   const activeTask = taskById.get(activeTaskId);
@@ -54,19 +54,20 @@ function getPromoteCandidate(
   overId: string,
   activeTaskId: string,
   taskById: Map<string, Task>,
-  groupsByCategory: Record<TaskCategory, TaskGroup[]>
+  groupsByCategory: Record<string, TaskGroup[]>,
+  categories: CategoryOption[]
 ): TaskCategory | null {
   const activeTask = taskById.get(activeTaskId);
   if (!activeTask?.parent_task_id) return null;
 
-  if (TASK_CATEGORIES.some((c) => c.id === overId)) {
-    return overId as TaskCategory;
+  if (isCategoryColumnId(overId, categories)) {
+    return overId;
   }
 
-  if (getNestCandidate(overId, activeTaskId, taskById)) return null;
+  if (getNestCandidate(overId, activeTaskId, taskById, categories)) return null;
 
-  for (const cat of TASK_CATEGORIES) {
-    const inColumn = groupsByCategory[cat.id].some(
+  for (const cat of categories) {
+    const inColumn = groupsByCategory[cat.id]?.some(
       (g) => g.parent.id === overId || g.subtasks.some((s) => s.id === overId)
     );
     if (inColumn) return cat.id;
@@ -76,6 +77,7 @@ function getPromoteCandidate(
 }
 
 interface KanbanBoardProps {
+  categories: CategoryOption[];
   tasks: Task[];
   collapsed: Record<string, boolean>;
   onToggleCollapse: (parentId: string) => void;
@@ -86,6 +88,8 @@ interface KanbanBoardProps {
   onPromoteTask: (taskId: string, category: TaskCategory) => void;
   onCreateTask: (category: TaskCategory) => void;
   creatingCategory?: TaskCategory | null;
+  isAdmin?: boolean;
+  onAddCategory?: (label: string) => Promise<void>;
 }
 
 function NestDropTarget({
@@ -287,7 +291,87 @@ function Column({
   );
 }
 
+function AddCategoryColumn({
+  onAddCategory,
+}: {
+  onAddCategory: (label: string) => Promise<void>;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [label, setLabel] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const trimmed = label.trim();
+    if (!trimmed) {
+      setError('Enter a category name.');
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    try {
+      await onAddCategory(trimmed);
+      setLabel('');
+      setAdding(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add category.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="flex-shrink-0 w-[280px] md:w-[300px]">
+      {!adding ? (
+        <button
+          type="button"
+          onClick={() => setAdding(true)}
+          className="w-full min-h-[120px] py-3 text-sm tb-new-task-btn tb-text-muted border border-dashed rounded-lg transition-colors"
+        >
+          + Add category
+        </button>
+      ) : (
+        <form onSubmit={handleSubmit} className="space-y-2 p-3 border border-dashed rounded-lg">
+          <p className="text-[0.65rem] tracking-[0.15em] uppercase tb-muted">New category</p>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Category name"
+            className="field-input w-full"
+            autoFocus
+          />
+          {error && <p className="text-xs text-red-600">{error}</p>}
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              disabled={saving || !label.trim()}
+              className="px-3 py-2 text-xs font-medium text-white bg-[#1a73e8] rounded hover:bg-[#1557b0] disabled:opacity-50 transition-colors"
+            >
+              {saving ? 'Adding…' : 'Add'}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAdding(false);
+                setLabel('');
+                setError('');
+              }}
+              className="text-xs tb-link px-2 py-2"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
+
 export default function KanbanBoard({
+  categories,
   tasks,
   collapsed,
   onToggleCollapse,
@@ -298,6 +382,8 @@ export default function KanbanBoard({
   onPromoteTask,
   onCreateTask,
   creatingCategory = null,
+  isAdmin = false,
+  onAddCategory,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [nestReadyId, setNestReadyId] = useState<string | null>(null);
@@ -315,33 +401,38 @@ export default function KanbanBoard({
   );
 
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
-  const groupsByCategory = useMemo(() => buildGroupsByCategory(tasks), [tasks]);
+  const groupsByCategory = useMemo(
+    () => buildGroupsByCategory(tasks, categories),
+    [tasks, categories]
+  );
 
   const activeTask = activeId ? taskById.get(activeId) : null;
   const isDragging = activeId !== null;
   const isDraggingSubtask = Boolean(activeTask?.parent_task_id);
 
   const visibleCategories = useMemo(() => {
-    const withTasks = TASK_CATEGORIES.filter(({ id }) => groupsByCategory[id].length > 0);
+    const withTasks = categories.filter(
+      ({ id }) => (groupsByCategory[id]?.length ?? 0) > 0
+    );
 
     if (!isDragging) {
-      return withTasks.length > 0 ? withTasks : TASK_CATEGORIES;
+      return withTasks;
     }
 
     const pinned = pinnedCategoriesRef.current;
-    const pinnedItems = TASK_CATEGORIES.filter(({ id }) => pinned.includes(id)).sort(
-      (a, b) => pinned.indexOf(a.id) - pinned.indexOf(b.id)
-    );
-    const rest = TASK_CATEGORIES.filter(({ id }) => !pinned.includes(id));
+    const pinnedItems = categories
+      .filter(({ id }) => pinned.includes(id))
+      .sort((a, b) => pinned.indexOf(a.id) - pinned.indexOf(b.id));
+    const rest = categories.filter(({ id }) => !pinned.includes(id));
     return [...pinnedItems, ...rest];
-  }, [groupsByCategory, isDragging]);
+  }, [categories, groupsByCategory, isDragging]);
 
   const snapshotPinnedCategories = () => {
-    const withTasks = TASK_CATEGORIES.filter(({ id }) => groupsByCategory[id].length > 0).map(
-      ({ id }) => id
-    );
+    const withTasks = categories
+      .filter(({ id }) => (groupsByCategory[id]?.length ?? 0) > 0)
+      .map(({ id }) => id);
     pinnedCategoriesRef.current =
-      withTasks.length > 0 ? withTasks : TASK_CATEGORIES.map(({ id }) => id);
+      withTasks.length > 0 ? withTasks : categories.map(({ id }) => id);
   };
 
   const clearPinnedCategories = () => {
@@ -395,9 +486,9 @@ export default function KanbanBoard({
   };
 
   const resolveColumnForOverId = (overId: string): TaskCategory | null => {
-    if (TASK_CATEGORIES.some((c) => c.id === overId)) return overId as TaskCategory;
-    for (const cat of TASK_CATEGORIES) {
-      const inColumn = groupsByCategory[cat.id].some(
+    if (isCategoryColumnId(overId, categories)) return overId;
+    for (const cat of categories) {
+      const inColumn = groupsByCategory[cat.id]?.some(
         (g) => g.parent.id === overId || g.subtasks.some((s) => s.id === overId)
       );
       if (inColumn) return cat.id;
@@ -416,7 +507,9 @@ export default function KanbanBoard({
       resetDwell();
     }
 
-    const nestCandidate = overId ? getNestCandidate(overId, activeTaskId, taskById) : null;
+    const nestCandidate = overId
+      ? getNestCandidate(overId, activeTaskId, taskById, categories)
+      : null;
     if (nestCandidate) {
       const action: DwellAction = { kind: 'nest', id: nestCandidate };
       if (isSameDwellReady(action)) return;
@@ -425,7 +518,7 @@ export default function KanbanBoard({
     }
 
     const promoteCandidate = overId
-      ? getPromoteCandidate(overId, activeTaskId, taskById, groupsByCategory)
+      ? getPromoteCandidate(overId, activeTaskId, taskById, groupsByCategory, categories)
       : null;
     if (promoteCandidate) {
       const action: DwellAction = { kind: 'promote', category: promoteCandidate };
@@ -467,8 +560,8 @@ export default function KanbanBoard({
     let sourceGroup: TaskGroup | undefined;
     let sourceCategory: TaskCategory | undefined;
 
-    for (const cat of TASK_CATEGORIES) {
-      const found = groupsByCategory[cat.id].find((g) => g.parent.id === activeTaskId);
+    for (const cat of categories) {
+      const found = groupsByCategory[cat.id]?.find((g) => g.parent.id === activeTaskId);
       if (found) {
         sourceGroup = found;
         sourceCategory = cat.id;
@@ -481,12 +574,12 @@ export default function KanbanBoard({
     let targetCategory = sourceCategory;
     let overTaskId: string | null = null;
 
-    if (TASK_CATEGORIES.some((c) => c.id === overId)) {
-      targetCategory = overId as TaskCategory;
+    if (isCategoryColumnId(overId, categories)) {
+      targetCategory = overId;
       overTaskId = null;
     } else {
-      for (const cat of TASK_CATEGORIES) {
-        const match = groupsByCategory[cat.id].find((g) => g.parent.id === overId);
+      for (const cat of categories) {
+        const match = groupsByCategory[cat.id]?.find((g) => g.parent.id === overId);
         if (match) {
           targetCategory = cat.id;
           overTaskId = overId;
@@ -524,7 +617,7 @@ export default function KanbanBoard({
             <Column
               categoryId={id}
               label={label}
-              groups={groupsByCategory[id]}
+              groups={groupsByCategory[id] ?? []}
               collapsed={collapsed}
               nestReadyId={nestReadyId}
               promoteReadyCategory={promoteReadyCategory}
@@ -539,6 +632,7 @@ export default function KanbanBoard({
             />
           </div>
         ))}
+        {isAdmin && onAddCategory && <AddCategoryColumn onAddCategory={onAddCategory} />}
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTask && (

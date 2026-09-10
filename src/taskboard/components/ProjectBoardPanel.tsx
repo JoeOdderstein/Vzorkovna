@@ -4,8 +4,15 @@ import { useCompleteUndo } from '../../context/CompleteUndoContext';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
-import type { Task, TaskGroup, Project } from '../../lib/taskboard/types';
+import type { Task, TaskGroup, Project, CategoryOption } from '../../lib/taskboard/types';
 import type { TaskCategory } from '../../lib/taskboard/constants';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
+import {
+  createProjectCategory,
+  fetchCategoriesForProject,
+  refreshCategoriesForProject,
+} from '../../lib/taskboard/categoryService';
+import { DEFAULT_CATEGORIES } from '../../lib/taskboard/categoryUtils';
 import {
   createTask,
   fetchActiveTasks,
@@ -34,6 +41,8 @@ export default function ProjectBoardPanel({
   const [error, setError] = useState('');
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [creatingCategory, setCreatingCategory] = useState<TaskCategory | null>(null);
+  const [categories, setCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES);
+  const { isAdmin } = useTaskboardAuth();
   const { assigneeFilter } = useTaskboardFilter();
   const { showCompleteUndo, dismissCompleteUndo } = useCompleteUndo();
   const { openTask, closeTask, selected, taskChangeToken, notifyTaskChange } =
@@ -57,10 +66,20 @@ export default function ProjectBoardPanel({
     }
   }, [project.id, onTasksChange]);
 
+  const loadCategories = useCallback(async () => {
+    try {
+      const next = await fetchCategoriesForProject(project.id);
+      setCategories(next);
+    } catch {
+      setCategories(DEFAULT_CATEGORIES);
+    }
+  }, [project.id]);
+
   useEffect(() => {
     setLoading(true);
     load();
-  }, [load]);
+    loadCategories();
+  }, [load, loadCategories]);
 
   useEffect(() => subscribeToProjectTasks(project.id, load), [project.id, load]);
 
@@ -161,6 +180,12 @@ export default function ProjectBoardPanel({
     }
   };
 
+  const handleAddCategory = async (label: string) => {
+    const created = await createProjectCategory(project.id, label);
+    const next = await refreshCategoriesForProject(project.id, created);
+    setCategories(next);
+  };
+
   if (loading) {
     return <p className="py-6 text-sm tb-muted">Loading tasks…</p>;
   }
@@ -171,9 +196,22 @@ export default function ProjectBoardPanel({
 
       {filteredTasks.length === 0 && tasks.length > 0 ? (
         <p className="py-4 text-sm tb-muted">No tasks match the current filter.</p>
+      ) : filteredTasks.length === 0 ? (
+        <div className="py-8 flex flex-col items-center gap-3">
+          <p className="text-sm tb-muted">No tasks in this project yet.</p>
+          <button
+            type="button"
+            onClick={() => handleCreateInCategory(categories[0]?.id ?? 'quotations')}
+            disabled={creatingCategory !== null}
+            className="tb-btn-primary disabled:opacity-50"
+          >
+            {creatingCategory ? 'Creating…' : '+ Add task'}
+          </button>
+        </div>
       ) : (
         <div className="-mx-2">
           <KanbanBoard
+            categories={categories}
             tasks={filteredTasks}
             collapsed={collapsed}
             onToggleCollapse={(id) => setCollapsed((c) => ({ ...c, [id]: !c[id] }))}
@@ -184,6 +222,8 @@ export default function ProjectBoardPanel({
             onPromoteTask={handlePromoteTask}
             onCreateTask={handleCreateInCategory}
             creatingCategory={creatingCategory}
+            isAdmin={isAdmin}
+            onAddCategory={isAdmin ? handleAddCategory : undefined}
           />
         </div>
       )}

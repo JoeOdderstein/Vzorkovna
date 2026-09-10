@@ -1,10 +1,12 @@
 import type { TaskCategory } from './constants';
-import type { Project, Task, TaskInsert, TaskUpdate } from './types';
+import type { Project, ProjectCategory, Task, TaskInsert, TaskUpdate } from './types';
 import { normalizeTask } from './assigneeUtils';
+import { DEFAULT_CATEGORIES } from './categoryUtils';
 import { ensureUniqueSlug, slugifyProjectName } from './projectUtils';
 
 const STORAGE_KEY = 'taskboard_local_tasks_v1';
 const PROJECTS_STORAGE_KEY = 'taskboard_local_projects_v1';
+const PROJECT_CATEGORIES_STORAGE_KEY = 'taskboard_local_project_categories_v1';
 
 const SEED_PROJECTS: Project[] = [
   { id: 'p1', name: 'Tank Shots', slug: 'tank-shots', sort_order: 1, created_at: '' },
@@ -45,6 +47,20 @@ function saveProjects(projects: Project[]) {
   localStorage.setItem(PROJECTS_STORAGE_KEY, JSON.stringify(projects));
 }
 
+function loadProjectCategories(): ProjectCategory[] {
+  try {
+    const raw = localStorage.getItem(PROJECT_CATEGORIES_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as ProjectCategory[];
+  } catch {
+    return [];
+  }
+}
+
+function saveProjectCategories(categories: ProjectCategory[]) {
+  localStorage.setItem(PROJECT_CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+}
+
 function newId() {
   return crypto.randomUUID();
 }
@@ -79,6 +95,7 @@ export const localStore = {
     };
 
     saveProjects([...projects, project]);
+    localStore.seedDefaultCategoriesForProject(project.id);
     return project;
   },
 
@@ -338,4 +355,81 @@ export const localStore = {
   },
 
   subscribe: (_projectId: string, _onChange: () => void) => () => {},
+
+  getProjectCategories: (projectId: string): ProjectCategory[] =>
+    loadProjectCategories()
+      .filter((category) => category.project_id === projectId)
+      .sort((a, b) => a.sort_order - b.sort_order),
+
+  seedDefaultCategoriesForProject: (projectId: string): ProjectCategory[] => {
+    const all = loadProjectCategories();
+    const existing = all.filter((category) => category.project_id === projectId);
+    if (existing.length > 0) return existing;
+
+    const seeded = DEFAULT_CATEGORIES.map((category, index) => ({
+      id: newId(),
+      project_id: projectId,
+      slug: category.id,
+      label: category.label,
+      sort_order: index + 1,
+      created_at: now(),
+    }));
+
+    saveProjectCategories([...all, ...seeded]);
+    return seeded;
+  },
+
+  createProjectCategory: (projectId: string, label: string): ProjectCategory => {
+    const trimmed = label.trim();
+    if (!trimmed) throw new Error('Category name is required');
+
+    const categories = loadProjectCategories();
+    const existingSlugs = categories
+      .filter((category) => category.project_id === projectId)
+      .map((category) => category.slug);
+
+    const slug = ensureUniqueSlug(
+      slugifyProjectName(trimmed) || 'category',
+      existingSlugs
+    );
+    const sort_order =
+      categories
+        .filter((category) => category.project_id === projectId)
+        .reduce((max, category) => Math.max(max, category.sort_order), 0) + 1;
+
+    const category: ProjectCategory = {
+      id: newId(),
+      project_id: projectId,
+      slug,
+      label: trimmed,
+      sort_order,
+      created_at: now(),
+    };
+
+    saveProjectCategories([...categories, category]);
+    return category;
+  },
+
+  deleteProjectCategory: (projectId: string, categorySlug: string): void => {
+    const categories = loadProjectCategories();
+    const forProject = categories.filter((category) => category.project_id === projectId);
+    if (forProject.length <= 1) {
+      throw new Error('A project needs at least one category.');
+    }
+
+    const tasks = loadTasks().filter(
+      (task) => task.project_id === projectId && task.category === categorySlug
+    );
+    if (tasks.length > 0) {
+      throw new Error('Move or complete all tasks in this category before removing it.');
+    }
+
+    const next = categories.filter(
+      (category) => !(category.project_id === projectId && category.slug === categorySlug)
+    );
+    if (next.length === categories.length) {
+      throw new Error('Category not found.');
+    }
+    saveProjectCategories(next);
+  },
 };

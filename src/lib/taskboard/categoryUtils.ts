@@ -1,31 +1,50 @@
-import { TASK_CATEGORIES, type TaskCategory } from './constants';
-import type { Task, TaskGroup } from './types';
+import { TASK_CATEGORIES } from './constants';
+import type { CategoryOption, Task, TaskGroup } from './types';
 
-export function buildGroupsByCategory(tasks: Task[]): Record<TaskCategory, TaskGroup[]> {
-  const taskIds = new Set(tasks.map((t) => t.id));
-  const map: Record<TaskCategory, TaskGroup[]> = {
-    quotations: [],
-    designing: [],
-    installation: [],
-    repairs: [],
-  };
+export const DEFAULT_CATEGORIES: CategoryOption[] = TASK_CATEGORIES.map(({ id, label }) => ({
+  id,
+  label,
+}));
 
-  for (const { id } of TASK_CATEGORIES) {
-    const inCategory = tasks.filter((t) => t.category === id);
+export function categoriesForTasks(tasks: Task[], categories: CategoryOption[]): CategoryOption[] {
+  const merged = [...categories];
+  const knownIds = new Set(categories.map((category) => category.id));
+
+  for (const task of tasks) {
+    if (knownIds.has(task.category)) continue;
+    merged.push({ id: task.category, label: task.category });
+    knownIds.add(task.category);
+  }
+
+  return merged;
+}
+
+export function buildGroupsByCategory(
+  tasks: Task[],
+  categories: CategoryOption[]
+): Record<string, TaskGroup[]> {
+  const resolvedCategories = categoriesForTasks(tasks, categories);
+  const taskIds = new Set(tasks.map((task) => task.id));
+  const map = Object.fromEntries(
+    resolvedCategories.map((category) => [category.id, [] as TaskGroup[]])
+  );
+
+  for (const { id } of resolvedCategories) {
+    const inCategory = tasks.filter((task) => task.category === id);
 
     const parents = inCategory
-      .filter((t) => !t.parent_task_id)
+      .filter((task) => !task.parent_task_id)
       .sort((a, b) => a.sort_order - b.sort_order);
 
     const groups: TaskGroup[] = parents.map((parent) => ({
       parent,
       subtasks: inCategory
-        .filter((t) => t.parent_task_id === parent.id)
+        .filter((task) => task.parent_task_id === parent.id)
         .sort((a, b) => a.sort_order - b.sort_order),
     }));
 
     const orphans = inCategory
-      .filter((t) => t.parent_task_id && !taskIds.has(t.parent_task_id))
+      .filter((task) => task.parent_task_id && !taskIds.has(task.parent_task_id))
       .sort((a, b) => a.sort_order - b.sort_order);
 
     for (const orphan of orphans) {
@@ -39,11 +58,15 @@ export function buildGroupsByCategory(tasks: Task[]): Record<TaskCategory, TaskG
   return map;
 }
 
-export function getVisibleCategories(tasks: Task[]): { id: TaskCategory; label: string }[] {
-  const groups = buildGroupsByCategory(tasks);
-  return TASK_CATEGORIES.filter(({ id }) => groups[id].length > 0);
+export function getVisibleCategories(tasks: Task[], categories: CategoryOption[]): CategoryOption[] {
+  const groups = buildGroupsByCategory(tasks, categories);
+  return categoriesForTasks(tasks, categories).filter(({ id }) => groups[id]?.length > 0);
 }
 
-export function getCategoryLabel(id: TaskCategory) {
-  return TASK_CATEGORIES.find((c) => c.id === id)?.label ?? id;
+export function getCategoryLabel(id: string, categories: CategoryOption[] = DEFAULT_CATEGORIES) {
+  return categories.find((category) => category.id === id)?.label ?? id;
+}
+
+export function isCategoryColumnId(id: string, categories: CategoryOption[]) {
+  return categories.some((category) => category.id === id);
 }

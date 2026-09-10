@@ -1,8 +1,18 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
-import { TASK_CATEGORIES, type TaskCategory } from '../../lib/taskboard/constants';
+import type { TaskCategory } from '../../lib/taskboard/constants';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { fetchVisibleProjects } from '../../lib/taskboard/taskService';
+import {
+  createProjectCategory,
+  deleteProjectCategory,
+  fetchCategoriesForProject,
+  refreshCategoriesForProject,
+} from '../../lib/taskboard/categoryService';
+import { DEFAULT_CATEGORIES } from '../../lib/taskboard/categoryUtils';
+import ProjectRestrictedIcon from './ProjectRestrictedIcon';
+import CategorySelect from './CategorySelect';
+import type { CategoryOption } from '../../lib/taskboard/types';
 import type { Project } from '../../lib/taskboard/types';
 
 interface AddTaskDialogProps {
@@ -22,6 +32,8 @@ export default function AddTaskDialog({
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [category, setCategory] = useState<TaskCategory>('quotations');
+  const [categories, setCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES);
+  const [loadingCategories, setLoadingCategories] = useState(false);
   const [projectId, setProjectId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -58,6 +70,19 @@ export default function AddTaskDialog({
       })
       .finally(() => setLoadingProjects(false));
   }, [open, defaultProjectId, username, isAdmin]);
+
+  useEffect(() => {
+    if (!open || !projectId) return;
+
+    setLoadingCategories(true);
+    fetchCategoriesForProject(projectId)
+      .then((list) => {
+        setCategories(list);
+        setCategory((current) => (list.some((item) => item.id === current) ? current : list[0]?.id ?? 'quotations'));
+      })
+      .catch(() => setCategories(DEFAULT_CATEGORIES))
+      .finally(() => setLoadingCategories(false));
+  }, [open, projectId]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,7 +154,10 @@ export default function AddTaskDialog({
                           selected ? 'tb-pill-selected font-medium' : 'tb-pill hover:bg-[var(--tb-surface)]'
                         }`}
                       >
-                        {p.name}
+                        <span className="inline-flex items-center gap-2">
+                          <span>{p.name}</span>
+                          <ProjectRestrictedIcon project={p} />
+                        </span>
                       </button>
                     </li>
                   );
@@ -142,18 +170,35 @@ export default function AddTaskDialog({
             <label htmlFor="new-task-category" className="tb-field-label block mb-2">
               2. Choose category
             </label>
-            <select
-              id="new-task-category"
-              value={category}
-              onChange={(e) => setCategory(e.target.value as TaskCategory)}
-              className="field-input"
-            >
-              {TASK_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
+            {loadingCategories ? (
+              <p className="text-sm tb-muted">Loading categories…</p>
+            ) : (
+              <CategorySelect
+                id="new-task-category"
+                categories={categories}
+                value={category}
+                onChange={setCategory}
+                isAdmin={isAdmin}
+                onAddCategory={
+                  isAdmin && projectId
+                    ? async (label) => {
+                        const created = await createProjectCategory(projectId, label);
+                        const next = await refreshCategoriesForProject(projectId, created);
+                        setCategories(next);
+                        return created.slug;
+                      }
+                    : undefined
+                }
+                onRemoveCategory={
+                  isAdmin && projectId
+                    ? async (categoryId) => {
+                        await deleteProjectCategory(projectId, categoryId);
+                        setCategories(await fetchCategoriesForProject(projectId));
+                      }
+                    : undefined
+                }
+              />
+            )}
           </div>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

@@ -1,8 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useCompleteUndo } from '../../context/CompleteUndoContext';
 import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import type { TaskCategory } from '../../lib/taskboard/constants';
-import type { Task } from '../../lib/taskboard/types';
+import type { CategoryOption, Task } from '../../lib/taskboard/types';
+import {
+  createProjectCategory,
+  deleteProjectCategory,
+  fetchCategoriesForProject,
+  refreshCategoriesForProject,
+} from '../../lib/taskboard/categoryService';
+import { DEFAULT_CATEGORIES } from '../../lib/taskboard/categoryUtils';
 import {
   createTask,
   fetchActiveTasks,
@@ -15,7 +23,9 @@ export default function TaskDrawerHost() {
   const { selected, taskSnapshot, taskChangeToken, openTask, closeTask, notifyTaskChange } =
     useTaskboardSelection();
   const { showCompleteUndo, dismissCompleteUndo } = useCompleteUndo();
+  const { isAdmin } = useTaskboardAuth();
   const [task, setTask] = useState<Task | null>(null);
+  const [categories, setCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES);
 
   useEffect(() => {
     if (!selected) {
@@ -49,6 +59,17 @@ export default function TaskDrawerHost() {
       cancelled = true;
     };
   }, [selected, taskSnapshot, taskChangeToken, closeTask]);
+
+  useEffect(() => {
+    if (!selected) {
+      setCategories(DEFAULT_CATEGORIES);
+      return;
+    }
+
+    fetchCategoriesForProject(selected.projectId)
+      .then(setCategories)
+      .catch(() => setCategories(DEFAULT_CATEGORIES));
+  }, [selected, taskChangeToken]);
 
   const handleSaved = useCallback(() => {
     notifyTaskChange();
@@ -116,6 +137,28 @@ export default function TaskDrawerHost() {
     [selected, closeTask, showCompleteUndo, dismissCompleteUndo, notifyTaskChange]
   );
 
+  const handleAddCategory = useCallback(
+    async (label: string) => {
+      if (!selected) return;
+      const created = await createProjectCategory(selected.projectId, label);
+      const next = await refreshCategoriesForProject(selected.projectId, created);
+      setCategories(next);
+      return created.slug;
+    },
+    [selected]
+  );
+
+  const handleRemoveCategory = useCallback(
+    async (categoryId: string) => {
+      if (!selected) return;
+      await deleteProjectCategory(selected.projectId, categoryId);
+      const next = await fetchCategoriesForProject(selected.projectId);
+      setCategories(next);
+      notifyTaskChange();
+    },
+    [selected, notifyTaskChange]
+  );
+
   if (!selected || !task) return null;
 
   return (
@@ -123,11 +166,15 @@ export default function TaskDrawerHost() {
       task={task}
       projectId={selected.projectId}
       category={task.category}
+      categories={categories}
       onClose={closeTask}
       onSaved={handleSaved}
       onAddSubtask={handleAddSubtask}
       onCategoryChange={handleCategoryChange}
       onComplete={handleCompleteTask}
+      isAdmin={isAdmin}
+      onAddCategory={isAdmin ? handleAddCategory : undefined}
+      onRemoveCategory={isAdmin ? handleRemoveCategory : undefined}
     />
   );
 }

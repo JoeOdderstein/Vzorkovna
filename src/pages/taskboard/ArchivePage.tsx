@@ -14,7 +14,9 @@ import {
   updateTask,
 } from '../../lib/taskboard/taskService';
 import { withRetry } from '../../lib/taskboard/loadUtils';
-import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
+import { getCategoryLabel } from '../../lib/taskboard/categoryUtils';
+import { fetchCategoriesForProject } from '../../lib/taskboard/categoryService';
+import type { CategoryOption } from '../../lib/taskboard/types';
 import { formatDeadline, getDeadlineStatus, deadlineClasses } from '../../lib/taskboard/deadlineUtils';
 import { priorityLabels } from '../../lib/taskboard/priorityUtils';
 
@@ -24,6 +26,9 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [categoryLabelsByProject, setCategoryLabelsByProject] = useState<
+    Record<string, CategoryOption[]>
+  >({});
   const { username, isAdmin } = useTaskboardAuth();
   const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
 
@@ -39,7 +44,17 @@ export default function ArchivePage() {
           fetchVisibleProjects(username, isAdmin),
           fetchArchivedTasks(search),
         ]);
-        return filterTasksForProjects(archivedTasks, visibleProjects);
+        const filtered = filterTasksForProjects(archivedTasks, visibleProjects);
+        const labels = Object.fromEntries(
+          await Promise.all(
+            visibleProjects.map(async (project) => [
+              project.id,
+              await fetchCategoriesForProject(project.id),
+            ])
+          )
+        );
+        setCategoryLabelsByProject(labels);
+        return filtered;
       });
       setTasks(data);
       setError('');
@@ -74,8 +89,8 @@ export default function ArchivePage() {
     }
   };
 
-  const categoryLabel = (id: string) =>
-    TASK_CATEGORIES.find((c) => c.id === id)?.label ?? id;
+  const categoryLabel = (projectId: string, id: string) =>
+    getCategoryLabel(id, categoryLabelsByProject[projectId]);
 
   return (
     <div className="max-w-screen-lg mx-auto px-6 md:px-10">
@@ -116,7 +131,7 @@ export default function ArchivePage() {
                 </p>
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs tb-text-secondary">
                   <span>{task.project?.name}</span>
-                  <span>{categoryLabel(task.category)}</span>
+                  <span>{categoryLabel(task.project_id, task.category)}</span>
                   <span>{priorityLabels[task.priority]}</span>
                   {task.assignees.length > 0 && <span>{formatAssignees(task.assignees)}</span>}
                   {task.deadline && (

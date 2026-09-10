@@ -13,6 +13,7 @@ import {
 } from '../../lib/taskboard/taskService';
 import type { Project, Task } from '../../lib/taskboard/types';
 import ProjectBoardPanel from '../../taskboard/components/ProjectBoardPanel';
+import ProjectRestrictedIcon from '../../taskboard/components/ProjectRestrictedIcon';
 
 export default function TaskboardOverviewPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -125,8 +126,9 @@ export default function TaskboardOverviewPage() {
                   >
                     {count}
                   </span>
-                  <span className="flex-1 text-base tb-text group-hover:opacity-80 transition-opacity">
-                    {project.name}
+                  <span className="flex-1 flex items-center gap-2 text-base tb-text group-hover:opacity-80 transition-opacity">
+                    <span>{project.name}</span>
+                    <ProjectRestrictedIcon project={project} />
                   </span>
                   {isOpen ? (
                     <ChevronDown size={18} className="text-[#80868b] shrink-0" />

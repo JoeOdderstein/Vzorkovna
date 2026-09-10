@@ -3,7 +3,9 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
 import type { Priority, TaskCategory } from '../../lib/taskboard/constants';
-import { ASSIGNEES, PRIORITIES, TASK_CATEGORIES } from '../../lib/taskboard/constants';
+import { ASSIGNEES, PRIORITIES } from '../../lib/taskboard/constants';
+import type { CategoryOption } from '../../lib/taskboard/types';
+import CategorySelect from './CategorySelect';
 import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
 import {
   getAttachmentUrl,
@@ -17,22 +19,30 @@ interface TaskDrawerProps {
   task: Task | null;
   projectId: string;
   category: TaskCategory;
+  categories: CategoryOption[];
   onClose: () => void;
   onSaved: () => void;
   onAddSubtask: (parentId: string) => void;
   onCategoryChange?: (taskId: string, category: TaskCategory) => Promise<void>;
   onComplete?: (taskId: string) => void;
+  isAdmin?: boolean;
+  onAddCategory?: (label: string) => Promise<string | void>;
+  onRemoveCategory?: (categoryId: string) => Promise<void>;
 }
 
 export default function TaskDrawer({
   task,
   projectId: _projectId,
   category,
+  categories,
   onClose,
   onSaved,
   onAddSubtask,
   onCategoryChange,
   onComplete,
+  isAdmin = false,
+  onAddCategory,
+  onRemoveCategory,
 }: TaskDrawerProps) {
   const { theme } = useTaskboardTheme();
   const [form, setForm] = useState<Partial<Task>>({});
@@ -220,10 +230,11 @@ export default function TaskDrawer({
           </Field>
 
           <Field label="Category">
-            <select
+            <CategorySelect
+              id={`task-category-${task.id}`}
+              categories={categories}
               value={form.category ?? category}
-              onChange={async (e) => {
-                const val = e.target.value as TaskCategory;
+              onChange={async (val) => {
                 setForm({ ...form, category: val });
                 if (isParent && onCategoryChange) {
                   await onCategoryChange(task.id, val);
@@ -231,12 +242,10 @@ export default function TaskDrawer({
                   save({ category: val });
                 }
               }}
-              className="field-input"
-            >
-              {TASK_CATEGORIES.map((c) => (
-                <option key={c.id} value={c.id}>{c.label}</option>
-              ))}
-            </select>
+              isAdmin={isAdmin}
+              onAddCategory={onAddCategory}
+              onRemoveCategory={onRemoveCategory}
+            />
           </Field>
 
           <Field label="Completed">

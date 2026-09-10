@@ -13,6 +13,7 @@ import ProjectVisibilityPicker, {
   selectionToVisibleTo,
   visibleToToSelection,
 } from './ProjectVisibilityPicker';
+import ProjectRestrictedIcon from './ProjectRestrictedIcon';
 
 interface ManageProjectsDialogProps {
   open: boolean;
@@ -228,6 +229,7 @@ export default function ManageProjectsDialog({
                 {projects.map((project) => (
                   <li key={project.id} className="space-y-3 pb-4 border-b border-[#eceff1] last:border-0">
                     <div className="flex items-center gap-2">
+                      <ProjectRestrictedIcon project={project} />
                       <input
                         type="text"
                         value={names[project.id] ?? project.name}

@@ -5,7 +5,9 @@ export const TASK_CATEGORIES = [
   { id: 'repairs', label: 'Repairs & Final Tweaks' },
 ] as const;
 
-export type TaskCategory = (typeof TASK_CATEGORIES)[number]['id'];
+export type GlobalTaskCategoryId = (typeof TASK_CATEGORIES)[number]['id'];
+/** Global category ids (quotations, …) or project-specific custom slugs. */
+export type TaskCategory = string;
 
 export const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha'] as const;
 export type Assignee = (typeof ASSIGNEES)[number];

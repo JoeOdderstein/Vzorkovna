@@ -12,6 +12,11 @@ function usernamesMatch(a: string, b: string) {
   return a.trim().toLowerCase() === b.trim().toLowerCase();
 }
 
+/** NULL visible_to = everyone; any array value means restricted visibility. */
+export function isProjectRestrictedVisibility(project: Pick<Project, 'visible_to'>): boolean {
+  return project.visible_to != null;
+}
+
 /** Admin always sees a project; NULL visible_to = everyone; [] = admin only. */
 export function canUserSeeProject(
   project: Project,
