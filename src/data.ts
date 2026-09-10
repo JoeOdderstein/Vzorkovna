@@ -33,12 +33,8 @@ export function getProjectById(id: string): Project | undefined {
 
 export const SITE_DATA = {
   // ── Company ──────────────────────────────────────────────
-  name: 'Haring Studio',
+  name: 'Headlight Rabbits',
   tagline: 'Audiovisual Installations · Immersive Sound · Interactive Experiences',
-
-  // ── Hero Logo ────────────────────────────────────────────
-  // Swap the file at public/images/logo.png — no code changes needed.
-  heroLogoUrl: '/images/logo.png',
 
   // ── Hero Video ───────────────────────────────────────────
   // Swap the file at public/videos/hero.mp4 — no code changes needed.

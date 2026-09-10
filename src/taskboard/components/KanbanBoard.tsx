@@ -19,7 +19,6 @@ import type { Task, TaskGroup } from '../../lib/taskboard/types';
 import type { TaskCategory } from '../../lib/taskboard/constants';
 import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
 import { buildGroupsByCategory } from '../../lib/taskboard/categoryUtils';
-import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import TaskCard from './TaskCard';
 
 const NEST_DWELL_MS = 750;
@@ -300,7 +299,6 @@ export default function KanbanBoard({
   onCreateTask,
   creatingCategory = null,
 }: KanbanBoardProps) {
-  const { selected } = useTaskboardSelection();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [nestReadyId, setNestReadyId] = useState<string | null>(null);
   const [promoteReadyCategory, setPromoteReadyCategory] = useState<TaskCategory | null>(null);
@@ -519,9 +517,7 @@ export default function KanbanBoard({
       }}
     >
       <div
-        className={`tb-kanban-scroll flex items-start gap-4 md:gap-6 overflow-x-auto px-1 pb-2 ${
-          selected ? 'tb-kanban-scroll--drawer-open' : ''
-        }`}
+        className="tb-kanban-scroll flex items-start gap-4 md:gap-6 overflow-x-auto px-1 pb-2"
       >
         {visibleCategories.map(({ id, label }) => (
           <div key={id} data-category={id}>

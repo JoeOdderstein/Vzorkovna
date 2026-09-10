@@ -37,7 +37,7 @@ function TaskboardShell() {
   }
 
   return (
-    <>
+    <div className={`tb-layout-push${selected ? ' tb-layout-push--open' : ''}`}>
       <Nav activeSection="login" />
       <div className="taskboard min-h-screen pt-24 pb-16" data-theme={theme}>
         <div className="tb-divider mb-8">
@@ -55,9 +55,6 @@ function TaskboardShell() {
                 <div className="flex flex-wrap items-center gap-4">
                   <TaskboardThemeToggle />
                   <TaskboardHeaderActions />
-                  <Link to="/" className="tb-link">
-                    Back to site
-                  </Link>
                 </div>
               </div>
             </div>
@@ -78,7 +75,7 @@ function TaskboardShell() {
           </p>
         )}
       </div>
-    </>
+    </div>
   );
 }
 

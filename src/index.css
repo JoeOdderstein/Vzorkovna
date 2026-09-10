@@ -9,6 +9,7 @@
 :root {
   --font-serif: 'Cormorant Garamond', Georgia, serif;
   --font-sans: 'Inter', system-ui, sans-serif;
+  --font-display: 'Syne', var(--font-sans);
   --color-accent: #c8a96e;
 
   --site-bg: #050505;
@@ -95,6 +96,17 @@ body {
   border-bottom: 1px solid var(--site-border);
 }
 
+/* Client-facing taskboard/login: hide main site nav links */
+.site-nav--taskboard .max-w-screen-xl > .hidden,
+.site-nav--minimal .max-w-screen-xl > .hidden {
+  display: none !important;
+}
+
+.site-nav--taskboard button[aria-label='Open menu'],
+.site-nav--minimal button[aria-label='Open menu'] {
+  display: none !important;
+}
+
 .group:hover .site-text-muted {
   color: var(--site-text);
 }
@@ -150,6 +162,34 @@ body {
     0 0 6px rgba(255, 220, 130, 1),
     0 0 14px rgba(255, 200, 90, 0.9),
     0 0 28px rgba(200, 169, 110, 0.75);
+}
+
+.site-logo {
+  display: inline-block;
+  font-family: var(--font-display);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  line-height: 1.15;
+  white-space: nowrap;
+  transform: scaleY(1.5);
+}
+
+.site-logo--nav {
+  font-size: clamp(0.55rem, 1.4vw, 0.68rem);
+  letter-spacing: 0.38em;
+  color: var(--site-text);
+  transform-origin: left center;
+}
+
+.site-logo--hero {
+  font-size: clamp(1.25rem, 4vw, 2.75rem);
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  max-width: 92vw;
+  white-space: normal;
+  text-wrap: balance;
+  transform-origin: center center;
 }
 
 .dimmed-glow-text {
@@ -568,17 +608,38 @@ body {
     --tb-drawer-width: 28rem;
   }
 
-  .taskboard .tb-kanban-scroll--drawer-open {
-    scroll-padding-right: var(--tb-drawer-width);
+  .tb-layout-push {
+    --tb-drawer-width: 28rem;
+    transition: margin-right 0.25s ease;
   }
 
-  .taskboard .tb-kanban-scroll--drawer-open::after {
-    content: '';
-    display: block;
-    flex: 0 0 var(--tb-drawer-width);
+  .tb-layout-push--open {
+    margin-right: var(--tb-drawer-width);
+  }
+
+  .tb-layout-push--open nav {
+    right: var(--tb-drawer-width);
+    transition: right 0.25s ease;
+  }
+
+  .tb-layout-push--open .tb-fab {
+    right: calc(var(--tb-drawer-width) + 1.5rem);
+    transition: right 0.25s ease;
+  }
+
+  .taskboard.tb-drawer-shell {
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
     width: var(--tb-drawer-width);
-    height: 1px;
-    pointer-events: none;
+    height: 100%;
+    pointer-events: auto;
+  }
+
+  .taskboard.tb-drawer-shell .tb-drawer-panel {
+    max-width: none;
+    width: 100%;
   }
 }
 

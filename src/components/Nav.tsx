@@ -3,6 +3,7 @@ import { Menu, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useScrollY } from '../hooks';
 import { SITE_DATA } from '../data';
+import SiteLogo from './SiteLogo';
 
 interface NavProps {
   activeSection: string;
@@ -15,6 +16,8 @@ export default function Nav({ activeSection }: NavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isScrolled = scrollY > 80 || location.pathname !== '/';
   const isTaskboardPage = location.pathname.startsWith('/taskboard');
+  const hideSiteNavLinks =
+    location.pathname.startsWith('/taskboard') || location.pathname === '/login';
 
   const goToNavLink = (link: string) => {
     setMenuOpen(false);
@@ -64,7 +67,7 @@ export default function Nav({ activeSection }: NavProps) {
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
           isTaskboardPage ? 'site-nav--taskboard py-4' : isScrolled ? 'py-4' : 'py-6'
-        }`}
+        }${hideSiteNavLinks ? ' site-nav--minimal' : ''}`}
         style={
           isTaskboardPage
             ? undefined
@@ -72,80 +75,86 @@ export default function Nav({ activeSection }: NavProps) {
         }
       >
         <div className="max-w-screen-xl mx-auto px-8 flex items-center justify-between">
-          {/* Logo: same file as hero — replace public/images/logo.png */}
-          <button
-            onClick={goHome}
-            className="opacity-90 hover:opacity-100 transition-opacity duration-300"
-            aria-label={`${SITE_DATA.name} — back to top`}
-          >
-            <img
-              src={SITE_DATA.heroLogoUrl}
-              alt=""
-              className="h-[1.75rem] w-auto object-contain"
-              draggable={false}
-            />
-          </button>
+          {isTaskboardPage ? (
+            <div className="opacity-90 cursor-default" aria-label={SITE_DATA.name}>
+              <SiteLogo />
+            </div>
+          ) : (
+            <button
+              onClick={goHome}
+              className="opacity-90 hover:opacity-100 transition-opacity duration-300"
+              aria-label={`${SITE_DATA.name} — back to top`}
+            >
+              <SiteLogo />
+            </button>
+          )}
 
           {/* Desktop Links */}
-          <div className="hidden md:flex items-center gap-10">
-            {SITE_DATA.navLinks.map((link) => (
+          {!hideSiteNavLinks && (
+            <div className="hidden md:flex items-center gap-10">
+              {SITE_DATA.navLinks.map((link) => (
+                <button
+                  key={link}
+                  onClick={() => goToNavLink(link)}
+                  className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                    isLinkActive(link)
+                      ? 'text-[var(--color-accent)]'
+                      : 'site-link-muted'
+                  }`}
+                >
+                  {link}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {!hideSiteNavLinks && (
+            <button
+              className="md:hidden site-link-muted transition-colors"
+              onClick={() => setMenuOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu size={22} strokeWidth={1.5} />
+            </button>
+          )}
+        </div>
+      </nav>
+
+      {/* Mobile Menu Overlay */}
+      {!hideSiteNavLinks && (
+        <div
+          className={`fixed inset-0 z-50 flex flex-col justify-center items-center transition-all duration-500 modal-backdrop ${
+            menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
+          }`}
+        >
+          <button
+            className="absolute top-6 right-8 site-link-subtle transition-colors"
+            onClick={() => setMenuOpen(false)}
+            aria-label="Close menu"
+          >
+            <X size={22} strokeWidth={1.5} />
+          </button>
+
+          <div className="flex flex-col items-center gap-10">
+            {SITE_DATA.navLinks.map((link, i) => (
               <button
                 key={link}
                 onClick={() => goToNavLink(link)}
-                className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
-                  isLinkActive(link)
-                    ? 'text-[var(--color-accent)]'
-                    : 'site-link-muted'
-                }`}
+                className="font-serif text-4xl site-link-muted transition-colors duration-300 tracking-wide"
+                style={{
+                  fontFamily: 'var(--font-serif)',
+                  transitionDelay: menuOpen ? `${i * 60}ms` : '0ms',
+                  transform: menuOpen ? 'translateY(0)' : 'translateY(20px)',
+                  opacity: menuOpen ? 1 : 0,
+                  transition: `opacity 0.5s ease ${i * 60}ms, transform 0.5s ease ${i * 60}ms, color 0.3s ease`,
+                }}
               >
                 {link}
               </button>
             ))}
           </div>
-
-          <button
-            className="md:hidden site-link-muted transition-colors"
-            onClick={() => setMenuOpen(true)}
-            aria-label="Open menu"
-          >
-            <Menu size={22} strokeWidth={1.5} />
-          </button>
         </div>
-      </nav>
-
-      {/* Mobile Menu Overlay */}
-      <div
-        className={`fixed inset-0 z-50 flex flex-col justify-center items-center transition-all duration-500 modal-backdrop ${
-          menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-        }`}
-      >
-        <button
-          className="absolute top-6 right-8 site-link-subtle transition-colors"
-          onClick={() => setMenuOpen(false)}
-          aria-label="Close menu"
-        >
-          <X size={22} strokeWidth={1.5} />
-        </button>
-
-        <div className="flex flex-col items-center gap-10">
-          {SITE_DATA.navLinks.map((link, i) => (
-            <button
-              key={link}
-              onClick={() => goToNavLink(link)}
-              className="font-serif text-4xl site-link-muted transition-colors duration-300 tracking-wide"
-              style={{
-                fontFamily: 'var(--font-serif)',
-                transitionDelay: menuOpen ? `${i * 60}ms` : '0ms',
-                transform: menuOpen ? 'translateY(0)' : 'translateY(20px)',
-                opacity: menuOpen ? 1 : 0,
-                transition: `opacity 0.5s ease ${i * 60}ms, transform 0.5s ease ${i * 60}ms, color 0.3s ease`,
-              }}
-            >
-              {link}
-            </button>
-          ))}
-        </div>
-      </div>
+      )}
     </>
   );
 }

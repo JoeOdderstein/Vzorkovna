@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import Nav from '../components/Nav';
 import LoginModal from '../components/LoginModal';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
@@ -47,14 +46,6 @@ export default function LoginPage() {
         style={{ backgroundColor: 'var(--site-bg)' }}
       >
         <div className="max-w-screen-md mx-auto">
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 font-sans text-xs tracking-[0.2em] uppercase site-link-subtle mb-12"
-          >
-            <ArrowLeft size={14} strokeWidth={1.5} />
-            Back to site
-          </Link>
-
           <span className="font-sans text-[0.65rem] tracking-[0.3em] uppercase text-[var(--color-accent)] block mb-6">
             Login
           </span>

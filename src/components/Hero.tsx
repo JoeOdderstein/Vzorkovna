@@ -28,8 +28,10 @@ export default function Hero() {
       <video
         ref={videoRef}
         className="absolute inset-0 w-full h-full object-cover"
-        style={{ backgroundColor: 'var(--site-bg)' }}
-        style={{ transform: `translateY(${parallaxOffset}px) scale(1.1)` }}
+        style={{
+          backgroundColor: 'var(--site-bg)',
+          transform: `translateY(${parallaxOffset}px) scale(1.1)`,
+        }}
         src={SITE_DATA.heroVideoUrl}
         poster={SITE_DATA.heroPosterUrl}
         autoPlay
@@ -42,14 +44,15 @@ export default function Hero() {
       {/* Dark overlay + bottom gradient fade to black */}
       <div className="absolute inset-0 video-overlay" />
 
-      {/* Hero logo: replace public/images/logo.png to update */}
       <div className="relative z-10 text-center px-6 flex flex-col items-center overflow-visible">
-        <img
-          src={SITE_DATA.heroLogoUrl}
-          alt={SITE_DATA.name}
-          className="h-[clamp(3rem,8vw,8rem)] w-auto mb-6 object-contain"
-          draggable={false}
-        />
+        <DimmingGlowText
+          className="site-logo site-logo--hero mb-6"
+          containerClassName="max-w-[92vw]"
+          as="h1"
+          spotlightRadius={130}
+        >
+          Headlight Rabbits
+        </DimmingGlowText>
 
         <DimmingGlowText>{SITE_DATA.tagline}</DimmingGlowText>
       </div>

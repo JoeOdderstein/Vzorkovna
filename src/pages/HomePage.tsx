@@ -6,12 +6,14 @@ import About from '../components/About';
 import Contact from '../components/Contact';
 import Footer from '../components/Footer';
 import Nav from '../components/Nav';
+import UnderConstructionModal from '../components/UnderConstructionModal';
 
 const SECTIONS = ['hero', 'projects', 'about', 'contact'];
 
 export default function HomePage() {
   const location = useLocation();
   const [activeSection, setActiveSection] = useState('hero');
+  const [showConstructionNotice, setShowConstructionNotice] = useState(true);
 
   useEffect(() => {
     const scrollTarget =
@@ -50,6 +52,9 @@ export default function HomePage() {
 
   return (
     <>
+      {showConstructionNotice && (
+        <UnderConstructionModal onClose={() => setShowConstructionNotice(false)} />
+      )}
       <Nav activeSection={activeSection} />
       <Hero />
       <Projects />

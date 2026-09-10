@@ -172,10 +172,7 @@ function ProjectBlock({ project, index }: { project: Project; index: number }) {
             </div>
 
             {/* Title */}
-            <h2
-              className="font-serif text-[clamp(2.5rem,5vw,5rem)] font-light leading-none tracking-wide text-white mb-4"
-              style={{ fontFamily: 'var(--font-serif)' }}
-            >
+            <h2 className="font-sans text-[clamp(1.6rem,3.6vw,3.2rem)] font-light leading-none tracking-[0.2em] uppercase text-white mb-4">
               {project.title}
             </h2>
 
