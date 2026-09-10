@@ -1,21 +1,10 @@
-import { useRef, useEffect } from 'react';
 import DimmingGlowText from './DimmingGlowText';
+import HeroVideoBackground from './HeroVideoBackground';
 import { useScrollY } from '../hooks';
 import { SITE_DATA } from '../data';
 
 export default function Hero() {
-  const videoRef = useRef<HTMLVideoElement>(null);
   const scrollY = useScrollY();
-
-  useEffect(() => {
-    const video = videoRef.current;
-    if (!video) return;
-    video.play().catch(() => {
-      // Autoplay blocked — browser will show poster
-    });
-  }, []);
-
-  // Subtle parallax: video moves up slightly as you scroll
   const parallaxOffset = scrollY * 0.3;
 
   return (
@@ -24,25 +13,7 @@ export default function Hero() {
       className="relative w-full h-screen overflow-hidden flex items-center justify-center"
       style={{ backgroundColor: 'var(--site-bg)' }}
     >
-      {/* Background video: replace public/videos/hero.mp4 to update */}
-      <video
-        ref={videoRef}
-        className="absolute inset-0 w-full h-full object-cover"
-        style={{
-          backgroundColor: 'var(--site-bg)',
-          transform: `translateY(${parallaxOffset}px) scale(1.1)`,
-        }}
-        src={SITE_DATA.heroVideoUrl}
-        poster={SITE_DATA.heroPosterUrl}
-        autoPlay
-        muted
-        loop
-        playsInline
-        preload="auto"
-      />
-
-      {/* Dark overlay + bottom gradient fade to black */}
-      <div className="absolute inset-0 video-overlay" />
+      <HeroVideoBackground parallaxOffset={parallaxOffset} />
 
       <div className="relative z-10 text-center px-6 flex flex-col items-center overflow-visible">
         <DimmingGlowText

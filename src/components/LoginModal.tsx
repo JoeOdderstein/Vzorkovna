@@ -1,13 +1,11 @@
 import { FormEvent, useEffect, useState } from 'react';
-import { X } from 'lucide-react';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 
 interface LoginModalProps {
   onSuccess: () => void;
-  onClose: () => void;
 }
 
-export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
+export default function LoginModal({ onSuccess }: LoginModalProps) {
   const { login } = useTaskboardAuth();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -15,14 +13,11 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
-      window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [onClose]);
+  }, []);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -41,22 +36,8 @@ export default function LoginModal({ onSuccess, onClose }: LoginModalProps) {
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[60] flex items-center justify-center modal-backdrop px-6"
-      onClick={onClose}
-    >
-      <div
-        className="relative w-full max-w-md border site-border site-surface px-8 py-10"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <button
-          className="absolute top-5 right-5 site-link-subtle transition-colors"
-          onClick={onClose}
-          aria-label="Close login"
-        >
-          <X size={20} strokeWidth={1.5} />
-        </button>
-
+    <div className="fixed inset-0 z-[60] flex items-center justify-center px-6">
+      <div className="relative w-full max-w-md border site-border site-surface px-8 py-10 bg-[rgba(5,5,5,0.72)] backdrop-blur-sm">
         <span className="font-sans text-[0.65rem] tracking-[0.3em] uppercase text-[var(--color-accent)] block mb-4">
           Login
         </span>
