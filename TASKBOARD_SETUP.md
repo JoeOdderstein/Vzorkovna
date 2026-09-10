@@ -18,10 +18,12 @@ VITE_SUPABASE_URL=
 VITE_SUPABASE_ANON_KEY=
 TASKBOARD_USERNAME=vzorkovna
 TASKBOARD_PASSWORD=your-secure-password
+TASKBOARD_USERNAME_2=admin
+TASKBOARD_PASSWORD_2=your-second-password
 SUPABASE_JWT_SECRET=
 ```
 
-`TASKBOARD_PASSWORD` and `SUPABASE_JWT_SECRET` are server-only (no `VITE_` prefix).
+`TASKBOARD_PASSWORD`, `TASKBOARD_PASSWORD_2`, etc. and `SUPABASE_JWT_SECRET` are server-only (no `VITE_` prefix). Up to 10 logins are supported (`TASKBOARD_USERNAME` / `TASKBOARD_PASSWORD` plus `_2` … `_10`).
 
 ## 3. Local development
 

@@ -26,10 +26,11 @@ export default async function handler(req, res) {
       return res.status(401).json({ error: 'Incorrect username or password' });
     }
 
-    const token = await createSessionToken();
+    const normalizedUsername = String(username);
+    const token = await createSessionToken(normalizedUsername);
     setSessionCookie(res, token);
 
-    return res.status(200).json({ ok: true, accessToken: token });
+    return res.status(200).json({ ok: true, accessToken: token, username: normalizedUsername });
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Login failed' });

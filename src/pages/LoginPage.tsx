@@ -37,7 +37,7 @@ export default function LoginPage() {
       {showModal && !authenticated && (
         <LoginModal
           onSuccess={() => navigate('/taskboard', { replace: true })}
-          onClose={() => navigate('/')}
+          onClose={() => setShowModal(false)}
         />
       )}
 

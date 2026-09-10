@@ -50,9 +50,14 @@ export function taskboardDevApi(): Plugin {
             if (!validateCredentials(String(username ?? ''), String(password ?? ''))) {
               return sendJson(res, 401, { error: 'Incorrect username or password' });
             }
-            const token = await createSessionToken();
+            const normalizedUsername = String(username ?? '');
+            const token = await createSessionToken(normalizedUsername);
             setSessionCookie(res as never, token);
-            return sendJson(res, 200, { ok: true, accessToken: token });
+            return sendJson(res, 200, {
+              ok: true,
+              accessToken: token,
+              username: normalizedUsername,
+            });
           }
 
           if (url === '/api/auth/logout' && req.method === 'POST') {
@@ -63,8 +68,12 @@ export function taskboardDevApi(): Plugin {
           if (url === '/api/auth/session' && req.method === 'GET') {
             const token = getTokenFromRequest({ headers: { cookie: req.headers.cookie } } as never);
             if (!token) return sendJson(res, 401, { authenticated: false });
-            await verifySessionToken(token);
-            return sendJson(res, 200, { authenticated: true, accessToken: token });
+            const claims = await verifySessionToken(token);
+            return sendJson(res, 200, {
+              authenticated: true,
+              accessToken: token,
+              username: typeof claims.username === 'string' ? claims.username : null,
+            });
           }
 
           sendJson(res, 404, { error: 'Not found' });

@@ -23,7 +23,7 @@ function signJwt(payload) {
   return `${data}.${signature}`;
 }
 
-export async function createSessionToken() {
+export async function createSessionToken(username) {
   const sub = process.env.TASKBOARD_USER_ID ?? '00000000-0000-0000-0000-000000000001';
   const now = Math.floor(Date.now() / 1000);
 
@@ -31,6 +31,7 @@ export async function createSessionToken() {
     role: 'authenticated',
     sub,
     aud: 'authenticated',
+    username,
     iat: now,
     exp: now + SESSION_DAYS * 24 * 60 * 60,
   });
@@ -83,14 +84,42 @@ export function getTokenFromRequest(req) {
   return match?.[1] ?? null;
 }
 
-export function validateCredentials(username, password) {
-  const expectedUser = process.env.TASKBOARD_USERNAME ?? 'vzorkovna';
-  const expectedPass =
+function safeEqual(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const bufA = Buffer.from(a);
+  const bufB = Buffer.from(b);
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+function getAllowedUsers() {
+  const users = [];
+
+  const primaryUser = process.env.TASKBOARD_USERNAME ?? 'vzorkovna';
+  const primaryPass =
     process.env.TASKBOARD_PASSWORD ??
     (process.env.NODE_ENV !== 'production' ? 'joost' : undefined);
+  if (primaryPass) {
+    users.push({ username: primaryUser, password: primaryPass });
+  }
 
-  if (!expectedPass) return false;
-  return username === expectedUser && password === expectedPass;
+  for (let i = 2; i <= 10; i++) {
+    const extraUser = process.env[`TASKBOARD_USERNAME_${i}`];
+    const extraPass = process.env[`TASKBOARD_PASSWORD_${i}`];
+    if (extraUser && extraPass) {
+      users.push({ username: extraUser, password: extraPass });
+    }
+  }
+
+  return users;
+}
+
+export function validateCredentials(username, password) {
+  if (!username || !password) return false;
+
+  return getAllowedUsers().some(
+    (user) => user.username === username && safeEqual(password, user.password)
+  );
 }
 
 export function getAuthConfigError() {

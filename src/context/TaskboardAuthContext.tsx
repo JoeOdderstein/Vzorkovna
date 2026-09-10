@@ -6,6 +6,7 @@ interface AuthContextValue {
   authenticated: boolean;
   loading: boolean;
   sessionReady: boolean;
+  username: string | null;
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
 }
@@ -16,9 +17,10 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
   const [authenticated, setAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
+  const [username, setUsername] = useState<string | null>(null);
   const authOpRef = useRef(0);
 
-  const applySession = useCallback(async (accessToken: string) => {
+  const applySession = useCallback(async (accessToken: string, sessionUsername?: string | null) => {
     authOpRef.current += 1;
 
     if (isSupabaseConfigured()) {
@@ -27,6 +29,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
 
     setAuthenticated(true);
     setSessionReady(true);
+    setUsername(sessionUsername ?? null);
     setLoading(false);
   }, []);
 
@@ -34,12 +37,13 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
     const opId = authOpRef.current;
 
     try {
-      const res = await fetch('/api/auth/session');
+      const res = await fetch('/api/auth/session', { credentials: 'include' });
       if (opId !== authOpRef.current) return;
 
       if (!res.ok) {
         setAuthenticated(false);
         setSessionReady(false);
+        setUsername(null);
         if (isSupabaseConfigured()) await clearSupabaseSession();
         return;
       }
@@ -54,14 +58,17 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         if (opId !== authOpRef.current) return;
         setAuthenticated(true);
         setSessionReady(true);
+        setUsername(typeof data.username === 'string' ? data.username : null);
       } else {
         setAuthenticated(false);
         setSessionReady(false);
+        setUsername(null);
       }
     } catch {
       if (opId !== authOpRef.current) return;
       setAuthenticated(false);
       setSessionReady(false);
+      setUsername(null);
     } finally {
       if (opId === authOpRef.current) setLoading(false);
     }
@@ -76,6 +83,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       try {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
+          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ username, password }),
         });
@@ -87,7 +95,10 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         }
 
         if (data.accessToken) {
-          await applySession(data.accessToken);
+          await applySession(
+            data.accessToken,
+            typeof data.username === 'string' ? data.username : username
+          );
         }
         return null;
       } catch {
@@ -99,15 +110,26 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
 
   const logout = useCallback(async () => {
     authOpRef.current += 1;
-    await fetch('/api/auth/logout', { method: 'POST' });
-    if (isSupabaseConfigured()) await clearSupabaseSession();
-    setAuthenticated(false);
-    setSessionReady(false);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      if (isSupabaseConfigured()) {
+        try {
+          await clearSupabaseSession();
+        } catch {
+          // Supabase cleanup is best-effort — local session still clears below
+        }
+      }
+    } finally {
+      setAuthenticated(false);
+      setSessionReady(false);
+      setUsername(null);
+      setLoading(false);
+    }
   }, []);
 
   const value = useMemo(
-    () => ({ authenticated, loading, sessionReady, login, logout }),
-    [authenticated, loading, sessionReady, login, logout]
+    () => ({ authenticated, loading, sessionReady, username, login, logout }),
+    [authenticated, loading, sessionReady, username, login, logout]
   );
 
   return <TaskboardAuthContext.Provider value={value}>{children}</TaskboardAuthContext.Provider>;

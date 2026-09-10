@@ -33,16 +33,24 @@ export async function setSupabaseSession(accessToken: string) {
 
 export async function clearSupabaseSession() {
   sessionToken = null;
-  const supabase = getSupabase();
-  await supabase.realtime.setAuth(null);
-  await supabase.auth.signOut();
+  try {
+    const supabase = getSupabase();
+    try {
+      await supabase.realtime.setAuth(null);
+    } catch {
+      // Realtime cleanup is optional
+    }
+    await supabase.auth.signOut();
+  } catch {
+    sessionToken = null;
+  }
 }
 
 /** Ensure the Supabase client has the taskboard JWT before RLS-protected queries. */
 export async function ensureSupabaseSession() {
   if (sessionToken) return;
 
-  const res = await fetch('/api/auth/session');
+  const res = await fetch('/api/auth/session', { credentials: 'include' });
   if (!res.ok) {
     throw new Error('Session expired. Please log in again.');
   }

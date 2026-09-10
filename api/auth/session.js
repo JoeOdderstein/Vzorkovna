@@ -11,8 +11,12 @@ export default async function handler(req, res) {
       return res.status(401).json({ authenticated: false });
     }
 
-    await verifySessionToken(token);
-    return res.status(200).json({ authenticated: true, accessToken: token });
+    const claims = await verifySessionToken(token);
+    return res.status(200).json({
+      authenticated: true,
+      accessToken: token,
+      username: typeof claims.username === 'string' ? claims.username : null,
+    });
   } catch {
     return res.status(401).json({ authenticated: false });
   }

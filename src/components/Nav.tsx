@@ -3,6 +3,7 @@ import { Menu, X } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useScrollY } from '../hooks';
 import { SITE_DATA } from '../data';
+import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 import SiteLogo from './SiteLogo';
 
 interface NavProps {
@@ -18,6 +19,16 @@ export default function Nav({ activeSection }: NavProps) {
   const isTaskboardPage = location.pathname.startsWith('/taskboard');
   const hideSiteNavLinks =
     location.pathname.startsWith('/taskboard') || location.pathname === '/login';
+  const { authenticated, username, logout } = useTaskboardAuth();
+
+  const handleLogout = async () => {
+    setMenuOpen(false);
+    try {
+      await logout();
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
 
   const goToNavLink = (link: string) => {
     setMenuOpen(false);
@@ -108,14 +119,31 @@ export default function Nav({ activeSection }: NavProps) {
             </div>
           )}
 
-          {!hideSiteNavLinks && (
-            <button
-              className="md:hidden site-link-muted transition-colors"
-              onClick={() => setMenuOpen(true)}
-              aria-label="Open menu"
-            >
-              <Menu size={22} strokeWidth={1.5} />
-            </button>
+          {isTaskboardPage && authenticated ? (
+            <div className="relative z-10 flex items-center gap-4">
+              {username && (
+                <span className="font-sans text-xs tracking-[0.2em] uppercase site-text-subtle">
+                  {username}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => void handleLogout()}
+                className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
+              >
+                Logout
+              </button>
+            </div>
+          ) : (
+            !hideSiteNavLinks && (
+              <button
+                className="md:hidden site-link-muted transition-colors"
+                onClick={() => setMenuOpen(true)}
+                aria-label="Open menu"
+              >
+                <Menu size={22} strokeWidth={1.5} />
+              </button>
+            )
           )}
         </div>
       </nav>
