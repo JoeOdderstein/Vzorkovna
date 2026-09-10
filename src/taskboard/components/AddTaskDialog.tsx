@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { TASK_CATEGORIES, type TaskCategory } from '../../lib/taskboard/constants';
-import { fetchProjects } from '../../lib/taskboard/taskService';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
+import { fetchVisibleProjects } from '../../lib/taskboard/taskService';
 import type { Project } from '../../lib/taskboard/types';
 
 interface AddTaskDialogProps {
@@ -17,6 +18,7 @@ export default function AddTaskDialog({
   onCreate,
   defaultProjectId,
 }: AddTaskDialogProps) {
+  const { username, isAdmin } = useTaskboardAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [category, setCategory] = useState<TaskCategory>('quotations');
@@ -32,7 +34,7 @@ export default function AddTaskDialog({
     setSubmitting(false);
     setLoadingProjects(true);
 
-    fetchProjects()
+    fetchVisibleProjects(username, isAdmin)
       .then((list) => {
         setProjects(list);
         const preferred = defaultProjectId && list.some((p) => p.id === defaultProjectId)
@@ -55,7 +57,7 @@ export default function AddTaskDialog({
         );
       })
       .finally(() => setLoadingProjects(false));
-  }, [open, defaultProjectId]);
+  }, [open, defaultProjectId, username, isAdmin]);
 
   useEffect(() => {
     if (!open) return;

@@ -3,7 +3,7 @@
 ## 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com)
-2. Run SQL from `supabase/migrations/001_taskboard.sql` in the SQL Editor
+2. Run SQL from `supabase/migrations/001_taskboard.sql` in the SQL Editor (then run later migrations through `005_project_visibility.sql`)
 3. Create a **private** Storage bucket named `task-attachments`
 4. Run `supabase/migrations/002_storage.sql`
 5. Enable **Realtime** for the `tasks` table (Database → Replication)

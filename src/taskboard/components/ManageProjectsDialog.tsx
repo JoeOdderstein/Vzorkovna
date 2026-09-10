@@ -4,9 +4,15 @@ import {
   createProject,
   deleteProject,
   fetchProjects,
+  fetchTaskboardUsernames,
+  isProjectVisibilityReady,
   updateProject,
 } from '../../lib/taskboard/taskService';
 import type { Project } from '../../lib/taskboard/types';
+import ProjectVisibilityPicker, {
+  selectionToVisibleTo,
+  visibleToToSelection,
+} from './ProjectVisibilityPicker';
 
 interface ManageProjectsDialogProps {
   open: boolean;
@@ -23,30 +29,45 @@ export default function ManageProjectsDialog({
 }: ManageProjectsDialogProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [names, setNames] = useState<Record<string, string>>({});
+  const [visibility, setVisibility] = useState<Record<string, string[]>>({});
+  const [assignableUsers, setAssignableUsers] = useState<string[]>([]);
+  const [usersLoaded, setUsersLoaded] = useState(false);
+  const [visibilityReady, setVisibilityReady] = useState(true);
   const [newName, setNewName] = useState('');
+  const [newVisible, setNewVisible] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [adding, setAdding] = useState(false);
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const loadProjects = () => {
-    setLoading(true);
-    setError('');
-    return fetchProjects()
-      .then((list) => {
-        setProjects(list);
-        setNames(Object.fromEntries(list.map((p) => [p.id, p.name])));
-      })
-      .catch(() => setError('Could not load projects.'))
-      .finally(() => setLoading(false));
-  };
-
   useEffect(() => {
     if (!open) return;
     setNewName('');
     setError('');
-    loadProjects();
+    setLoading(true);
+    setUsersLoaded(false);
+
+    Promise.all([fetchTaskboardUsernames(), isProjectVisibilityReady()])
+      .then(([{ usernames }, ready]) => {
+        setVisibilityReady(ready);
+        setAssignableUsers(usernames);
+        setNewVisible([...usernames]);
+        setUsersLoaded(true);
+        return fetchProjects().then((list) => {
+          setProjects(list);
+          setNames(Object.fromEntries(list.map((p) => [p.id, p.name])));
+          setVisibility(
+            Object.fromEntries(
+              list.map((p) => [p.id, visibleToToSelection(p.visible_to, usernames)])
+            )
+          );
+        });
+      })
+      .catch(() => {
+        setError('Could not load user list. Restart the dev server or redeploy, then try again.');
+      })
+      .finally(() => setLoading(false));
   }, [open]);
 
   useEffect(() => {
@@ -62,25 +83,45 @@ export default function ManageProjectsDialog({
 
   if (!open) return null;
 
-  const handleRename = async (project: Project) => {
+  const saveProject = async (project: Project) => {
     const trimmed = (names[project.id] ?? '').trim();
     if (!trimmed) {
       setNames((prev) => ({ ...prev, [project.id]: project.name }));
       setError('Project name cannot be empty.');
       return;
     }
-    if (trimmed === project.name) return;
+
+    const nextVisible = selectionToVisibleTo(
+      visibility[project.id] ?? visibleToToSelection(project.visible_to, assignableUsers),
+      assignableUsers
+    );
+    const nameChanged = trimmed !== project.name;
+    const visibleChanged =
+      JSON.stringify(nextVisible ?? null) !== JSON.stringify(project.visible_to ?? null);
+
+    if (!nameChanged && !visibleChanged) return;
 
     setSavingId(project.id);
     setError('');
     try {
-      const updated = await updateProject(project.id, trimmed);
+      const updated = await updateProject(project.id, {
+        ...(nameChanged ? { name: trimmed } : {}),
+        ...(visibleChanged ? { visible_to: nextVisible } : {}),
+      });
       setProjects((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
       setNames((prev) => ({ ...prev, [updated.id]: updated.name }));
+      setVisibility((prev) => ({
+        ...prev,
+        [updated.id]: visibleToToSelection(updated.visible_to, assignableUsers),
+      }));
       onChanged();
     } catch {
       setNames((prev) => ({ ...prev, [project.id]: project.name }));
-      setError('Could not rename project. That name may already exist.');
+      setVisibility((prev) => ({
+        ...prev,
+        [project.id]: visibleToToSelection(project.visible_to, assignableUsers),
+      }));
+      setError('Could not update project.');
     } finally {
       setSavingId(null);
     }
@@ -102,6 +143,11 @@ export default function ManageProjectsDialog({
         delete next[project.id];
         return next;
       });
+      setVisibility((prev) => {
+        const next = { ...prev };
+        delete next[project.id];
+        return next;
+      });
       onChanged();
     } catch {
       setError('Could not delete project.');
@@ -117,18 +163,28 @@ export default function ManageProjectsDialog({
       setError('Enter a project name.');
       return;
     }
+    if (!usersLoaded || assignableUsers.length === 0) {
+      setError('User list is still loading. Wait a moment and try again.');
+      return;
+    }
 
     setAdding(true);
     setError('');
     try {
-      const project = await createProject(trimmed);
+      const visible_to = selectionToVisibleTo(newVisible, assignableUsers);
+      const project = await createProject(trimmed, visible_to);
       setProjects((prev) => [...prev, project]);
       setNames((prev) => ({ ...prev, [project.id]: project.name }));
+      setVisibility((prev) => ({
+        ...prev,
+        [project.id]: visibleToToSelection(project.visible_to, assignableUsers),
+      }));
       setNewName('');
+      setNewVisible([...assignableUsers]);
       onChanged();
       onProjectCreated?.(project);
-    } catch {
-      setError('Could not create project. That name may already exist.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not create project. That name may already exist.');
     } finally {
       setAdding(false);
     }
@@ -154,6 +210,13 @@ export default function ManageProjectsDialog({
         </div>
 
         <div className="px-6 py-6 overflow-y-auto flex-1 space-y-6">
+          {!visibilityReady && (
+            <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+              Project visibility is not set up yet. In Supabase → SQL Editor, run{' '}
+              <code className="text-xs">supabase/migrations/005_project_visibility.sql</code>, then
+              add the project again.
+            </p>
+          )}
           <div>
             <p className="tb-field-label mb-3">Projects</p>
             {loading && <p className="text-sm tb-muted">Loading projects…</p>}
@@ -161,34 +224,55 @@ export default function ManageProjectsDialog({
               <p className="text-sm tb-muted">No projects yet. Add one below.</p>
             )}
             {!loading && projects.length > 0 && (
-              <ul className="space-y-2">
+              <ul className="space-y-4">
                 {projects.map((project) => (
-                  <li key={project.id} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={names[project.id] ?? project.name}
-                      onChange={(e) =>
-                        setNames((prev) => ({ ...prev, [project.id]: e.target.value }))
-                      }
-                      onBlur={() => handleRename(project)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          (e.target as HTMLInputElement).blur();
+                  <li key={project.id} className="space-y-3 pb-4 border-b border-[#eceff1] last:border-0">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={names[project.id] ?? project.name}
+                        onChange={(e) =>
+                          setNames((prev) => ({ ...prev, [project.id]: e.target.value }))
                         }
+                        onBlur={() => saveProject(project)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            (e.target as HTMLInputElement).blur();
+                          }
+                        }}
+                        disabled={savingId === project.id || deletingId === project.id}
+                        className="field-input flex-1 min-w-0"
+                        aria-label={`Rename ${project.name}`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(project)}
+                        disabled={savingId === project.id || deletingId === project.id}
+                        className="p-2 text-[#80868b] hover:text-red-600 transition-colors disabled:opacity-50"
+                        aria-label={`Delete ${project.name}`}
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                    <ProjectVisibilityPicker
+                      usernames={assignableUsers}
+                      selected={
+                        visibility[project.id] ??
+                        visibleToToSelection(project.visible_to, assignableUsers)
+                      }
+                      onChange={(selected) => {
+                        setVisibility((prev) => ({ ...prev, [project.id]: selected }));
                       }}
                       disabled={savingId === project.id || deletingId === project.id}
-                      className="field-input flex-1 min-w-0"
-                      aria-label={`Rename ${project.name}`}
                     />
                     <button
                       type="button"
-                      onClick={() => handleDelete(project)}
+                      onClick={() => saveProject(project)}
                       disabled={savingId === project.id || deletingId === project.id}
-                      className="p-2 text-[#80868b] hover:text-red-600 transition-colors disabled:opacity-50"
-                      aria-label={`Delete ${project.name}`}
+                      className="text-xs tb-link uppercase tracking-[0.15em]"
                     >
-                      <Trash2 size={18} />
+                      {savingId === project.id ? 'Saving…' : 'Save visibility'}
                     </button>
                   </li>
                 ))}
@@ -196,24 +280,28 @@ export default function ManageProjectsDialog({
             )}
           </div>
 
-          <form onSubmit={handleAdd} className="space-y-3">
+          <form onSubmit={handleAdd} className="space-y-4">
             <p className="tb-field-label">Add project</p>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                placeholder="e.g. Mirror Room"
-                className="field-input flex-1 min-w-0"
-              />
-              <button
-                type="submit"
-                disabled={adding || !newName.trim()}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#1a73e8] rounded hover:bg-[#1557b0] disabled:opacity-50 transition-colors shrink-0"
-              >
-                {adding ? 'Adding…' : 'Add'}
-              </button>
-            </div>
+            <input
+              type="text"
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              placeholder="e.g. Mirror Room"
+              className="field-input w-full"
+            />
+            <ProjectVisibilityPicker
+              usernames={assignableUsers}
+              selected={newVisible}
+              onChange={setNewVisible}
+              disabled={adding}
+            />
+            <button
+              type="submit"
+              disabled={adding || !newName.trim() || !usersLoaded || !visibilityReady}
+              className="px-4 py-2 text-sm font-medium text-white bg-[#1a73e8] rounded hover:bg-[#1557b0] disabled:opacity-50 transition-colors"
+            >
+              {adding ? 'Adding…' : 'Add project'}
+            </button>
           </form>
 
           {error && <p className="text-sm text-red-600">{error}</p>}

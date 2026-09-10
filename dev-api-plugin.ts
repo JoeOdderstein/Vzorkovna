@@ -7,6 +7,9 @@ import {
   getAuthConfigError,
   getTokenFromRequest,
   setSessionCookie,
+  getAdminUsername,
+  getTaskboardUsernames,
+  isAdminUsername,
   validateCredentials,
   verifySessionToken,
 } from './api/_lib/auth.js';
@@ -57,6 +60,7 @@ export function taskboardDevApi(): Plugin {
               ok: true,
               accessToken: token,
               username: normalizedUsername,
+              isAdmin: isAdminUsername(normalizedUsername),
             });
           }
 
@@ -69,11 +73,30 @@ export function taskboardDevApi(): Plugin {
             const token = getTokenFromRequest({ headers: { cookie: req.headers.cookie } } as never);
             if (!token) return sendJson(res, 401, { authenticated: false });
             const claims = await verifySessionToken(token);
+            const username = typeof claims.username === 'string' ? claims.username : null;
             return sendJson(res, 200, {
               authenticated: true,
               accessToken: token,
-              username: typeof claims.username === 'string' ? claims.username : null,
+              username,
+              isAdmin: isAdminUsername(username),
             });
+          }
+
+          if (url === '/api/auth/usernames' && req.method === 'GET') {
+            const token = getTokenFromRequest({ headers: { cookie: req.headers.cookie } } as never);
+            if (!token) return sendJson(res, 401, { error: 'Unauthorized' });
+            try {
+              const claims = await verifySessionToken(token);
+              const username = typeof claims.username === 'string' ? claims.username : null;
+              if (!isAdminUsername(username)) {
+                return sendJson(res, 403, { error: 'Forbidden' });
+              }
+              const adminUsername = getAdminUsername();
+              const usernames = getTaskboardUsernames().filter((name) => name !== adminUsername);
+              return sendJson(res, 200, { usernames, adminUsername });
+            } catch {
+              return sendJson(res, 401, { error: 'Unauthorized' });
+            }
           }
 
           sendJson(res, 404, { error: 'Not found' });

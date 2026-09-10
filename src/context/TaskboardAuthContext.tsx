@@ -7,6 +7,7 @@ interface AuthContextValue {
   loading: boolean;
   sessionReady: boolean;
   username: string | null;
+  isAdmin: boolean;
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
 }
@@ -18,9 +19,15 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
   const [loading, setLoading] = useState(true);
   const [sessionReady, setSessionReady] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
   const authOpRef = useRef(0);
 
-  const applySession = useCallback(async (accessToken: string, sessionUsername?: string | null) => {
+  const applySession = useCallback(
+    async (
+      accessToken: string,
+      sessionUsername?: string | null,
+      sessionIsAdmin = false
+    ) => {
     authOpRef.current += 1;
 
     if (isSupabaseConfigured()) {
@@ -30,8 +37,10 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
     setAuthenticated(true);
     setSessionReady(true);
     setUsername(sessionUsername ?? null);
+    setIsAdmin(sessionIsAdmin);
     setLoading(false);
-  }, []);
+  },
+  []);
 
   const checkSession = useCallback(async () => {
     const opId = authOpRef.current;
@@ -44,6 +53,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setAuthenticated(false);
         setSessionReady(false);
         setUsername(null);
+        setIsAdmin(false);
         if (isSupabaseConfigured()) await clearSupabaseSession();
         return;
       }
@@ -59,16 +69,19 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setAuthenticated(true);
         setSessionReady(true);
         setUsername(typeof data.username === 'string' ? data.username : null);
+        setIsAdmin(Boolean(data.isAdmin));
       } else {
         setAuthenticated(false);
         setSessionReady(false);
         setUsername(null);
+        setIsAdmin(false);
       }
     } catch {
       if (opId !== authOpRef.current) return;
       setAuthenticated(false);
       setSessionReady(false);
       setUsername(null);
+      setIsAdmin(false);
     } finally {
       if (opId === authOpRef.current) setLoading(false);
     }
@@ -97,7 +110,8 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         if (data.accessToken) {
           await applySession(
             data.accessToken,
-            typeof data.username === 'string' ? data.username : username
+            typeof data.username === 'string' ? data.username : username,
+            Boolean(data.isAdmin)
           );
         }
         return null;
@@ -123,13 +137,14 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setAuthenticated(false);
       setSessionReady(false);
       setUsername(null);
+      setIsAdmin(false);
       setLoading(false);
     }
   }, []);
 
   const value = useMemo(
-    () => ({ authenticated, loading, sessionReady, username, login, logout }),
-    [authenticated, loading, sessionReady, username, login, logout]
+    () => ({ authenticated, loading, sessionReady, username, isAdmin, login, logout }),
+    [authenticated, loading, sessionReady, username, isAdmin, login, logout]
   );
 
   return <TaskboardAuthContext.Provider value={value}>{children}</TaskboardAuthContext.Provider>;

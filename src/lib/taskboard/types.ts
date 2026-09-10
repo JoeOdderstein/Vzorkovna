@@ -6,6 +6,8 @@ export interface Project {
   slug: string;
   sort_order: number;
   created_at: string;
+  /** NULL = all users; [] = admin only; otherwise listed usernames + admin */
+  visible_to?: string[] | null;
 }
 
 export interface Task {

@@ -58,7 +58,7 @@ export const localStore = {
 
   getProjectBySlug: (slug: string) => loadProjects().find((p) => p.slug === slug) ?? null,
 
-  createProject: (name: string): Project => {
+  createProject: (name: string, visible_to: string[] | null = null): Project => {
     const trimmed = name.trim();
     if (!trimmed) throw new Error('Project name is required');
 
@@ -75,26 +75,39 @@ export const localStore = {
       slug,
       sort_order,
       created_at: now(),
+      visible_to,
     };
 
     saveProjects([...projects, project]);
     return project;
   },
 
-  updateProject: (id: string, name: string): Project => {
-    const trimmed = name.trim();
-    if (!trimmed) throw new Error('Project name is required');
-
+  updateProject: (
+    id: string,
+    updates: { name?: string; visible_to?: string[] | null }
+  ): Project => {
     const projects = loadProjects();
     const idx = projects.findIndex((p) => p.id === id);
     if (idx < 0) throw new Error('Project not found');
 
-    const slug = ensureUniqueSlug(
-      slugifyProjectName(trimmed),
-      projects.filter((p) => p.id !== id).map((p) => p.slug)
-    );
+    const current = projects[idx];
+    const trimmed = updates.name?.trim() ?? current.name;
+    if (!trimmed) throw new Error('Project name is required');
 
-    const updated: Project = { ...projects[idx], name: trimmed, slug };
+    const slug =
+      trimmed === current.name
+        ? current.slug
+        : ensureUniqueSlug(
+            slugifyProjectName(trimmed),
+            projects.filter((p) => p.id !== id).map((p) => p.slug)
+          );
+
+    const updated: Project = {
+      ...current,
+      name: trimmed,
+      slug,
+      ...(updates.visible_to !== undefined ? { visible_to: updates.visible_to } : {}),
+    };
     projects[idx] = updated;
     saveProjects(projects);
     return updated;

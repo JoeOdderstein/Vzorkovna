@@ -5,7 +5,14 @@ import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
 import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
 import type { Task } from '../../lib/taskboard/types';
-import { fetchArchivedTasks, subscribeToArchive, updateTask } from '../../lib/taskboard/taskService';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
+import {
+  fetchArchivedTasks,
+  fetchVisibleProjects,
+  filterTasksForProjects,
+  subscribeToArchive,
+  updateTask,
+} from '../../lib/taskboard/taskService';
 import { withRetry } from '../../lib/taskboard/loadUtils';
 import { TASK_CATEGORIES } from '../../lib/taskboard/constants';
 import { formatDeadline, getDeadlineStatus, deadlineClasses } from '../../lib/taskboard/deadlineUtils';
@@ -17,6 +24,7 @@ export default function ArchivePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const { username, isAdmin } = useTaskboardAuth();
   const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
 
   const filteredTasks = useMemo(
@@ -26,7 +34,13 @@ export default function ArchivePage() {
 
   const load = useCallback(async () => {
     try {
-      const data = await withRetry(() => fetchArchivedTasks(search));
+      const data = await withRetry(async () => {
+        const [visibleProjects, archivedTasks] = await Promise.all([
+          fetchVisibleProjects(username, isAdmin),
+          fetchArchivedTasks(search),
+        ]);
+        return filterTasksForProjects(archivedTasks, visibleProjects);
+      });
       setTasks(data);
       setError('');
     } catch {
@@ -34,7 +48,7 @@ export default function ArchivePage() {
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [search, username, isAdmin]);
 
   useEffect(() => {
     const t = setTimeout(load, 300);

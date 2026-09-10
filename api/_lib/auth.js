@@ -122,6 +122,18 @@ export function validateCredentials(username, password) {
   );
 }
 
+export function getTaskboardUsernames() {
+  return getAllowedUsers().map((user) => user.username);
+}
+
+export function getAdminUsername() {
+  return process.env.TASKBOARD_ADMIN_USERNAME ?? 'admin';
+}
+
+export function isAdminUsername(username) {
+  return username === getAdminUsername();
+}
+
 export function getAuthConfigError() {
   if (!process.env.TASKBOARD_PASSWORD && process.env.NODE_ENV === 'production') {
     return 'TASKBOARD_PASSWORD is not configured on the server.';

@@ -5,9 +5,11 @@ import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
 import { countProjectTasksForFilter, sortProjectsByWorkload } from '../../lib/taskboard/filterUtils';
 import { withRetry } from '../../lib/taskboard/loadUtils';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import {
   fetchAllActiveTasks,
-  fetchProjects,
+  fetchVisibleProjects,
+  filterTasksForProjects,
 } from '../../lib/taskboard/taskService';
 import type { Project, Task } from '../../lib/taskboard/types';
 import ProjectBoardPanel from '../../taskboard/components/ProjectBoardPanel';
@@ -18,6 +20,7 @@ export default function TaskboardOverviewPage() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const { username, isAdmin } = useTaskboardAuth();
   const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
   const { projectsToken, expandProjectId } = useTaskboardRefresh();
   const [searchParams] = useSearchParams();
@@ -31,11 +34,11 @@ export default function TaskboardOverviewPage() {
   useEffect(() => {
     let cancelled = false;
 
-    withRetry(() => Promise.all([fetchProjects(), fetchAllActiveTasks()]))
+    withRetry(() => Promise.all([fetchVisibleProjects(username, isAdmin), fetchAllActiveTasks()]))
       .then(([projectList, tasks]) => {
         if (cancelled) return;
         setProjects(projectList);
-        setAllTasks(tasks);
+        setAllTasks(filterTasksForProjects(tasks, projectList));
         setError('');
       })
       .catch(() => {
@@ -49,7 +52,7 @@ export default function TaskboardOverviewPage() {
     return () => {
       cancelled = true;
     };
-  }, [projectsToken]);
+  }, [projectsToken, username, isAdmin]);
 
   useEffect(() => {
     setTasksForCounts(allTasks);

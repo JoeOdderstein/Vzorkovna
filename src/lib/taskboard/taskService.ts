@@ -10,6 +10,11 @@ import {
 import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { normalizeAssignees, normalizeTask } from './assigneeUtils';
 import { ensureUniqueSlug, slugifyProjectName } from './projectUtils';
+import {
+  canUserSeeProject,
+  filterProjectsForUser,
+  normalizeProjectVisibleTo,
+} from './projectVisibility';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -24,8 +29,21 @@ function mapTasks(rows: Record<string, unknown>[]): Task[] {
   return rows.map(normalizeTask);
 }
 
-export async function fetchProjects() {
-  if (isLocalTaskboardMode()) return localStore.getProjects();
+function normalizeProject(row: Record<string, unknown>): Project {
+  return {
+    ...(row as Project),
+    visible_to: normalizeProjectVisibleTo(row.visible_to),
+  };
+}
+
+function mapProjects(rows: Record<string, unknown>[]): Project[] {
+  return rows.map(normalizeProject);
+}
+
+async function fetchAllProjectsRaw(): Promise<Project[]> {
+  if (isLocalTaskboardMode()) {
+    return localStore.getProjects().map((project) => normalizeProject(project));
+  }
 
   const { data, error } = await (await db())
     .from('projects')
@@ -33,14 +51,42 @@ export async function fetchProjects() {
     .order('sort_order', { ascending: true });
 
   if (error) throw error;
-  return data;
+  return mapProjects((data ?? []) as Record<string, unknown>[]);
 }
 
-export async function createProject(name: string): Promise<Project> {
+/** All projects (admin manage dialog). */
+export async function fetchProjects() {
+  return fetchAllProjectsRaw();
+}
+
+/** False when Supabase is missing the visible_to column (migration not applied). */
+export async function isProjectVisibilityReady() {
+  if (isLocalTaskboardMode()) return true;
+
+  const { error } = await (await db()).from('projects').select('visible_to').limit(1);
+  return !error;
+}
+
+/** Projects visible to the current user. */
+export async function fetchVisibleProjects(username: string | null, isAdmin = false) {
+  const projects = await fetchAllProjectsRaw();
+  return filterProjectsForUser(projects, username, isAdmin);
+}
+
+export async function fetchTaskboardUsernames() {
+  const res = await fetch('/api/auth/usernames', { credentials: 'include' });
+  if (!res.ok) throw new Error('Could not load taskboard users.');
+  return res.json() as Promise<{ usernames: string[]; adminUsername: string }>;
+}
+
+export async function createProject(
+  name: string,
+  visible_to: string[] | null = null
+): Promise<Project> {
   const trimmed = name.trim();
   if (!trimmed) throw new Error('Project name is required');
 
-  if (isLocalTaskboardMode()) return localStore.createProject(trimmed);
+  if (isLocalTaskboardMode()) return localStore.createProject(trimmed, visible_to);
 
   const supabase = await db();
   const { data: existing, error: fetchError } = await supabase.from('projects').select('slug');
@@ -62,41 +108,67 @@ export async function createProject(name: string): Promise<Project> {
 
   const { data, error } = await supabase
     .from('projects')
-    .insert({ name: trimmed, slug, sort_order })
+    .insert({ name: trimmed, slug, sort_order, visible_to })
     .select('*')
     .single();
 
-  if (error) throw error;
-  return data as Project;
+  if (error) {
+    if (visible_to != null && /visible_to|column/i.test(error.message)) {
+      throw new Error(
+        'Could not save project visibility. Run supabase/migrations/005_project_visibility.sql in Supabase SQL Editor, then try again.'
+      );
+    }
+    throw error;
+  }
+  return normalizeProject(data as Record<string, unknown>);
 }
 
-export async function updateProject(id: string, name: string): Promise<Project> {
-  const trimmed = name.trim();
-  if (!trimmed) throw new Error('Project name is required');
-
-  if (isLocalTaskboardMode()) return localStore.updateProject(id, trimmed);
+export async function updateProject(
+  id: string,
+  updates: { name?: string; visible_to?: string[] | null }
+): Promise<Project> {
+  if (isLocalTaskboardMode()) return localStore.updateProject(id, updates);
 
   const supabase = await db();
-  const { data: existing, error: fetchError } = await supabase
-    .from('projects')
-    .select('slug, id')
-    .neq('id', id);
-  if (fetchError) throw fetchError;
+  const patch: { name?: string; slug?: string; visible_to?: string[] | null } = {};
 
-  const slug = ensureUniqueSlug(
-    slugifyProjectName(trimmed),
-    (existing ?? []).map((p) => p.slug)
-  );
+  if (updates.visible_to !== undefined) {
+    patch.visible_to = updates.visible_to;
+  }
+
+  if (updates.name !== undefined) {
+    const trimmed = updates.name.trim();
+    if (!trimmed) throw new Error('Project name is required');
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('projects')
+      .select('slug, id')
+      .neq('id', id);
+    if (fetchError) throw fetchError;
+
+    patch.name = trimmed;
+    patch.slug = ensureUniqueSlug(
+      slugifyProjectName(trimmed),
+      (existing ?? []).map((p) => p.slug)
+    );
+  }
 
   const { data, error } = await supabase
     .from('projects')
-    .update({ name: trimmed, slug })
+    .update(patch)
     .eq('id', id)
     .select('*')
     .single();
 
-  if (error) throw error;
-  return data as Project;
+  if (error) {
+    if (updates.visible_to !== undefined && /visible_to|column/i.test(error.message)) {
+      throw new Error(
+        'Could not save project visibility. Run supabase/migrations/005_project_visibility.sql in Supabase SQL Editor, then try again.'
+      );
+    }
+    throw error;
+  }
+  return normalizeProject(data as Record<string, unknown>);
 }
 
 export async function deleteProject(id: string): Promise<void> {
@@ -126,11 +198,17 @@ export async function fetchActiveTaskCountsByProject() {
   return counts;
 }
 
-export async function fetchProjectBySlug(slug: string) {
+export async function fetchProjectBySlug(
+  slug: string,
+  username: string | null = null,
+  isAdmin = false
+) {
   if (isLocalTaskboardMode()) {
     const project = localStore.getProjectBySlug(slug);
     if (!project) throw new Error('Project not found');
-    return project;
+    const normalized = normalizeProject(project);
+    if (!canUserSeeProject(normalized, username, isAdmin)) throw new Error('Project not found');
+    return normalized;
   }
 
   const { data, error } = await (await db())
@@ -140,7 +218,14 @@ export async function fetchProjectBySlug(slug: string) {
     .single();
 
   if (error) throw error;
-  return data;
+  const project = normalizeProject(data as Record<string, unknown>);
+  if (!canUserSeeProject(project, username, isAdmin)) throw new Error('Project not found');
+  return project;
+}
+
+export function filterTasksForProjects(tasks: Task[], projects: Project[]): Task[] {
+  const ids = new Set(projects.map((project) => project.id));
+  return tasks.filter((task) => ids.has(task.project_id));
 }
 
 export async function fetchActiveTasks(projectId: string) {

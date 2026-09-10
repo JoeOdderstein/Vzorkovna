@@ -1,6 +1,7 @@
 import {
   createSessionToken,
   getAuthConfigError,
+  isAdminUsername,
   setSessionCookie,
   validateCredentials,
 } from '../_lib/auth.js';
@@ -30,7 +31,12 @@ export default async function handler(req, res) {
     const token = await createSessionToken(normalizedUsername);
     setSessionCookie(res, token);
 
-    return res.status(200).json({ ok: true, accessToken: token, username: normalizedUsername });
+    return res.status(200).json({
+      ok: true,
+      accessToken: token,
+      username: normalizedUsername,
+      isAdmin: isAdminUsername(normalizedUsername),
+    });
   } catch (err) {
     console.error('Login error:', err);
     return res.status(500).json({ error: 'Login failed' });
