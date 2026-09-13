@@ -95,7 +95,7 @@ export default function Nav({ activeSection }: NavProps) {
             : { background: isScrolled ? 'var(--site-nav-bg-scrolled)' : 'var(--site-nav-bg)' }
         }
       >
-        <div className="max-w-screen-xl mx-auto px-8 flex items-center justify-between">
+        <div className="max-w-screen-xl mx-auto px-4 sm:px-8 flex items-center justify-between gap-3">
           {isAppPage ? (
             <div className="opacity-90 cursor-default" aria-label={SITE_DATA.name}>
               <SiteLogo />
@@ -111,7 +111,7 @@ export default function Nav({ activeSection }: NavProps) {
           )}
 
           {!hideSiteNavLinks && (
-            <div className="hidden md:flex items-center gap-10">
+            <div className="site-nav-site-links hidden md:flex items-center gap-10">
               {SITE_DATA.navLinks.map((link) => (
                 <button
                   key={link}
@@ -129,48 +129,65 @@ export default function Nav({ activeSection }: NavProps) {
           )}
 
           {isAppPage && authenticated ? (
-            <div className="relative z-10 flex items-center gap-4">
-              {username && (
-                <span className="font-sans text-xs tracking-[0.2em] uppercase site-text-subtle">
-                  {username}
-                </span>
-              )}
-              {showPrivateNav && (
-                <a
-                  href={TASKBOARD_DRIVE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
-                >
-                  DRIVE
-                </a>
-              )}
-              <Link
-                to={TASKBOARD_PATH}
-                className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
-                  isTaskboardPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
-                }`}
-              >
-                TASKBOARD
-              </Link>
-              {showPrivateNav && (
+            <>
+              <div className="relative z-10 hidden md:flex items-center gap-4">
+                {username && (
+                  <span className="font-sans text-xs tracking-[0.2em] uppercase site-text-subtle">
+                    {username}
+                  </span>
+                )}
                 <Link
-                  to={REMOTE_INST_PATH}
+                  to={TASKBOARD_PATH}
                   className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
-                    isRemoteInstPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                    isTaskboardPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
                   }`}
                 >
-                  REMOTE INST
+                  TASKBOARD
                 </Link>
-              )}
-              <button
-                type="button"
-                onClick={() => void handleLogout()}
-                className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
-              >
-                Logout
-              </button>
-            </div>
+                {showPrivateNav && (
+                  <a
+                    href={TASKBOARD_DRIVE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
+                  >
+                    DRIVE
+                  </a>
+                )}
+                {showPrivateNav && (
+                  <Link
+                    to={REMOTE_INST_PATH}
+                    className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                      isRemoteInstPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                    }`}
+                  >
+                    REMOTE INST
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
+                >
+                  Logout
+                </button>
+              </div>
+              <div className="md:hidden flex items-center gap-3 min-w-0">
+                {username && (
+                  <span className="font-sans text-xs tracking-[0.2em] uppercase site-text-subtle truncate">
+                    {username}
+                  </span>
+                )}
+                <button
+                  type="button"
+                  className="site-link-muted transition-colors shrink-0"
+                  onClick={() => setMenuOpen(true)}
+                  aria-label="Open menu"
+                >
+                  <Menu size={22} strokeWidth={1.5} />
+                </button>
+              </div>
+            </>
           ) : (
             !hideSiteNavLinks && (
               <button
@@ -185,37 +202,79 @@ export default function Nav({ activeSection }: NavProps) {
         </div>
       </nav>
 
-      {!hideSiteNavLinks && (
-        <div
-          className={`fixed inset-0 z-50 flex flex-col justify-center items-center transition-all duration-500 modal-backdrop ${
-            menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
-          }`}
-        >
-          <button
-            className="absolute top-6 right-8 site-link-subtle transition-colors"
-            onClick={() => setMenuOpen(false)}
-            aria-label="Close menu"
-          >
-            <X size={22} strokeWidth={1.5} />
-          </button>
+      {menuOpen && (
+        <div className="fixed inset-0 z-[60] flex flex-col transition-all duration-500 modal-backdrop">
+          <div className="flex items-center justify-end px-4 sm:px-8 py-4 border-b site-border">
+            <button
+              type="button"
+              className="site-link-subtle transition-colors shrink-0"
+              onClick={() => setMenuOpen(false)}
+              aria-label="Close menu"
+            >
+              <X size={22} strokeWidth={1.5} />
+            </button>
+          </div>
 
-          <div className="flex flex-col items-center gap-10">
-            {SITE_DATA.navLinks.map((link, i) => (
-              <button
-                key={link}
-                onClick={() => goToNavLink(link)}
-                className="font-serif text-4xl site-link-muted transition-colors duration-300 tracking-wide"
-                style={{
-                  fontFamily: 'var(--font-serif)',
-                  transitionDelay: menuOpen ? `${i * 60}ms` : '0ms',
-                  transform: menuOpen ? 'translateY(0)' : 'translateY(20px)',
-                  opacity: menuOpen ? 1 : 0,
-                  transition: `opacity 0.5s ease ${i * 60}ms, transform 0.5s ease ${i * 60}ms, color 0.3s ease`,
-                }}
-              >
-                {link}
-              </button>
-            ))}
+          <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-8">
+            {isAppPage && authenticated ? (
+              <div className="flex flex-col gap-1 max-w-md mx-auto">
+                <Link
+                  to={TASKBOARD_PATH}
+                  onClick={() => setMenuOpen(false)}
+                  className={`site-mobile-nav-link${isTaskboardPage ? ' site-mobile-nav-link--active' : ''}`}
+                >
+                  Taskboard
+                </Link>
+                {showPrivateNav && (
+                  <a
+                    href={TASKBOARD_DRIVE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={() => setMenuOpen(false)}
+                    className="site-mobile-nav-link"
+                  >
+                    Drive
+                  </a>
+                )}
+                {showPrivateNav && (
+                  <Link
+                    to={REMOTE_INST_PATH}
+                    onClick={() => setMenuOpen(false)}
+                    className={`site-mobile-nav-link${isRemoteInstPage ? ' site-mobile-nav-link--active' : ''}`}
+                  >
+                    Remote Inst
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void handleLogout()}
+                  className="site-mobile-nav-link site-mobile-nav-link--logout text-left"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              !hideSiteNavLinks && (
+                <div className="flex flex-col items-center gap-10">
+                  {SITE_DATA.navLinks.map((link, i) => (
+                    <button
+                      key={link}
+                      onClick={() => goToNavLink(link)}
+                      className="font-serif text-4xl site-link-muted transition-colors duration-300 tracking-wide"
+                      style={{
+                        fontFamily: 'var(--font-serif)',
+                        transitionDelay: menuOpen ? `${i * 60}ms` : '0ms',
+                        transform: menuOpen ? 'translateY(0)' : 'translateY(20px)',
+                        opacity: menuOpen ? 1 : 0,
+                        transition: `opacity 0.5s ease ${i * 60}ms, transform 0.5s ease ${i * 60}ms, color 0.3s ease`,
+                      }}
+                    >
+                      {link}
+                    </button>
+                  ))}
+                </div>
+              )
+            )}
           </div>
         </div>
       )}

@@ -96,15 +96,40 @@ body {
   border-bottom: 1px solid var(--site-border);
 }
 
-/* Client-facing taskboard/login: hide main site nav links */
-.site-nav--taskboard .max-w-screen-xl > .hidden,
-.site-nav--minimal .max-w-screen-xl > .hidden {
+/* Client-facing taskboard/login: hide main site nav links only */
+.site-nav--taskboard .site-nav-site-links,
+.site-nav--minimal .site-nav-site-links {
   display: none !important;
 }
 
-.site-nav--taskboard button[aria-label='Open menu'],
-.site-nav--minimal button[aria-label='Open menu'] {
-  display: none !important;
+.site-mobile-nav-link {
+  display: block;
+  width: 100%;
+  padding: 0.875rem 1rem;
+  font-family: var(--font-sans, system-ui, sans-serif);
+  font-size: 0.8125rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  text-decoration: none;
+  color: var(--site-text-muted);
+  border-radius: 0.5rem;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.site-mobile-nav-link:hover,
+.site-mobile-nav-link:focus-visible {
+  color: var(--site-text);
+  background-color: var(--site-surface);
+}
+
+.site-mobile-nav-link--active {
+  color: var(--color-accent);
+}
+
+.site-mobile-nav-link--logout {
+  margin-top: 0.75rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--site-border);
 }
 
 .group:hover .site-text-muted {
