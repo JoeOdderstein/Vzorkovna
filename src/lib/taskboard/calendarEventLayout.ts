@@ -122,9 +122,13 @@ function assignLanes(segments: CalendarEventSegment[]): CalendarEventSegment[] {
   return sorted;
 }
 
-export function eventLaneHeight(maxLanes: number) {
+export const CALENDAR_LAYOUT = {
+  desktop: { laneHeight: 1.375, laneGap: 0.125 },
+  mobile: { laneHeight: 2, laneGap: 0.25 },
+} as const;
+
+export function eventLaneHeight(maxLanes: number, mobile = false) {
   if (maxLanes === 0) return 0;
-  const laneSize = 1.375; // rem
-  const gap = 0.125; // rem
-  return maxLanes * laneSize + Math.max(0, maxLanes - 1) * gap;
+  const { laneHeight, laneGap } = mobile ? CALENDAR_LAYOUT.mobile : CALENDAR_LAYOUT.desktop;
+  return maxLanes * laneHeight + Math.max(0, maxLanes - 1) * laneGap;
 }

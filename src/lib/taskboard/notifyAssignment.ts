@@ -21,7 +21,15 @@ export function notifyTaskAssignment(
         if (!res.ok) {
           console.warn('[taskboard] assignment notification failed:', res.status, data);
         } else if ((data.notified ?? 0) === 0) {
-          console.warn('[taskboard] assignment notification: no email sent', data);
+          const skipped = Array.isArray(data.skipped) ? data.skipped : [];
+          const reasons = skipped.map(
+            (item: { assignee?: string; reason?: string; detail?: string }) =>
+              `${item.assignee ?? '?'}: ${item.reason ?? 'unknown'}${item.detail ? ` (${item.detail})` : ''}`
+          );
+          console.warn(
+            '[taskboard] assignment notification: no email sent.',
+            reasons.length > 0 ? reasons.join('; ') : data
+          );
         } else {
           console.info('[taskboard] assignment notification sent', data);
         }

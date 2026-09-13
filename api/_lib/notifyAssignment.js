@@ -52,7 +52,7 @@ export async function handleNotifyAssignment(req, res) {
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('id, task_name, assignees, deadline, project_id')
+    .select('id, task_name, description, assignees, deadline, project_id')
     .eq('id', taskId)
     .maybeSingle();
 
@@ -148,15 +148,17 @@ export async function handleNotifyAssignment(req, res) {
         assigneeName: assignee,
         assignedBy: assignerBoardName ?? assignedBy ?? 'Someone',
         taskName: task.task_name || 'Untitled task',
+        description: task.description,
         projectName: project.name || 'Taskboard',
         deadline: task.deadline,
         taskUrl,
       });
       notified += 1;
     } catch (err) {
-      console.error(`Assignment email failed for ${profile.email}:`, err);
+      const detail = err instanceof Error ? err.message : String(err);
+      console.error(`Assignment email failed for ${profile.email}:`, detail, err);
       failures.push(assignee);
-      skipped.push({ assignee, reason: 'send_failed', email: profile.email });
+      skipped.push({ assignee, reason: 'send_failed', email: profile.email, detail });
     }
   }
 

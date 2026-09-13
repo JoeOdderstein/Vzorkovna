@@ -6,6 +6,7 @@ import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
 import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import {
   buildCalendarCells,
+  CALENDAR_LAYOUT,
   eventLaneHeight,
   layoutEventSegments,
   splitIntoWeeks,
@@ -38,6 +39,23 @@ interface TaskCalendarDialogProps {
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const DEFAULT_VISIT_TITLE = 'Prague visit';
+const MOBILE_CALENDAR_QUERY = '(max-width: 767px)';
+
+function useMobileCalendarLayout() {
+  const [mobile, setMobile] = useState(() =>
+    typeof window !== 'undefined' ? window.matchMedia(MOBILE_CALENDAR_QUERY).matches : false
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(MOBILE_CALENDAR_QUERY);
+    const update = () => setMobile(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+
+  return mobile;
+}
 
 function segmentClassName(segment: CalendarEventSegment) {
   const classes = ['tb-calendar-visit-segment'];
@@ -47,7 +65,17 @@ function segmentClassName(segment: CalendarEventSegment) {
   return classes.join(' ');
 }
 
+function formatAgendaDate(dateKey: string) {
+  const [year, month, day] = dateKey.split('-').map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialogProps) {
+  const mobileCalendar = useMobileCalendarLayout();
   const { username, isAdmin } = useTaskboardAuth();
   const { assigneeFilter } = useTaskboardFilter();
   const { projectsToken } = useTaskboardRefresh();
@@ -144,6 +172,18 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
     [events, weeks]
   );
   const todayKey = formatDateKey(new Date());
+  const laneHeight = CALENDAR_LAYOUT.desktop.laneHeight;
+  const monthTaskEntries = useMemo(() => {
+    const entries: [string, Task[]][] = [];
+    for (const [dateKey, dayTasks] of tasksByDate) {
+      const [entryYear, entryMonth] = dateKey.split('-').map(Number);
+      if (entryYear === year && entryMonth === month + 1) {
+        entries.push([dateKey, dayTasks]);
+      }
+    }
+    entries.sort(([a], [b]) => a.localeCompare(b));
+    return entries;
+  }, [tasksByDate, year, month]);
 
   const handleTaskClick = (task: Task) => {
     openTask(task, task.project_id);
@@ -212,7 +252,9 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
     <div className="taskboard fixed inset-0 z-[80] flex items-center justify-center px-4 sm:px-6">
       <div className="absolute inset-0 tb-overlay" onClick={onClose} />
       <div
-        className="relative w-full max-w-5xl tb-calendar-panel max-h-[90vh] flex flex-col"
+        className={`relative w-full max-w-5xl tb-calendar-panel max-h-[90vh] flex flex-col${
+          mobileCalendar ? ' tb-calendar-panel--mobile' : ''
+        }`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b tb-calendar-border flex items-center justify-between shrink-0">
@@ -337,7 +379,7 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
               <div className="space-y-px tb-calendar-grid rounded-lg overflow-hidden">
                 {weeks.map((week, weekIndex) => {
                   const maxLanes = maxLanesByWeek[weekIndex] ?? 0;
-                  const laneAreaHeight = eventLaneHeight(maxLanes);
+                  const laneAreaHeight = mobileCalendar ? 0 : eventLaneHeight(maxLanes);
                   const segments = segmentsByWeek[weekIndex] ?? [];
 
                   return (
@@ -373,39 +415,50 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                                 style={{ height: `${laneAreaHeight}rem` }}
                                 aria-hidden
                               />
-                              <ul className="space-y-1">
-                                {dayTasks.map((task) => {
-                                  const status = getDeadlineStatus(task.deadline, task.completed);
-                                  return (
-                                    <li key={task.id}>
-                                      <button
-                                        type="button"
-                                        onClick={() => handleTaskClick(task)}
-                                        className={`tb-calendar-task ${deadlineClasses[status]}`}
-                                        title={`${task.task_name} · ${projectNames[task.project_id] ?? 'Project'}`}
-                                      >
-                                        <span className="block truncate">
-                                          {task.task_name || 'Untitled task'}
-                                        </span>
-                                        <span className="block truncate text-[10px] opacity-80">
-                                          {projectNames[task.project_id] ?? 'Project'}
-                                        </span>
-                                      </button>
-                                    </li>
-                                  );
-                                })}
-                              </ul>
+                              {mobileCalendar ? (
+                                dayTasks.length > 0 && (
+                                  <span
+                                    className="tb-calendar-mobile-indicator"
+                                    aria-label={`${dayTasks.length} deadline${dayTasks.length === 1 ? '' : 's'}`}
+                                  >
+                                    {dayTasks.length}
+                                  </span>
+                                )
+                              ) : (
+                                <ul className="space-y-1">
+                                  {dayTasks.map((task) => {
+                                    const status = getDeadlineStatus(task.deadline, task.completed);
+                                    return (
+                                      <li key={task.id}>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleTaskClick(task)}
+                                          className={`tb-calendar-task ${deadlineClasses[status]}`}
+                                          title={`${task.task_name} · ${projectNames[task.project_id] ?? 'Project'}`}
+                                        >
+                                          <span className="block truncate">
+                                            {task.task_name || 'Untitled task'}
+                                          </span>
+                                          <span className="block truncate tb-calendar-task-sub opacity-80">
+                                            {projectNames[task.project_id] ?? 'Project'}
+                                          </span>
+                                        </button>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              )}
                             </div>
                           );
                         })}
                       </div>
 
-                      {maxLanes > 0 && (
+                      {!mobileCalendar && maxLanes > 0 && (
                         <div
                           className="tb-calendar-event-layer"
                           style={{
                             height: `${laneAreaHeight}rem`,
-                            gridTemplateRows: `repeat(${maxLanes}, 1.375rem)`,
+                            gridTemplateRows: `repeat(${maxLanes}, ${laneHeight}rem)`,
                           }}
                         >
                           {segments.map((segment) => (
@@ -427,6 +480,40 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                   );
                 })}
               </div>
+
+              {mobileCalendar && monthTaskEntries.length > 0 && (
+                <div className="tb-calendar-mobile-agenda mt-5">
+                  <p className="tb-field-label mb-3">Deadlines this month</p>
+                  <ul className="space-y-4">
+                    {monthTaskEntries.map(([dateKey, dayTasks]) => (
+                      <li key={dateKey}>
+                        <p className="tb-calendar-agenda-date">{formatAgendaDate(dateKey)}</p>
+                        <ul className="space-y-2 mt-1.5">
+                          {dayTasks.map((task) => {
+                            const status = getDeadlineStatus(task.deadline, task.completed);
+                            return (
+                              <li key={task.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleTaskClick(task)}
+                                  className={`tb-calendar-agenda-task ${deadlineClasses[status]}`}
+                                >
+                                  <span className="block font-medium">
+                                    {task.task_name || 'Untitled task'}
+                                  </span>
+                                  <span className="block tb-calendar-agenda-task-sub opacity-80">
+                                    {projectNames[task.project_id] ?? 'Project'}
+                                  </span>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {tasksByDate.size === 0 && events.length === 0 && (
                 <p className="text-sm tb-muted mt-4">No deadlines or visits yet.</p>
