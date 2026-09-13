@@ -1,5 +1,15 @@
 import type { TaskCategory } from './constants';
-import type { Project, ProjectCategory, Task, TaskInsert, TaskUpdate } from './types';
+import type {
+  CalendarEvent,
+  CalendarEventInsert,
+  Project,
+  ProjectCategory,
+  Task,
+  TaskInsert,
+  TaskUpdate,
+  UserProfile,
+  UserProfileUpdate,
+} from './types';
 import { normalizeTask } from './assigneeUtils';
 import { DEFAULT_CATEGORIES } from './categoryUtils';
 import { ensureUniqueSlug, slugifyProjectName } from './projectUtils';
@@ -7,6 +17,8 @@ import { ensureUniqueSlug, slugifyProjectName } from './projectUtils';
 const STORAGE_KEY = 'taskboard_local_tasks_v1';
 const PROJECTS_STORAGE_KEY = 'taskboard_local_projects_v1';
 const PROJECT_CATEGORIES_STORAGE_KEY = 'taskboard_local_project_categories_v1';
+const CALENDAR_EVENTS_STORAGE_KEY = 'taskboard_local_calendar_events_v1';
+const USER_PROFILES_STORAGE_KEY = 'taskboard_local_user_profiles_v1';
 
 const SEED_PROJECTS: Project[] = [
   { id: 'p1', name: 'Tank Shots', slug: 'tank-shots', sort_order: 1, created_at: '' },
@@ -59,6 +71,34 @@ function loadProjectCategories(): ProjectCategory[] {
 
 function saveProjectCategories(categories: ProjectCategory[]) {
   localStorage.setItem(PROJECT_CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+}
+
+function loadCalendarEvents(): CalendarEvent[] {
+  try {
+    const raw = localStorage.getItem(CALENDAR_EVENTS_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as CalendarEvent[];
+  } catch {
+    return [];
+  }
+}
+
+function saveCalendarEvents(events: CalendarEvent[]) {
+  localStorage.setItem(CALENDAR_EVENTS_STORAGE_KEY, JSON.stringify(events));
+}
+
+function loadUserProfiles(): UserProfile[] {
+  try {
+    const raw = localStorage.getItem(USER_PROFILES_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as UserProfile[];
+  } catch {
+    return [];
+  }
+}
+
+function saveUserProfiles(profiles: UserProfile[]) {
+  localStorage.setItem(USER_PROFILES_STORAGE_KEY, JSON.stringify(profiles));
 }
 
 function newId() {
@@ -431,5 +471,63 @@ export const localStore = {
       throw new Error('Category not found.');
     }
     saveProjectCategories(next);
+  },
+
+  getCalendarEvents: (): CalendarEvent[] =>
+    loadCalendarEvents().sort((a, b) => a.start_date.localeCompare(b.start_date)),
+
+  createCalendarEvent: (input: CalendarEventInsert): CalendarEvent => {
+    const event: CalendarEvent = {
+      id: newId(),
+      title: input.title.trim() || 'Prague visit',
+      start_date: input.start_date,
+      end_date: input.end_date,
+      created_at: now(),
+    };
+    saveCalendarEvents([...loadCalendarEvents(), event]);
+    return event;
+  },
+
+  deleteCalendarEvent: (id: string): void => {
+    const events = loadCalendarEvents();
+    const next = events.filter((event) => event.id !== id);
+    if (next.length === events.length) throw new Error('Event not found.');
+    saveCalendarEvents(next);
+  },
+
+  listUserProfiles: (): UserProfile[] => loadUserProfiles(),
+
+  getUserProfile: (username: string): UserProfile | null =>
+    loadUserProfiles().find((profile) => profile.username === username) ?? null,
+
+  upsertUserProfile: (profile: UserProfile): UserProfile => {
+    const profiles = loadUserProfiles();
+    const index = profiles.findIndex((item) => item.username === profile.username);
+    const nextProfile = { ...profile, updated_at: now() };
+    if (index === -1) {
+      saveUserProfiles([...profiles, nextProfile]);
+    } else {
+      const next = [...profiles];
+      next[index] = { ...next[index], ...nextProfile };
+      saveUserProfiles(next);
+    }
+    return nextProfile;
+  },
+
+  updateUserProfile: (username: string, updates: UserProfileUpdate): UserProfile => {
+    const profiles = loadUserProfiles();
+    const index = profiles.findIndex((profile) => profile.username === username);
+    if (index === -1) {
+      throw new Error('Profile not found.');
+    }
+
+    const next = [...profiles];
+    next[index] = {
+      ...next[index],
+      ...updates,
+      updated_at: now(),
+    };
+    saveUserProfiles(next);
+    return next[index];
   },
 };

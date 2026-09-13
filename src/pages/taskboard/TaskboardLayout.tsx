@@ -1,10 +1,15 @@
+import { useState } from 'react';
+import { User } from 'lucide-react';
 import { Link, Navigate, Outlet, useLocation } from 'react-router-dom';
 import Nav from '../../components/Nav';
 import { TaskboardFilterProvider } from '../../context/TaskboardFilterContext';
 import { CompleteUndoProvider } from '../../context/CompleteUndoContext';
 import { TaskboardRefreshProvider } from '../../context/TaskboardRefreshContext';
 import { TaskboardThemeProvider, useTaskboardTheme } from '../../context/TaskboardThemeContext';
+import { UserProfileProvider, useUserProfile } from '../../context/UserProfileContext';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
+import ProfileSettingsDialog from '../../taskboard/components/ProfileSettingsDialog';
+import TbIconTooltip from '../../taskboard/components/TbIconTooltip';
 import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
 import { isSupabaseConfigured } from '../../lib/taskboard/config';
 import AddTaskFab from '../../taskboard/components/AddTaskFab';
@@ -17,11 +22,13 @@ import { TaskboardSelectionProvider, useTaskboardSelection } from '../../context
 function TaskboardShell() {
   const { authenticated, loading, sessionReady } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
+  const { loading: profileLoading } = useUserProfile();
   const { selected } = useTaskboardSelection();
   const location = useLocation();
+  const [profileOpen, setProfileOpen] = useState(false);
   const waitingForSession = authenticated && isSupabaseConfigured() && !sessionReady;
 
-  if (loading || waitingForSession) {
+  if (loading || waitingForSession || profileLoading) {
     return (
       <>
         <Nav activeSection="login" />
@@ -54,6 +61,16 @@ function TaskboardShell() {
               <div className="flex flex-col items-end gap-1">
                 <div className="flex flex-wrap items-center gap-4">
                   <TaskboardThemeToggle />
+                  <TbIconTooltip label="Profile">
+                    <button
+                      type="button"
+                      onClick={() => setProfileOpen(true)}
+                      className="tb-btn-secondary px-2.5"
+                      aria-label="Open profile settings"
+                    >
+                      <User size={18} />
+                    </button>
+                  </TbIconTooltip>
                   <TaskboardHeaderActions />
                 </div>
               </div>
@@ -69,6 +86,7 @@ function TaskboardShell() {
         </div>
         <AddTaskFab />
         <TaskDrawerHost />
+        <ProfileSettingsDialog open={profileOpen} onClose={() => setProfileOpen(false)} />
         {isLocalTaskboardMode() && (
           <p className="max-w-screen-2xl mx-auto px-6 md:px-10 mt-8 text-xs tb-muted">
             Local mode — tasks are saved in this browser. Add Supabase keys to .env for shared storage and realtime sync.
@@ -81,16 +99,18 @@ function TaskboardShell() {
 
 export default function TaskboardLayout() {
   return (
-    <TaskboardThemeProvider>
-      <TaskboardFilterProvider>
-        <CompleteUndoProvider>
-          <TaskboardRefreshProvider>
-            <TaskboardSelectionProvider>
-              <TaskboardShell />
-            </TaskboardSelectionProvider>
-          </TaskboardRefreshProvider>
-        </CompleteUndoProvider>
-      </TaskboardFilterProvider>
-    </TaskboardThemeProvider>
+    <UserProfileProvider>
+      <TaskboardThemeProvider>
+        <TaskboardFilterProvider>
+          <CompleteUndoProvider>
+            <TaskboardRefreshProvider>
+              <TaskboardSelectionProvider>
+                <TaskboardShell />
+              </TaskboardSelectionProvider>
+            </TaskboardRefreshProvider>
+          </CompleteUndoProvider>
+        </TaskboardFilterProvider>
+      </TaskboardThemeProvider>
+    </UserProfileProvider>
   );
 }

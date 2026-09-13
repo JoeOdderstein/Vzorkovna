@@ -1,8 +1,12 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
+import { useUserProfile } from './UserProfileContext';
+import {
+  cacheThemeForUser,
+  getCachedThemeForUser,
+} from '../lib/taskboard/userProfileService';
+import { useTaskboardAuth } from './TaskboardAuthContext';
 
 export type TaskboardTheme = 'dark' | 'light';
-
-const STORAGE_KEY = 'taskboard-theme';
 
 interface TaskboardThemeContextValue {
   theme: TaskboardTheme;
@@ -12,27 +16,29 @@ interface TaskboardThemeContextValue {
 
 const TaskboardThemeContext = createContext<TaskboardThemeContextValue | null>(null);
 
-function getInitialTheme(): TaskboardTheme {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'light' || stored === 'dark') return stored;
-  } catch {
-    // ignore
-  }
-  return 'light';
-}
-
 export function TaskboardThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setThemeState] = useState<TaskboardTheme>(getInitialTheme);
+  const { username } = useTaskboardAuth();
+  const { profile, updateProfile } = useUserProfile();
 
-  const setTheme = (next: TaskboardTheme) => {
-    setThemeState(next);
-    localStorage.setItem(STORAGE_KEY, next);
-  };
+  const theme: TaskboardTheme =
+    profile?.theme ?? (username ? getCachedThemeForUser(username) : null) ?? 'light';
 
-  const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
+  const setTheme = useCallback(
+    (next: TaskboardTheme) => {
+      if (username) cacheThemeForUser(username, next);
+      void updateProfile({ theme: next }).catch(() => {});
+    },
+    [username, updateProfile]
+  );
 
-  const value = useMemo(() => ({ theme, setTheme, toggleTheme }), [theme]);
+  const toggleTheme = useCallback(() => {
+    setTheme(theme === 'dark' ? 'light' : 'dark');
+  }, [theme, setTheme]);
+
+  const value = useMemo(
+    () => ({ theme, setTheme, toggleTheme }),
+    [theme, setTheme, toggleTheme]
+  );
 
   return (
     <TaskboardThemeContext.Provider value={value}>{children}</TaskboardThemeContext.Provider>

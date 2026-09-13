@@ -85,7 +85,10 @@ export default function ProjectBoardPanel({
 
   useEffect(() => {
     if (taskChangeToken === 0) return;
-    load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 150);
+    return () => window.clearTimeout(timer);
   }, [taskChangeToken, load]);
 
   useEffect(() => {

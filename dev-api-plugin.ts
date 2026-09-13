@@ -13,6 +13,7 @@ import {
   validateCredentials,
   verifySessionToken,
 } from './api/_lib/auth.js';
+import { handleNotifyAssignment } from './api/_lib/notifyAssignment.js';
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -29,19 +30,45 @@ function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.end(JSON.stringify(body));
 }
 
+function syncDevEnv() {
+  const env = loadEnv('development', process.cwd(), '');
+  Object.assign(process.env, env);
+}
+
 /** Local dev API for taskboard auth (production uses Vercel serverless). */
 export function taskboardDevApi(): Plugin {
   return {
     name: 'taskboard-dev-api',
     configureServer(server) {
-      const env = loadEnv('development', process.cwd(), '');
-      Object.assign(process.env, env);
+      syncDevEnv();
 
       server.middlewares.use(async (req, res, next) => {
         const url = req.url?.split('?')[0];
-        if (!url?.startsWith('/api/auth')) return next();
+        if (!url?.startsWith('/api/')) return next();
+
+        syncDevEnv();
 
         try {
+          if (url === '/api/tasks/notify-assignment' && req.method === 'POST') {
+            const raw = await readBody(req);
+            const body = raw ? JSON.parse(raw) : {};
+            return handleNotifyAssignment(
+              { ...req, method: req.method, headers: req.headers, body } as never,
+              {
+                status: (code: number) => {
+                  res.statusCode = code;
+                  return {
+                    json: (payload: unknown) => sendJson(res, code, payload),
+                  };
+                },
+              } as never
+            );
+          }
+
+          if (!url.startsWith('/api/auth')) {
+            return sendJson(res, 404, { error: 'Not found' });
+          }
+
           if (url === '/api/auth/login' && req.method === 'POST') {
             const configError = getAuthConfigError();
             if (configError) {

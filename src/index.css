@@ -986,3 +986,213 @@ body {
   color: var(--tb-text);
   border-color: var(--tb-accent);
 }
+
+.taskboard .tb-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.taskboard .tb-tooltip {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: var(--tb-text);
+  color: var(--tb-bg);
+  font-family: var(--tb-font);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  z-index: 20;
+}
+
+.taskboard .tb-tooltip-wrap:hover .tb-tooltip {
+  opacity: 1;
+}
+
+.taskboard .tb-calendar-panel {
+  background: var(--tb-bg);
+  border: 1px solid var(--tb-border);
+  border-radius: 8px;
+  box-shadow: 0 8px 28px var(--tb-shadow);
+}
+
+.taskboard .tb-calendar-border {
+  border-color: var(--tb-border);
+}
+
+.taskboard .tb-calendar-nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--tb-border);
+  border-radius: 8px;
+  background: var(--tb-bg);
+  color: var(--tb-text-secondary);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.taskboard .tb-calendar-nav:hover {
+  background: var(--tb-surface);
+  color: var(--tb-text);
+}
+
+.taskboard .tb-calendar-weekday {
+  padding: 0.35rem 0.25rem;
+  text-align: center;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--tb-text-muted);
+}
+
+.taskboard .tb-calendar-grid {
+  background: var(--tb-border);
+}
+
+.taskboard .tb-calendar-week {
+  background: var(--tb-border);
+}
+
+.taskboard .tb-calendar-cell {
+  min-height: 5.5rem;
+  padding: 0.35rem;
+  background: var(--tb-bg);
+}
+
+.taskboard .tb-calendar-cell--empty {
+  background: var(--tb-surface-muted);
+}
+
+.taskboard .tb-calendar-cell--today {
+  background: var(--tb-accent-soft);
+}
+
+.taskboard .tb-calendar-day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--tb-text-secondary);
+}
+
+.taskboard .tb-calendar-cell--today .tb-calendar-day {
+  border-radius: 999px;
+  background: var(--tb-accent);
+  color: #fff;
+}
+
+.taskboard .tb-calendar-task {
+  width: 100%;
+  text-align: left;
+  padding: 0.2rem 0.35rem;
+  border-radius: 4px;
+  border: none;
+  background: var(--tb-surface);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.taskboard .tb-calendar-task:hover {
+  background: var(--tb-surface-hover);
+}
+
+.taskboard .tb-calendar-form {
+  background: var(--tb-surface-muted);
+}
+
+.taskboard .tb-remote-inst-card {
+  padding: 1.25rem 1.5rem;
+  border-radius: 8px;
+  border: 1px solid var(--tb-border);
+  background: var(--tb-bg);
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.taskboard .tb-remote-inst-card:hover {
+  background: var(--tb-surface);
+}
+
+.taskboard .tb-remote-inst-light {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 999px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px color-mix(in srgb, currentColor 15%, transparent);
+}
+
+.taskboard .tb-remote-inst-light--active {
+  background: #34a853;
+  color: #34a853;
+}
+
+.taskboard .tb-remote-inst-light--issues {
+  background: #f9ab00;
+  color: #f9ab00;
+}
+
+.taskboard .tb-remote-inst-light--broken {
+  background: #ea4335;
+  color: #ea4335;
+}
+
+.taskboard .tb-calendar-event-spacer {
+  flex-shrink: 0;
+}
+
+.taskboard .tb-calendar-event-layer {
+  position: absolute;
+  top: 1.85rem;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 1px;
+  padding: 0 0.35rem;
+  pointer-events: none;
+}
+
+.taskboard .tb-calendar-visit-segment {
+  min-width: 0;
+  height: 1.375rem;
+  padding: 0.15rem 0.35rem;
+  display: flex;
+  align-items: center;
+  background: color-mix(in srgb, var(--tb-accent) 22%, var(--tb-surface));
+  color: var(--tb-accent);
+  font-size: 0.6875rem;
+  line-height: 1.25;
+  font-weight: 500;
+  border-radius: 0;
+  pointer-events: auto;
+  overflow: hidden;
+}
+
+.taskboard .tb-calendar-visit-segment--event-start {
+  border-top-left-radius: 4px;
+  border-bottom-left-radius: 4px;
+}
+
+.taskboard .tb-calendar-visit-segment--event-end {
+  border-top-right-radius: 4px;
+  border-bottom-right-radius: 4px;
+}
+
+.taskboard .tb-calendar-visit-segment--single {
+  border-radius: 4px;
+}

@@ -1,7 +1,10 @@
 import { useState } from 'react';
+import { Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AddTaskDialog from './AddTaskDialog';
 import ManageProjectsDialog from './ManageProjectsDialog';
+import TaskCalendarDialog from './TaskCalendarDialog';
+import TbIconTooltip from './TbIconTooltip';
 import { useAddTaskFlow } from '../hooks/useAddTaskFlow';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
@@ -13,6 +16,7 @@ export default function TaskboardHeaderActions() {
   const { refreshProjects, openProject } = useTaskboardRefresh();
   const { addTaskOpen, setAddTaskOpen, handleCreateTask } = useAddTaskFlow();
   const [manageProjectsOpen, setManageProjectsOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const handleProjectsChanged = () => {
     refreshProjects();
@@ -34,6 +38,16 @@ export default function TaskboardHeaderActions() {
           + Manage projects
         </button>
       )}
+      <TbIconTooltip label="Calendar">
+        <button
+          type="button"
+          onClick={() => setCalendarOpen(true)}
+          className="tb-btn-secondary px-2.5"
+          aria-label="View deadlines calendar"
+        >
+          <Calendar size={18} />
+        </button>
+      </TbIconTooltip>
       <button type="button" onClick={() => setAddTaskOpen(true)} className="tb-btn-primary">
         + Add task
       </button>
@@ -43,6 +57,7 @@ export default function TaskboardHeaderActions() {
         onChanged={handleProjectsChanged}
         onProjectCreated={handleProjectCreated}
       />
+      <TaskCalendarDialog open={calendarOpen} onClose={() => setCalendarOpen(false)} />
       <AddTaskDialog
         open={addTaskOpen}
         onClose={() => setAddTaskOpen(false)}

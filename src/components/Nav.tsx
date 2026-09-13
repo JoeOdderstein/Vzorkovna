@@ -1,9 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Menu, X } from 'lucide-react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useScrollY } from '../hooks';
 import { SITE_DATA } from '../data';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
+import {
+  canAccessTaskboardPrivateNav,
+  REMOTE_INST_PATH,
+  TASKBOARD_DRIVE_URL,
+  TASKBOARD_PATH,
+} from '../lib/taskboard/driveConstants';
 import SiteLogo from './SiteLogo';
 
 interface NavProps {
@@ -16,10 +22,13 @@ export default function Nav({ activeSection }: NavProps) {
   const scrollY = useScrollY();
   const [menuOpen, setMenuOpen] = useState(false);
   const isScrolled = scrollY > 80 || location.pathname !== '/';
-  const isTaskboardPage = location.pathname.startsWith('/taskboard');
+  const isTaskboardPage = location.pathname.startsWith(TASKBOARD_PATH);
+  const isRemoteInstPage = location.pathname.startsWith(REMOTE_INST_PATH);
+  const isAppPage = isTaskboardPage || isRemoteInstPage;
   const hideSiteNavLinks =
-    location.pathname.startsWith('/taskboard') || location.pathname === '/login';
-  const { authenticated, username, logout } = useTaskboardAuth();
+    isAppPage || location.pathname === '/login';
+  const { authenticated, username, isAdmin, logout } = useTaskboardAuth();
+  const showPrivateNav = canAccessTaskboardPrivateNav(username, isAdmin);
 
   const handleLogout = async () => {
     setMenuOpen(false);
@@ -67,26 +76,27 @@ export default function Nav({ activeSection }: NavProps) {
     goToSection('hero');
   };
 
-  // Lock body scroll when mobile menu is open
   useEffect(() => {
     document.body.style.overflow = menuOpen ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [menuOpen]);
 
   return (
     <>
       <nav
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ${
-          isTaskboardPage ? 'site-nav--taskboard py-4' : isScrolled ? 'py-4' : 'py-6'
+          isAppPage ? 'site-nav--taskboard py-4' : isScrolled ? 'py-4' : 'py-6'
         }${hideSiteNavLinks ? ' site-nav--minimal' : ''}`}
         style={
-          isTaskboardPage
+          isAppPage
             ? undefined
             : { background: isScrolled ? 'var(--site-nav-bg-scrolled)' : 'var(--site-nav-bg)' }
         }
       >
         <div className="max-w-screen-xl mx-auto px-8 flex items-center justify-between">
-          {isTaskboardPage ? (
+          {isAppPage ? (
             <div className="opacity-90 cursor-default" aria-label={SITE_DATA.name}>
               <SiteLogo />
             </div>
@@ -100,7 +110,6 @@ export default function Nav({ activeSection }: NavProps) {
             </button>
           )}
 
-          {/* Desktop Links */}
           {!hideSiteNavLinks && (
             <div className="hidden md:flex items-center gap-10">
               {SITE_DATA.navLinks.map((link) => (
@@ -119,12 +128,40 @@ export default function Nav({ activeSection }: NavProps) {
             </div>
           )}
 
-          {isTaskboardPage && authenticated ? (
+          {isAppPage && authenticated ? (
             <div className="relative z-10 flex items-center gap-4">
               {username && (
                 <span className="font-sans text-xs tracking-[0.2em] uppercase site-text-subtle">
                   {username}
                 </span>
+              )}
+              {showPrivateNav && (
+                <a
+                  href={TASKBOARD_DRIVE_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
+                >
+                  DRIVE
+                </a>
+              )}
+              <Link
+                to={TASKBOARD_PATH}
+                className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                  isTaskboardPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                }`}
+              >
+                TASKBOARD
+              </Link>
+              {showPrivateNav && (
+                <Link
+                  to={REMOTE_INST_PATH}
+                  className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                    isRemoteInstPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                  }`}
+                >
+                  REMOTE INST
+                </Link>
               )}
               <button
                 type="button"
@@ -148,7 +185,6 @@ export default function Nav({ activeSection }: NavProps) {
         </div>
       </nav>
 
-      {/* Mobile Menu Overlay */}
       {!hideSiteNavLinks && (
         <div
           className={`fixed inset-0 z-50 flex flex-col justify-center items-center transition-all duration-500 modal-backdrop ${

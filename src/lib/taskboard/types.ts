@@ -83,3 +83,30 @@ export interface TaskGroup {
   parent: Task;
   subtasks: Task[];
 }
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+}
+
+export type CalendarEventInsert = Pick<CalendarEvent, 'title' | 'start_date' | 'end_date'>;
+
+export type UserProfileTheme = 'light' | 'dark';
+
+export interface UserProfile {
+  username: string;
+  /** Personal name on the taskboard and in assignment emails. */
+  board_name: string | null;
+  email: string | null;
+  theme: UserProfileTheme;
+  notify_on_assign: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type UserProfileUpdate = Partial<
+  Pick<UserProfile, 'board_name' | 'email' | 'theme' | 'notify_on_assign'>
+>;

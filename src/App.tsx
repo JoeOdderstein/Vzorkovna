@@ -8,6 +8,8 @@ import ArchivePage from './pages/taskboard/ArchivePage';
 import ProjectBoardPage from './pages/taskboard/ProjectBoardPage';
 import TaskboardLayout from './pages/taskboard/TaskboardLayout';
 import TaskboardOverviewPage from './pages/taskboard/TaskboardOverviewPage';
+import RemoteInstLayout from './pages/RemoteInstLayout';
+import RemoteInstPage from './pages/RemoteInstPage';
 
 export default function App() {
   return (
@@ -23,6 +25,9 @@ export default function App() {
               <Route index element={<TaskboardOverviewPage />} />
               <Route path="projects/:slug" element={<ProjectBoardPage />} />
               <Route path="archive" element={<ArchivePage />} />
+            </Route>
+            <Route path="/remote-inst" element={<RemoteInstLayout />}>
+              <Route index element={<RemoteInstPage />} />
             </Route>
           </Routes>
         </div>

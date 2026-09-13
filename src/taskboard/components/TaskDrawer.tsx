@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
-import type { Priority, TaskCategory } from '../../lib/taskboard/constants';
+import type { Assignee, Priority, TaskCategory } from '../../lib/taskboard/constants';
 import { ASSIGNEES, PRIORITIES } from '../../lib/taskboard/constants';
 import type { CategoryOption } from '../../lib/taskboard/types';
 import CategorySelect from './CategorySelect';
@@ -93,16 +93,21 @@ export default function TaskDrawer({
 
   if (!task) return null;
 
-  const save = async (updates: Partial<Task>) => {
-    setSaving(true);
+  const save = async (
+    updates: Partial<Task>,
+    options?: { previousAssignees?: Assignee[]; quiet?: boolean }
+  ) => {
+    if (!options?.quiet) setSaving(true);
     setError('');
     try {
-      await updateTask(task.id, updates);
+      await updateTask(task.id, updates, {
+        previousAssignees: options?.previousAssignees,
+      });
       onSaved();
     } catch {
       setError('Could not save changes.');
     } finally {
-      setSaving(false);
+      if (!options?.quiet) setSaving(false);
     }
   };
 
@@ -185,9 +190,10 @@ export default function TaskDrawer({
                     key={a}
                     type="button"
                     onClick={() => {
-                      const next = toggleAssignee(form.assignees ?? [], a);
+                      const previous = form.assignees ?? [];
+                      const next = toggleAssignee(previous, a);
                       setForm({ ...form, assignees: next });
-                      save({ assignees: next });
+                      save({ assignees: next }, { previousAssignees: previous, quiet: true });
                     }}
                     className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
                       selected ? 'tb-pill-selected font-medium' : 'tb-pill'

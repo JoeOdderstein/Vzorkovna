@@ -1,5 +1,5 @@
 import type { Project, Task, TaskGroup, TaskInsert, TaskUpdate } from './types';
-import type { TaskCategory } from './constants';
+import type { Assignee, TaskCategory } from './constants';
 import { isSupabaseConfigured } from './config';
 import { localStore } from './localStore';
 import {
@@ -16,6 +16,7 @@ import {
   normalizeProjectVisibleTo,
 } from './projectVisibility';
 import { seedDefaultCategoriesForProject } from './categoryService';
+import { notifyTaskAssignment } from './notifyAssignment';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -349,11 +350,29 @@ export async function createTask(input: TaskInsert) {
     .single();
 
   if (error) throw error;
-  return normalizeTask(data);
+  const task = normalizeTask(data);
+  if (task.assignees.length > 0) {
+    notifyTaskAssignment(task.id, []);
+  }
+  return task;
 }
 
-export async function updateTask(id: string, updates: TaskUpdate) {
+export async function updateTask(
+  id: string,
+  updates: TaskUpdate,
+  options?: { previousAssignees?: Assignee[] }
+) {
   if (isLocalTaskboardMode()) return localStore.updateTask(id, updates);
+
+  let previousAssignees = options?.previousAssignees;
+  if (updates.assignees !== undefined && previousAssignees === undefined) {
+    const { data: existing } = await (await db())
+      .from('tasks')
+      .select('assignees')
+      .eq('id', id)
+      .maybeSingle();
+    previousAssignees = normalizeAssignees(existing?.assignees);
+  }
 
   const payload: TaskUpdate = { ...updates };
   if (updates.completed === true) {
@@ -371,7 +390,11 @@ export async function updateTask(id: string, updates: TaskUpdate) {
     .single();
 
   if (error) throw error;
-  return normalizeTask(data);
+  const task = normalizeTask(data);
+  if (updates.assignees !== undefined) {
+    notifyTaskAssignment(id, previousAssignees ?? []);
+  }
+  return task;
 }
 
 export async function deleteTask(id: string) {
