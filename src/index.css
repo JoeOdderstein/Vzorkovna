@@ -792,8 +792,40 @@ body {
   color: #80868b;
 }
 
+.taskboard .tb-header-scroll-row {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.5rem;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  min-width: 0;
+}
+
+.taskboard .tb-header-scroll-row::-webkit-scrollbar {
+  display: none;
+}
+
+.taskboard .tb-header-scroll-row > * {
+  flex-shrink: 0;
+}
+
+.taskboard .tb-header-scroll-row--filters {
+  padding-top: 0.45rem;
+  padding-bottom: 0.15rem;
+  padding-right: 0.35rem;
+}
+
+@media (min-width: 768px) {
+  .taskboard .tb-header-scroll-row {
+    gap: 1rem;
+  }
+}
+
 .taskboard .tb-filter-btn {
   position: relative;
+  white-space: nowrap;
   font-family: var(--tb-font);
   font-size: 0.75rem;
   font-weight: 500;

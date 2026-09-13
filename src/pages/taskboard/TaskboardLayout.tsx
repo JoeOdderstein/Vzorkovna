@@ -49,8 +49,8 @@ function TaskboardShell() {
       <div className="taskboard min-h-screen pt-24 pb-16" data-theme={theme}>
         <div className="tb-divider mb-8">
           <div className="max-w-screen-2xl mx-auto px-6 md:px-10 py-4 flex flex-col gap-4">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
+              <div className="flex items-center gap-6 shrink-0">
                 <Link to="/taskboard" className="tb-heading hover:opacity-80 transition-opacity">
                   Taskboard
                 </Link>
@@ -58,21 +58,19 @@ function TaskboardShell() {
                   Archive
                 </Link>
               </div>
-              <div className="flex flex-col items-end gap-1">
-                <div className="flex flex-wrap items-center gap-4">
-                  <TaskboardThemeToggle />
-                  <TbIconTooltip label="Profile">
-                    <button
-                      type="button"
-                      onClick={() => setProfileOpen(true)}
-                      className="tb-btn-secondary px-2.5"
-                      aria-label="Open profile settings"
-                    >
-                      <User size={18} />
-                    </button>
-                  </TbIconTooltip>
-                  <TaskboardHeaderActions />
-                </div>
+              <div className="tb-header-scroll-row md:justify-end">
+                <TaskboardThemeToggle />
+                <TbIconTooltip label="Profile">
+                  <button
+                    type="button"
+                    onClick={() => setProfileOpen(true)}
+                    className="tb-btn-secondary px-2.5 shrink-0"
+                    aria-label="Open profile settings"
+                  >
+                    <User size={18} />
+                  </button>
+                </TbIconTooltip>
+                <TaskboardHeaderActions />
               </div>
             </div>
             <AssigneeFilterBar />

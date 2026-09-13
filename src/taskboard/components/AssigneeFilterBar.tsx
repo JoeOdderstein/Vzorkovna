@@ -22,7 +22,7 @@ export default function AssigneeFilterBar() {
   }, [tasksForCounts]);
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="tb-header-scroll-row tb-header-scroll-row--filters">
       {ASSIGNEE_FILTERS.map(({ id, label }) => {
         const active = assigneeFilter === id;
         const count = counts[id] ?? 0;

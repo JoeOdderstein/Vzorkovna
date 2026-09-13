@@ -33,7 +33,7 @@ export default function TaskboardHeaderActions() {
         <button
           type="button"
           onClick={() => setManageProjectsOpen(true)}
-          className="tb-btn-secondary"
+          className="tb-btn-secondary shrink-0 whitespace-nowrap"
         >
           + Manage projects
         </button>
@@ -42,13 +42,17 @@ export default function TaskboardHeaderActions() {
         <button
           type="button"
           onClick={() => setCalendarOpen(true)}
-          className="tb-btn-secondary px-2.5"
+          className="tb-btn-secondary px-2.5 shrink-0"
           aria-label="View deadlines calendar"
         >
           <Calendar size={18} />
         </button>
       </TbIconTooltip>
-      <button type="button" onClick={() => setAddTaskOpen(true)} className="tb-btn-primary">
+      <button
+        type="button"
+        onClick={() => setAddTaskOpen(true)}
+        className="tb-btn-primary shrink-0 whitespace-nowrap"
+      >
         + Add task
       </button>
       <ManageProjectsDialog
