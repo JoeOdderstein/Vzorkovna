@@ -1,9 +1,14 @@
 import { useMemo } from 'react';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
-import { ASSIGNEE_FILTERS } from '../../lib/taskboard/filterUtils';
+import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
+import {
+  ASSIGNEE_FILTERS,
+  orderAssigneeFiltersForUser,
+  type AssigneeFilter,
+} from '../../lib/taskboard/filterUtils';
 import { taskHasAssignee } from '../../lib/taskboard/assigneeUtils';
 import type { Task } from '../../lib/taskboard/types';
-import type { AssigneeFilter } from '../../lib/taskboard/filterUtils';
 
 function countTasksForFilter(tasks: Task[], id: AssigneeFilter) {
   if (id === 'all') return tasks.length;
@@ -11,6 +16,7 @@ function countTasksForFilter(tasks: Task[], id: AssigneeFilter) {
 }
 
 export default function AssigneeFilterBar() {
+  const { username } = useTaskboardAuth();
   const { assigneeFilter, setAssigneeFilter, tasksForCounts } = useTaskboardFilter();
 
   const counts = useMemo(() => {
@@ -21,9 +27,16 @@ export default function AssigneeFilterBar() {
     return map;
   }, [tasksForCounts]);
 
+  const currentAssignee = username ? defaultBoardNameForUsername(username) : null;
+
+  const orderedFilters = useMemo(
+    () => orderAssigneeFiltersForUser(currentAssignee, counts),
+    [currentAssignee, counts]
+  );
+
   return (
     <div className="tb-header-scroll-row tb-header-scroll-row--filters">
-      {ASSIGNEE_FILTERS.map(({ id, label }) => {
+      {orderedFilters.map(({ id, label }) => {
         const active = assigneeFilter === id;
         const count = counts[id] ?? 0;
 

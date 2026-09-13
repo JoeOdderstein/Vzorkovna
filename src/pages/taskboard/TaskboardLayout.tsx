@@ -15,12 +15,13 @@ import { isSupabaseConfigured } from '../../lib/taskboard/config';
 import AddTaskFab from '../../taskboard/components/AddTaskFab';
 import AssigneeFilterBar from '../../taskboard/components/AssigneeFilterBar';
 import TaskDrawerHost from '../../taskboard/components/TaskDrawerHost';
+import ManageProjectsHeaderAction from '../../taskboard/components/ManageProjectsHeaderAction';
 import TaskboardHeaderActions from '../../taskboard/components/TaskboardHeaderActions';
 import TaskboardThemeToggle from '../../taskboard/components/TaskboardThemeToggle';
 import { TaskboardSelectionProvider, useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 
 function TaskboardShell() {
-  const { authenticated, loading, sessionReady } = useTaskboardAuth();
+  const { authenticated, loading, sessionReady, isAdmin } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
   const { loading: profileLoading } = useUserProfile();
   const { selected } = useTaskboardSelection();
@@ -46,17 +47,20 @@ function TaskboardShell() {
   return (
     <div className={`tb-layout-push${selected ? ' tb-layout-push--open' : ''}`}>
       <Nav activeSection="login" />
-      <div className="taskboard min-h-screen pt-24 pb-16" data-theme={theme}>
+      <div className="taskboard min-h-screen pt-20 pb-16" data-theme={theme}>
         <div className="tb-divider mb-8">
-          <div className="max-w-screen-2xl mx-auto px-6 md:px-10 py-4 flex flex-col gap-4">
-            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-4">
-              <div className="flex items-center gap-6 shrink-0">
-                <Link to="/taskboard" className="tb-heading hover:opacity-80 transition-opacity">
-                  Taskboard
-                </Link>
-                <Link to="/taskboard/archive" className="tb-link">
-                  Archive
-                </Link>
+          <div className="max-w-screen-2xl mx-auto px-6 md:px-10 pt-0.5 pb-4 flex flex-col gap-4">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-4 min-w-0">
+                <div className="flex items-center gap-6 shrink-0">
+                  <Link to="/taskboard" className="tb-heading hover:opacity-80 transition-opacity">
+                    Taskboard
+                  </Link>
+                  <Link to="/taskboard/archive" className="tb-link">
+                    Archive
+                  </Link>
+                </div>
+                {isAdmin && <ManageProjectsHeaderAction />}
               </div>
               <div className="tb-header-scroll-row md:justify-end">
                 <TaskboardThemeToggle />

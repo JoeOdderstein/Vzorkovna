@@ -15,6 +15,32 @@ export const ASSIGNEE_FILTERS: { id: AssigneeFilter; label: string }[] = [
   ...[...ASSIGNEES].sort((a, b) => a.localeCompare(b)).map((id) => ({ id, label: id })),
 ];
 
+const ASSIGNEE_FILTER_ITEMS = ASSIGNEE_FILTERS.filter(
+  (filter): filter is { id: Assignee; label: string } => filter.id !== 'all'
+);
+
+/** All first, logged-in assignee second, then others by open-task count (desc). */
+export function orderAssigneeFiltersForUser(
+  currentAssignee: Assignee | null,
+  counts: Record<AssigneeFilter, number>
+): { id: AssigneeFilter; label: string }[] {
+  const allFilter = ASSIGNEE_FILTERS[0];
+  const others = [...ASSIGNEE_FILTER_ITEMS]
+    .filter((filter) => filter.id !== currentAssignee)
+    .sort((a, b) => {
+      const countDiff = (counts[b.id] ?? 0) - (counts[a.id] ?? 0);
+      if (countDiff !== 0) return countDiff;
+      return a.label.localeCompare(b.label);
+    });
+
+  if (currentAssignee) {
+    const currentFilter = ASSIGNEE_FILTER_ITEMS.find((filter) => filter.id === currentAssignee);
+    if (currentFilter) return [allFilter, currentFilter, ...others];
+  }
+
+  return [allFilter, ...others];
+}
+
 export function filterTasksByAssignee(tasks: Task[], filter: AssigneeFilter): Task[] {
   if (filter === 'all') return tasks;
 
