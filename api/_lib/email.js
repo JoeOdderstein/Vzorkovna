@@ -88,6 +88,38 @@ export function buildGoogleCalendarUrl({
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
 
+function buildEmailPhotoThumbnailsHtml({ photoUrls, totalPhotoCount, taskUrl }) {
+  if (!Array.isArray(photoUrls) || photoUrls.length === 0) return '';
+
+  const safeTaskUrl = taskUrl ? escapeHref(taskUrl) : '';
+  const extra =
+    typeof totalPhotoCount === 'number' && totalPhotoCount > photoUrls.length
+      ? totalPhotoCount - photoUrls.length
+      : 0;
+
+  const thumbs = photoUrls
+    .map((url) => {
+      const safeSrc = escapeHref(url);
+      const img = `<img src="${safeSrc}" alt="" width="80" height="80" style="display:inline-block;width:80px;height:80px;object-fit:cover;border-radius:6px;border:1px solid #e5e5e5;margin:0 8px 8px 0;vertical-align:top;" />`;
+      if (safeTaskUrl) {
+        return `<a href="${safeTaskUrl}" style="text-decoration:none;">${img}</a>`;
+      }
+      return img;
+    })
+    .join('');
+
+  const extraLine =
+    extra > 0
+      ? `<p style="margin:8px 0 0;font-size:12px;color:#666;">+ ${extra} more on the taskboard</p>`
+      : '';
+
+  return `<div style="margin:0 0 16px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#666;">Photos</p>
+      <div style="line-height:0;">${thumbs}</div>
+      ${extraLine}
+    </div>`;
+}
+
 function buildAssignmentHtml({
   assigneeName,
   assignedBy,
@@ -96,6 +128,8 @@ function buildAssignmentHtml({
   projectName,
   deadline,
   taskUrl,
+  photoUrls,
+  totalPhotoCount,
 }) {
   const deadlineLine = deadline
     ? `<p style="margin:0 0 16px;color:#444;">Deadline: <strong>${formatDeadline(deadline)}</strong></p>`
@@ -150,6 +184,7 @@ function buildAssignmentHtml({
       <p style="margin:0 0 8px;font-size:18px;font-weight:600;">${safeTaskName}</p>
       <p style="margin:0 0 16px;color:#444;">Project: <strong>${safeProjectName}</strong></p>
       ${descriptionBlock}
+      ${buildEmailPhotoThumbnailsHtml({ photoUrls, totalPhotoCount, taskUrl })}
       ${deadlineLine}
       ${buttons}
       ${taskUrlLine}
@@ -167,6 +202,8 @@ export async function sendAssignmentEmail({
   projectName,
   deadline,
   taskUrl,
+  photoUrls = [],
+  totalPhotoCount = 0,
 }) {
   const resend = getResend();
   const from = process.env.EMAIL_FROM;
@@ -184,6 +221,8 @@ export async function sendAssignmentEmail({
     projectName,
     deadline,
     taskUrl,
+    photoUrls,
+    totalPhotoCount,
   });
 
   const { error } = await resend.emails.send({
@@ -203,6 +242,8 @@ function buildCommentHtml({
   projectName,
   commentBody,
   taskUrl,
+  photoUrls,
+  totalPhotoCount,
 }) {
   const safeAssigneeName = escapeHtml(assigneeName);
   const safeCommenterName = escapeHtml(commenterName);
@@ -233,6 +274,7 @@ function buildCommentHtml({
       <div style="margin:0 0 16px;padding:12px 14px;background:#f6f6f6;border-radius:8px;border-left:3px solid #111;">
         <p style="margin:0;white-space:pre-wrap;color:#333;">${safeCommentBody}</p>
       </div>
+      ${buildEmailPhotoThumbnailsHtml({ photoUrls, totalPhotoCount, taskUrl })}
       ${openTaskButton}
       ${taskUrlLine}
     </div>
@@ -248,6 +290,8 @@ export async function sendCommentNotificationEmail({
   projectName,
   commentBody,
   taskUrl,
+  photoUrls = [],
+  totalPhotoCount = 0,
 }) {
   const resend = getResend();
   const from = process.env.EMAIL_FROM;
@@ -264,6 +308,8 @@ export async function sendCommentNotificationEmail({
     projectName,
     commentBody,
     taskUrl,
+    photoUrls,
+    totalPhotoCount,
   });
 
   const { error } = await resend.emails.send({

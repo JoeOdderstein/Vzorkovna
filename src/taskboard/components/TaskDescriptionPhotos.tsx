@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { TaskPhoto } from '../../lib/taskboard/types';
 import { getTaskPhotoUrl } from '../../lib/taskboard/taskPhotoService';
 import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
+import TaskPhotoLightbox from './TaskPhotoLightbox';
 
 interface TaskDescriptionPhotosProps {
   photos: TaskPhoto[];
@@ -20,6 +21,22 @@ export default function TaskDescriptionPhotos({
   onUpload,
   onRemove,
 }: TaskDescriptionPhotosProps) {
+  const [previewUrls, setPreviewUrls] = useState<Record<string, string>>({});
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const openLightbox = useCallback((photoId: string) => {
+    const index = photos.findIndex((photo) => photo.id === photoId);
+    if (index >= 0 && previewUrls[photoId]) setLightboxIndex(index);
+  }, [photos, previewUrls]);
+
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+
+  const lightboxPhoto =
+    lightboxIndex != null && lightboxIndex >= 0 && lightboxIndex < photos.length
+      ? photos[lightboxIndex]
+      : null;
+  const lightboxUrl = lightboxPhoto ? previewUrls[lightboxPhoto.id] : null;
+
   return (
     <div className="mt-2 space-y-2">
       {photos.length > 0 && (
@@ -29,6 +46,11 @@ export default function TaskDescriptionPhotos({
               key={photo.id}
               photo={photo}
               disabled={uploading}
+              previewUrl={previewUrls[photo.id] ?? null}
+              onPreviewUrl={(url) =>
+                setPreviewUrls((prev) => ({ ...prev, [photo.id]: url }))
+              }
+              onOpen={() => openLightbox(photo.id)}
               onRemove={() => onRemove(photo.id)}
             />
           ))}
@@ -60,6 +82,24 @@ export default function TaskDescriptionPhotos({
       </div>
 
       {uploadError && <p className="text-[11px] text-red-600">{uploadError}</p>}
+
+      {lightboxPhoto && lightboxUrl && (
+        <TaskPhotoLightbox
+          imageUrl={lightboxUrl}
+          fileName={lightboxPhoto.file_name}
+          onClose={closeLightbox}
+          hasPrevious={lightboxIndex != null && lightboxIndex > 0}
+          hasNext={lightboxIndex != null && lightboxIndex < photos.length - 1}
+          onPrevious={() =>
+            setLightboxIndex((i) => (i != null && i > 0 ? i - 1 : i))
+          }
+          onNext={() =>
+            setLightboxIndex((i) =>
+              i != null && i < photos.length - 1 ? i + 1 : i
+            )
+          }
+        />
+      )}
     </div>
   );
 }
@@ -67,19 +107,23 @@ export default function TaskDescriptionPhotos({
 function PhotoThumb({
   photo,
   disabled,
+  previewUrl,
+  onPreviewUrl,
+  onOpen,
   onRemove,
 }: {
   photo: TaskPhoto;
   disabled: boolean;
+  previewUrl: string | null;
+  onPreviewUrl: (url: string) => void;
+  onOpen: () => void;
   onRemove: () => void;
 }) {
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewError, setPreviewError] = useState('');
 
   useEffect(() => {
     if (isLocalTaskboardMode() && !photo.storage_path.startsWith('data:')) {
       setPreviewError('Photo preview requires Supabase.');
-      setPreviewUrl(null);
       return;
     }
 
@@ -88,32 +132,26 @@ function PhotoThumb({
 
     getTaskPhotoUrl(photo.storage_path)
       .then((url) => {
-        if (!cancelled) setPreviewUrl(url);
+        if (!cancelled) onPreviewUrl(url);
       })
       .catch(() => {
-        if (!cancelled) {
-          setPreviewUrl(null);
-          setPreviewError('Could not load photo.');
-        }
+        if (!cancelled) setPreviewError('Could not load photo.');
       });
 
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- load once per storage path
   }, [photo.storage_path]);
-
-  const openFullSize = () => {
-    if (previewUrl) window.open(previewUrl, '_blank', 'noopener,noreferrer');
-  };
 
   return (
     <li className="relative shrink-0">
       <button
         type="button"
-        onClick={openFullSize}
+        onClick={onOpen}
         disabled={!previewUrl}
         className="tb-desc-photo group relative rounded-md border border-[var(--tb-surface-border)] overflow-hidden bg-[var(--tb-surface-muted)] disabled:opacity-60"
-        title={photo.file_name || 'Open photo'}
+        title={photo.file_name || 'View photo'}
       >
         {previewUrl ? (
           <img src={previewUrl} alt="" className="block h-20 w-20 object-cover" />
@@ -123,12 +161,15 @@ function PhotoThumb({
           </span>
         )}
         <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/50 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity">
-          Open
+          View
         </span>
       </button>
       <button
         type="button"
-        onClick={onRemove}
+        onClick={(e) => {
+          e.stopPropagation();
+          onRemove();
+        }}
         disabled={disabled}
         aria-label="Remove photo"
         className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-[#202124] text-white text-xs leading-none hover:bg-red-600 disabled:opacity-50 shadow"

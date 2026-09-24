@@ -4,6 +4,7 @@ import { sendCommentNotificationEmail } from './email.js';
 import { getTokenFromRequest, verifySessionToken } from './auth.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import { findProfileForAssignee } from './profileForAssignee.js';
+import { getTaskPhotoSignedUrlsForEmail } from './taskPhotosForEmail.js';
 
 function readRequestBody(req) {
   if (req.body == null) return {};
@@ -128,6 +129,9 @@ export async function handleNotifyComment(req, res) {
       ? `${siteUrl}/taskboard?open=${encodeURIComponent(project.slug)}&task=${encodeURIComponent(task.id)}`
       : null;
 
+  const { urls: photoUrls, totalCount: totalPhotoCount } =
+    await getTaskPhotoSignedUrlsForEmail(supabase, taskId);
+
   let notified = 0;
   const failures = [];
   const skipped = [];
@@ -170,6 +174,8 @@ export async function handleNotifyComment(req, res) {
         projectName: project.name || 'Taskboard',
         commentBody: comment.body,
         taskUrl,
+        photoUrls,
+        totalPhotoCount,
       });
       notified += 1;
     } catch (err) {

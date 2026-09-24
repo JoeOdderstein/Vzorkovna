@@ -766,6 +766,24 @@ body {
   font-size: 0.8125rem;
 }
 
+.taskboard .tb-photo-lightbox-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(32, 33, 36, 0.75);
+  color: #fff;
+  backdrop-filter: blur(6px);
+  transition: background 0.15s ease;
+}
+
+.taskboard .tb-photo-lightbox-btn:hover {
+  background: rgba(32, 33, 36, 0.92);
+}
+
 .taskboard .tb-list-item {
   border-bottom: 1px solid var(--tb-border);
 }
