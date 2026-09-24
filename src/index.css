@@ -730,6 +730,42 @@ body {
   text-transform: none;
 }
 
+.taskboard .tb-comments-toggle {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.taskboard .tb-comments-toggle:hover .tb-field-label {
+  color: var(--tb-text);
+}
+
+.taskboard .tb-comments-list {
+  max-height: 9rem;
+  overflow-y: auto;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--tb-surface-border);
+  border-radius: 6px;
+  background: var(--tb-surface-muted);
+}
+
+.taskboard .tb-comments-item {
+  padding: 0.375rem 0.5rem;
+  border-bottom: 1px solid var(--tb-surface-border);
+}
+
+.taskboard .tb-comments-item:last-child {
+  border-bottom: 0;
+}
+
+.taskboard .tb-comments-input {
+  font-size: 0.8125rem;
+}
+
 .taskboard .tb-list-item {
   border-bottom: 1px solid var(--tb-border);
 }

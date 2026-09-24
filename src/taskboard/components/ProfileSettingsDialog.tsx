@@ -126,9 +126,11 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
               className="tb-task-checkbox mt-0.5"
             />
             <span>
-              <span className="block text-sm tb-text">Email me when I am assigned to a task</span>
+              <span className="block text-sm tb-text">
+                Email me when I am assigned to a task or someone comments on my task
+              </span>
               <span className="block text-xs tb-muted mt-1">
-                Requires a saved email above.
+                Requires a saved email above. Applies to tasks assigned to your board name.
               </span>
             </span>
           </label>

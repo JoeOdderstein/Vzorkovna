@@ -13,7 +13,15 @@ import {
   uploadAttachment,
 } from '../../lib/taskboard/taskService';
 import { ALLOWED_UPLOAD_TYPES, MAX_UPLOAD_BYTES } from '../../lib/taskboard/constants';
+import { isImageAttachment } from '../../lib/taskboard/attachmentUtils';
+import TaskDescriptionPhotos from './TaskDescriptionPhotos';
 import { useTaskboardTheme } from '../../context/TaskboardThemeContext';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
+import { useTaskComments } from '../../hooks/useTaskComments';
+import { useTaskPhotos } from '../../hooks/useTaskPhotos';
+import { fetchOrCreateUserProfile } from '../../lib/taskboard/userProfileService';
+import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
+import TaskCommentsSection from './TaskCommentsSection';
 
 interface TaskDrawerProps {
   task: Task | null;
@@ -45,10 +53,54 @@ export default function TaskDrawer({
   onRemoveCategory,
 }: TaskDrawerProps) {
   const { theme } = useTaskboardTheme();
+  const { username } = useTaskboardAuth();
+  const [displayName, setDisplayName] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Task>>({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [uploadError, setUploadError] = useState('');
+
+  const commentAuthor = {
+    username,
+    displayName: displayName ?? (username ? defaultBoardNameForUsername(username) : null),
+  };
+  const {
+    comments,
+    loading: commentsLoading,
+    error: commentsError,
+    postComment,
+    editComment,
+    removeComment,
+  } = useTaskComments(task?.id ?? null, commentAuthor);
+
+  const {
+    photos,
+    loading: photosLoading,
+    uploading: photosUploading,
+    error: photosError,
+    setError: setPhotosError,
+    uploadPhotos,
+    removePhoto,
+  } = useTaskPhotos(task?.id ?? null);
+
+  useEffect(() => {
+    if (!username) {
+      setDisplayName(null);
+      return;
+    }
+    let cancelled = false;
+    fetchOrCreateUserProfile(username)
+      .then((profile) => {
+        if (cancelled) return;
+        setDisplayName(profile.board_name ?? defaultBoardNameForUsername(username));
+      })
+      .catch(() => {
+        if (!cancelled) setDisplayName(defaultBoardNameForUsername(username));
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [username]);
 
   useEffect(() => {
     if (task) setForm(task);
@@ -65,6 +117,7 @@ export default function TaskDrawer({
 
       const target = e.target as HTMLElement;
       if (target.closest('[data-task-description]')) return;
+      if (target.closest('[data-task-comments-composer]')) return;
 
       e.preventDefault();
       if (target instanceof HTMLElement && 'blur' in target) {
@@ -111,22 +164,56 @@ export default function TaskDrawer({
     }
   };
 
-  const handleFileUpload = async (file: File) => {
-    setUploadError('');
+  const validateUploadFile = (file: File, err: (msg: string) => void): boolean => {
     if (!ALLOWED_UPLOAD_TYPES.includes(file.type)) {
-      setUploadError('File type not allowed.');
-      return;
+      err('File type not allowed.');
+      return false;
     }
     if (file.size > MAX_UPLOAD_BYTES) {
-      setUploadError('File is too large (max 25MB).');
+      err('File is too large (max 25MB).');
+      return false;
+    }
+    return true;
+  };
+
+  const handleFileUpload = async (file: File) => {
+    setUploadError('');
+    if (!validateUploadFile(file, setUploadError)) return;
+
+    if (file.type.startsWith('image/')) {
+      try {
+        await uploadPhotos([file]);
+      } catch {
+        setUploadError('Upload failed.');
+      }
       return;
     }
+
     try {
       const { path, name } = await uploadAttachment(file, task.id);
       await save({ attachment_path: path, attachment_name: name });
       setForm((f) => ({ ...f, attachment_path: path, attachment_name: name }));
     } catch {
       setUploadError('Upload failed.');
+    }
+  };
+
+  const handlePhotoUpload = async (files: File[]) => {
+    setPhotosError('');
+    const valid: File[] = [];
+    for (const file of files) {
+      if (!file.type.startsWith('image/')) {
+        setPhotosError('Please choose image files only.');
+        continue;
+      }
+      if (!validateUploadFile(file, setPhotosError)) continue;
+      valid.push(file);
+    }
+    if (valid.length === 0) return;
+    try {
+      await uploadPhotos(valid);
+    } catch {
+      // hook sets error
     }
   };
 
@@ -179,7 +266,34 @@ export default function TaskDrawer({
               rows={4}
               className="field-input resize-y min-h-[100px]"
             />
+            <TaskDescriptionPhotos
+              photos={photos}
+              loading={photosLoading}
+              uploading={photosUploading}
+              uploadError={photosError}
+              onUpload={handlePhotoUpload}
+              onRemove={async (photoId) => {
+                await removePhoto(photoId);
+              }}
+            />
           </Field>
+
+          <TaskCommentsSection
+            taskId={task.id}
+            comments={comments}
+            loading={commentsLoading}
+            error={commentsError}
+            currentUsername={username}
+            onPost={async (body) => {
+              await postComment(body);
+            }}
+            onEdit={async (commentId, body) => {
+              await editComment(commentId, body);
+            }}
+            onDelete={async (commentId) => {
+              await removeComment(commentId);
+            }}
+          />
 
           <Field label="Assigned to">
             <div className="flex flex-wrap gap-2">
@@ -307,15 +421,16 @@ export default function TaskDrawer({
               }}
               className="text-xs tb-text-secondary file:mr-3 file:bg-white file:border file:border-[#dadce0] file:text-[#5f6368] file:px-3 file:py-1.5 file:text-xs file:rounded"
             />
-            {form.attachment_name && (
-              <button
-                type="button"
-                onClick={openAttachment}
-                className="mt-2 block text-xs tb-link-accent hover:underline truncate text-left"
-              >
-                {form.attachment_name}
-              </button>
-            )}
+            {form.attachment_name &&
+              !isImageAttachment(form.attachment_name, form.attachment_path) && (
+                <button
+                  type="button"
+                  onClick={openAttachment}
+                  className="mt-2 block text-xs tb-link-accent hover:underline truncate text-left"
+                >
+                  {form.attachment_name}
+                </button>
+              )}
             {uploadError && <p className="mt-2 text-xs text-red-600">{uploadError}</p>}
           </Field>
 

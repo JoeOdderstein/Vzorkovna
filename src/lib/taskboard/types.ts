@@ -110,3 +110,22 @@ export interface UserProfile {
 export type UserProfileUpdate = Partial<
   Pick<UserProfile, 'board_name' | 'email' | 'theme' | 'notify_on_assign'>
 >;
+
+export interface TaskPhoto {
+  id: string;
+  task_id: string;
+  storage_path: string;
+  file_name: string;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  author_username: string;
+  author_display_name: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
+}

@@ -14,6 +14,7 @@ import {
   verifySessionToken,
 } from './api/_lib/auth.js';
 import { handleNotifyAssignment } from './api/_lib/notifyAssignment.js';
+import { handleNotifyComment } from './api/_lib/notifyComment.js';
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -53,6 +54,22 @@ export function taskboardDevApi(): Plugin {
             const raw = await readBody(req);
             const body = raw ? JSON.parse(raw) : {};
             return handleNotifyAssignment(
+              { ...req, method: req.method, headers: req.headers, body } as never,
+              {
+                status: (code: number) => {
+                  res.statusCode = code;
+                  return {
+                    json: (payload: unknown) => sendJson(res, code, payload),
+                  };
+                },
+              } as never
+            );
+          }
+
+          if (url === '/api/tasks/notify-comment' && req.method === 'POST') {
+            const raw = await readBody(req);
+            const body = raw ? JSON.parse(raw) : {};
+            return handleNotifyComment(
               { ...req, method: req.method, headers: req.headers, body } as never,
               {
                 status: (code: number) => {

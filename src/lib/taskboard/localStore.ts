@@ -5,6 +5,8 @@ import type {
   Project,
   ProjectCategory,
   Task,
+  TaskComment,
+  TaskPhoto,
   TaskInsert,
   TaskUpdate,
   UserProfile,
@@ -19,6 +21,14 @@ const PROJECTS_STORAGE_KEY = 'taskboard_local_projects_v1';
 const PROJECT_CATEGORIES_STORAGE_KEY = 'taskboard_local_project_categories_v1';
 const CALENDAR_EVENTS_STORAGE_KEY = 'taskboard_local_calendar_events_v1';
 const USER_PROFILES_STORAGE_KEY = 'taskboard_local_user_profiles_v1';
+const TASK_COMMENTS_STORAGE_KEY = 'taskboard_local_task_comments_v1';
+const TASK_PHOTOS_STORAGE_KEY = 'taskboard_local_task_photos_v1';
+
+const taskCommentListeners = new Map<string, Set<() => void>>();
+
+function notifyTaskCommentListeners(taskId: string) {
+  taskCommentListeners.get(taskId)?.forEach((listener) => listener());
+}
 
 const SEED_PROJECTS: Project[] = [
   { id: 'p1', name: 'Tank Shots', slug: 'tank-shots', sort_order: 1, created_at: '' },
@@ -99,6 +109,34 @@ function loadUserProfiles(): UserProfile[] {
 
 function saveUserProfiles(profiles: UserProfile[]) {
   localStorage.setItem(USER_PROFILES_STORAGE_KEY, JSON.stringify(profiles));
+}
+
+function loadTaskComments(): TaskComment[] {
+  try {
+    const raw = localStorage.getItem(TASK_COMMENTS_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as TaskComment[];
+  } catch {
+    return [];
+  }
+}
+
+function saveTaskComments(comments: TaskComment[]) {
+  localStorage.setItem(TASK_COMMENTS_STORAGE_KEY, JSON.stringify(comments));
+}
+
+function loadTaskPhotos(): TaskPhoto[] {
+  try {
+    const raw = localStorage.getItem(TASK_PHOTOS_STORAGE_KEY);
+    if (!raw) return [];
+    return JSON.parse(raw) as TaskPhoto[];
+  } catch {
+    return [];
+  }
+}
+
+function saveTaskPhotos(photos: TaskPhoto[]) {
+  localStorage.setItem(TASK_PHOTOS_STORAGE_KEY, JSON.stringify(photos));
 }
 
 function newId() {
@@ -529,5 +567,103 @@ export const localStore = {
     };
     saveUserProfiles(next);
     return next[index];
+  },
+
+  getTaskComments: (taskId: string): TaskComment[] =>
+    loadTaskComments()
+      .filter((comment) => comment.task_id === taskId)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+
+  createTaskComment: (
+    taskId: string,
+    body: string,
+    author: { username: string; displayName: string }
+  ): TaskComment => {
+    const comment: TaskComment = {
+      id: newId(),
+      task_id: taskId,
+      author_username: author.username,
+      author_display_name: author.displayName || author.username,
+      body,
+      created_at: now(),
+      updated_at: now(),
+    };
+    saveTaskComments([...loadTaskComments(), comment]);
+    notifyTaskCommentListeners(taskId);
+    return comment;
+  },
+
+  updateTaskComment: (commentId: string, body: string, authorUsername: string): TaskComment => {
+    const comments = loadTaskComments();
+    const index = comments.findIndex((comment) => comment.id === commentId);
+    if (index === -1) throw new Error('Comment not found.');
+    if (comments[index].author_username !== authorUsername) {
+      throw new Error('You can only edit your own comments.');
+    }
+
+    const updated: TaskComment = {
+      ...comments[index],
+      body,
+      updated_at: now(),
+    };
+    const next = [...comments];
+    next[index] = updated;
+    saveTaskComments(next);
+    notifyTaskCommentListeners(updated.task_id);
+    return updated;
+  },
+
+  deleteTaskComment: (commentId: string, authorUsername: string): void => {
+    const comments = loadTaskComments();
+    const index = comments.findIndex((comment) => comment.id === commentId);
+    if (index === -1) throw new Error('Comment not found.');
+    if (comments[index].author_username !== authorUsername) {
+      throw new Error('You can only delete your own comments.');
+    }
+
+    const taskId = comments[index].task_id;
+    const next = comments.filter((comment) => comment.id !== commentId);
+    saveTaskComments(next);
+    notifyTaskCommentListeners(taskId);
+  },
+
+  getTaskPhotos: (taskId: string): TaskPhoto[] =>
+    loadTaskPhotos()
+      .filter((photo) => photo.task_id === taskId)
+      .sort((a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)),
+
+  addTaskPhoto: (taskId: string, file: File, dataUrl: string): TaskPhoto => {
+    const photos = loadTaskPhotos();
+    const sort_order =
+      photos
+        .filter((photo) => photo.task_id === taskId)
+        .reduce((max, photo) => Math.max(max, photo.sort_order), -1) + 1;
+    const photo: TaskPhoto = {
+      id: newId(),
+      task_id: taskId,
+      storage_path: dataUrl,
+      file_name: file.name,
+      sort_order,
+      created_at: now(),
+    };
+    saveTaskPhotos([...photos, photo]);
+    return photo;
+  },
+
+  deleteTaskPhoto: (photoId: string): void => {
+    saveTaskPhotos(loadTaskPhotos().filter((photo) => photo.id !== photoId));
+  },
+
+  subscribeToTaskComments: (taskId: string, onChange: () => void) => {
+    let set = taskCommentListeners.get(taskId);
+    if (!set) {
+      set = new Set();
+      taskCommentListeners.set(taskId, set);
+    }
+    set.add(onChange);
+    return () => {
+      set?.delete(onChange);
+      if (set?.size === 0) taskCommentListeners.delete(taskId);
+    };
   },
 };

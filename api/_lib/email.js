@@ -195,3 +195,83 @@ export async function sendAssignmentEmail({
 
   if (error) throw error;
 }
+
+function buildCommentHtml({
+  assigneeName,
+  commenterName,
+  taskName,
+  projectName,
+  commentBody,
+  taskUrl,
+}) {
+  const safeAssigneeName = escapeHtml(assigneeName);
+  const safeCommenterName = escapeHtml(commenterName);
+  const safeTaskName = escapeHtml(taskName);
+  const safeProjectName = escapeHtml(projectName);
+  const safeTaskUrl = taskUrl ? escapeHref(taskUrl) : '';
+  const safeCommentBody = escapeHtml(commentBody);
+
+  const openTaskButton = taskUrl
+    ? `<a href="${safeTaskUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;margin:16px 0 0;">
+          Open task
+        </a>`
+    : '';
+
+  const taskUrlLine = taskUrl
+    ? `<p style="margin:16px 0 0;font-size:12px;color:#888;word-break:break-all;">${safeTaskUrl}</p>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+  <body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;margin:0;padding:24px;background:#f6f6f6;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#666;">Headlight Rabbits taskboard</p>
+      <h1 style="margin:0 0 16px;font-size:22px;">New comment on your task</h1>
+      <p style="margin:0 0 16px;">Hi ${safeAssigneeName}, <strong>${safeCommenterName}</strong> commented on a task assigned to you:</p>
+      <p style="margin:0 0 8px;font-size:18px;font-weight:600;">${safeTaskName}</p>
+      <p style="margin:0 0 16px;color:#444;">Project: <strong>${safeProjectName}</strong></p>
+      <div style="margin:0 0 16px;padding:12px 14px;background:#f6f6f6;border-radius:8px;border-left:3px solid #111;">
+        <p style="margin:0;white-space:pre-wrap;color:#333;">${safeCommentBody}</p>
+      </div>
+      ${openTaskButton}
+      ${taskUrlLine}
+    </div>
+  </body>
+</html>`;
+}
+
+export async function sendCommentNotificationEmail({
+  to,
+  assigneeName,
+  commenterName,
+  taskName,
+  projectName,
+  commentBody,
+  taskUrl,
+}) {
+  const resend = getResend();
+  const from = process.env.EMAIL_FROM;
+
+  if (!resend || !from) {
+    throw new Error('Email is not configured');
+  }
+
+  const subject = `Comment: ${taskName} (${projectName})`;
+  const html = buildCommentHtml({
+    assigneeName,
+    commenterName,
+    taskName,
+    projectName,
+    commentBody,
+    taskUrl,
+  });
+
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject,
+    html,
+  });
+
+  if (error) throw error;
+}
