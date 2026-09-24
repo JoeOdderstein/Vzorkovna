@@ -49,7 +49,11 @@ function TaskboardShell() {
       <Nav activeSection="login" />
       <div className="taskboard min-h-screen pt-20 pb-16" data-theme={theme}>
         <div className="tb-divider mb-8">
-          <div className="max-w-screen-2xl mx-auto px-6 md:px-10 pt-0.5 pb-4 flex flex-col gap-4">
+          <div
+            className={`tb-taskboard-page px-6 md:px-10 pt-0.5 pb-4 flex flex-col gap-4 mx-auto max-w-screen-2xl${
+              selected ? ' tb-taskboard-page--drawer-open' : ''
+            }`}
+          >
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between gap-4 min-w-0">
                 <div className="flex items-center gap-6 shrink-0">

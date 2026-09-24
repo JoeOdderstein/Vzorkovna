@@ -1,4 +1,4 @@
-const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha'];
+const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha', 'Sasha', 'Misha', 'Tereza'];
 
 const DEFAULT_BOARD_NAMES = {
   admin: 'Joost',

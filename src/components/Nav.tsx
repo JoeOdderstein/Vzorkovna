@@ -6,6 +6,7 @@ import { SITE_DATA } from '../data';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 import {
   canAccessTaskboardPrivateNav,
+  PROJECTS_PATH,
   REMOTE_INST_PATH,
   TASKBOARD_DRIVE_URL,
   TASKBOARD_PATH,
@@ -23,8 +24,11 @@ export default function Nav({ activeSection }: NavProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const isScrolled = scrollY > 80 || location.pathname !== '/';
   const isTaskboardPage = location.pathname.startsWith(TASKBOARD_PATH);
+  const isProjectsAppPage =
+    location.pathname === PROJECTS_PATH ||
+    location.pathname.startsWith(`${PROJECTS_PATH}/installation/`);
   const isRemoteInstPage = location.pathname.startsWith(REMOTE_INST_PATH);
-  const isAppPage = isTaskboardPage || isRemoteInstPage;
+  const isAppPage = isTaskboardPage || isProjectsAppPage || isRemoteInstPage;
   const hideSiteNavLinks =
     isAppPage || location.pathname === '/login';
   const { authenticated, username, isAdmin, logout } = useTaskboardAuth();
@@ -144,6 +148,14 @@ export default function Nav({ activeSection }: NavProps) {
                 >
                   TASKBOARD
                 </Link>
+                <Link
+                  to={PROJECTS_PATH}
+                  className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                    isProjectsAppPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                  }`}
+                >
+                  PROJECTS
+                </Link>
                 {showPrivateNav && (
                   <a
                     href={TASKBOARD_DRIVE_URL}
@@ -224,6 +236,13 @@ export default function Nav({ activeSection }: NavProps) {
                   className={`site-mobile-nav-link${isTaskboardPage ? ' site-mobile-nav-link--active' : ''}`}
                 >
                   Taskboard
+                </Link>
+                <Link
+                  to={PROJECTS_PATH}
+                  onClick={() => setMenuOpen(false)}
+                  className={`site-mobile-nav-link${isProjectsAppPage ? ' site-mobile-nav-link--active' : ''}`}
+                >
+                  Projects
                 </Link>
                 {showPrivateNav && (
                   <a

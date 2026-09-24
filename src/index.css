@@ -635,16 +635,37 @@ body {
 
   .tb-layout-push {
     --tb-drawer-width: 28rem;
-    transition: margin-right 0.25s ease;
   }
 
   .tb-layout-push--open {
     margin-right: var(--tb-drawer-width);
+    transition: margin-right 0.25s ease;
   }
 
-  .tb-layout-push--open nav {
-    right: var(--tb-drawer-width);
-    transition: right 0.25s ease;
+  .tb-layout-push--open .taskboard {
+    width: 100%;
+  }
+
+  .tb-layout-push--open .tb-taskboard-page--drawer-open {
+    max-width: none !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    width: 100%;
+  }
+
+  .tb-layout-push--open .tb-kanban-scroll--fill {
+    width: 100%;
+  }
+
+  .tb-layout-push--open .tb-kanban-scroll--fill > div {
+    flex: 1 1 280px;
+    min-width: 280px;
+  }
+
+  .tb-layout-push--open .tb-kanban-scroll--fill .tb-kanban-column {
+    width: 100%;
+    max-width: none;
+    flex-shrink: 1;
   }
 
   .tb-layout-push--open .tb-fab {
@@ -653,18 +674,19 @@ body {
   }
 
   .taskboard.tb-drawer-shell {
-    top: 0;
+    top: 4rem;
     right: 0;
     bottom: 0;
     left: auto;
     width: var(--tb-drawer-width);
-    height: 100%;
-    pointer-events: auto;
+    pointer-events: none;
   }
 
   .taskboard.tb-drawer-shell .tb-drawer-panel {
     max-width: none;
     width: 100%;
+    height: 100%;
+    pointer-events: auto;
   }
 }
 
@@ -1195,6 +1217,14 @@ body {
   background: var(--tb-surface);
 }
 
+.taskboard .tb-remote-inst-card--link {
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+  appearance: none;
+  font: inherit;
+}
+
 .taskboard .tb-remote-inst-light {
   width: 0.75rem;
   height: 0.75rem;
@@ -1216,6 +1246,11 @@ body {
 .taskboard .tb-remote-inst-light--broken {
   background: #ea4335;
   color: #ea4335;
+}
+
+.taskboard .tb-remote-inst-light--concept {
+  background: #9aa0a6;
+  color: #9aa0a6;
 }
 
 .taskboard .tb-calendar-event-spacer {

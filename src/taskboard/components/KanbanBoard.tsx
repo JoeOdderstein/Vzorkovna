@@ -9,8 +9,11 @@ import {
   useSensor,
   useSensors,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
   useDraggable,
   useDroppable,
+  type CollisionDetection,
 } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -40,6 +43,7 @@ function getNestCandidate(
   const activeTask = taskById.get(activeTaskId);
   if (!overTask || !activeTask) return null;
   if (overTask.parent_task_id) return null;
+  if (!activeTask.parent_task_id && activeTask.category !== overTask.category) return null;
   if (activeTask.parent_task_id === overId) return null;
 
   const isChildOfActive = [...taskById.values()].some(
@@ -90,6 +94,7 @@ interface KanbanBoardProps {
   creatingCategory?: TaskCategory | null;
   isAdmin?: boolean;
   onAddCategory?: (label: string) => Promise<void>;
+  fillWidth?: boolean;
 }
 
 function NestDropTarget({
@@ -137,6 +142,7 @@ function DraggableSubtask({
         isSubtask
         onClick={() => onTaskClick(task)}
         onComplete={onCompleteTask}
+        titleAsDiv
       />
     </div>
   );
@@ -169,12 +175,18 @@ function SortableGroup({
 
   return (
     <div ref={setNodeRef} style={style} className="space-y-1">
-      <div className="flex-1 cursor-grab active:cursor-grabbing tb-task-draggable" {...attributes} {...listeners}>
+      <div
+        className="flex-1 cursor-grab active:cursor-grabbing tb-task-draggable select-none"
+        style={{ touchAction: 'none' }}
+        {...attributes}
+        {...listeners}
+      >
         <NestDropTarget showNestHint={nestReadyId === group.parent.id}>
           <TaskCard
             task={group.parent}
             onClick={() => onTaskClick(group.parent)}
             onComplete={onCompleteTask}
+            titleAsDiv
             expandControl={
               group.subtasks.length > 0
                 ? {
@@ -217,6 +229,7 @@ function Column({
   onCompleteTask,
   onCreateTask,
   creating,
+  fillWidth = false,
 }: {
   categoryId: TaskCategory;
   label: string;
@@ -232,6 +245,7 @@ function Column({
   onCompleteTask: (taskId: string) => void;
   onCreateTask: (category: TaskCategory) => void;
   creating: boolean;
+  fillWidth?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: categoryId });
   const ids = groups.map((g) => g.parent.id);
@@ -240,7 +254,11 @@ function Column({
   const showDropHint = isDragging && !showPromoteHint && (isDragOver || isOver);
 
   return (
-    <div className="flex-shrink-0 w-[280px] md:w-[300px] flex flex-col max-h-[calc(100vh-12rem)]">
+    <div
+      className={`tb-kanban-column flex flex-col max-h-[calc(100vh-12rem)] flex-shrink-0 w-[280px] md:w-[300px]${
+        fillWidth ? ' md:flex-1 md:min-w-[280px] md:basis-0 md:max-w-none' : ''
+      }`}
+    >
       <div className="px-1 py-4">
         <div className="tb-category-header">
           <h3 className="tb-label">{label}</h3>
@@ -293,8 +311,10 @@ function Column({
 
 function AddCategoryColumn({
   onAddCategory,
+  fillWidth = false,
 }: {
   onAddCategory: (label: string) => Promise<void>;
+  fillWidth?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
   const [label, setLabel] = useState('');
@@ -323,7 +343,11 @@ function AddCategoryColumn({
   };
 
   return (
-    <div className="flex-shrink-0 w-[280px] md:w-[300px]">
+    <div
+      className={`tb-kanban-column flex-shrink-0 w-[280px] md:w-[300px]${
+        fillWidth ? ' md:flex-1 md:min-w-[280px] md:basis-0 md:max-w-none' : ''
+      }`}
+    >
       {!adding ? (
         <button
           type="button"
@@ -384,6 +408,7 @@ export default function KanbanBoard({
   creatingCategory = null,
   isAdmin = false,
   onAddCategory,
+  fillWidth = false,
 }: KanbanBoardProps) {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [nestReadyId, setNestReadyId] = useState<string | null>(null);
@@ -412,7 +437,7 @@ export default function KanbanBoard({
 
   const visibleCategories = useMemo(() => {
     const withTasks = categories.filter(
-      ({ id }) => (groupsByCategory[id]?.length ?? 0) > 0
+      ({ id }) => (groupsByCategory[id]?.length ?? 0) > 0,
     );
 
     if (!isDragging) {
@@ -530,6 +555,26 @@ export default function KanbanBoard({
     resetDwell();
   };
 
+  const resolveMoveTarget = (overId: string) => {
+    const targetCategory = resolveColumnForOverId(overId);
+    if (!targetCategory) return null;
+
+    if (isCategoryColumnId(overId, categories)) {
+      return { targetCategory, overTaskId: null as string | null };
+    }
+
+    const overTask = taskById.get(overId);
+    if (overTask && !overTask.parent_task_id) {
+      return { targetCategory, overTaskId: overId };
+    }
+
+    if (overTask?.parent_task_id) {
+      return { targetCategory, overTaskId: overTask.parent_task_id };
+    }
+
+    return { targetCategory, overTaskId: null as string | null };
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const readyAction = dwellReadyRef.current;
     resetDwell();
@@ -571,30 +616,27 @@ export default function KanbanBoard({
     if (!sourceGroup || !sourceCategory) return;
 
     const overId = String(over.id);
-    let targetCategory = sourceCategory;
-    let overTaskId: string | null = null;
+    const moveTarget = resolveMoveTarget(overId);
+    if (!moveTarget) return;
 
-    if (isCategoryColumnId(overId, categories)) {
-      targetCategory = overId;
-      overTaskId = null;
-    } else {
-      for (const cat of categories) {
-        const match = groupsByCategory[cat.id]?.find((g) => g.parent.id === overId);
-        if (match) {
-          targetCategory = cat.id;
-          overTaskId = overId;
-          break;
-        }
-      }
-    }
+    const { targetCategory, overTaskId } = moveTarget;
+    if (targetCategory === sourceCategory && overTaskId === activeTaskId) return;
 
     onMoveGroup(sourceGroup, targetCategory, overTaskId);
+  };
+
+  const collisionDetection: CollisionDetection = (args) => {
+    const pointerHits = pointerWithin(args);
+    if (pointerHits.length > 0) return pointerHits;
+    const rectHits = rectIntersection(args);
+    if (rectHits.length > 0) return rectHits;
+    return closestCorners(args);
   };
 
   return (
     <DndContext
       sensors={sensors}
-      collisionDetection={closestCorners}
+      collisionDetection={collisionDetection}
       onDragStart={(e: DragStartEvent) => {
         resetDwell();
         snapshotPinnedCategories();
@@ -610,10 +652,16 @@ export default function KanbanBoard({
       }}
     >
       <div
-        className="tb-kanban-scroll flex items-start gap-4 md:gap-6 overflow-x-auto px-1 pb-2"
+        className={`tb-kanban-scroll flex items-start gap-4 md:gap-6 overflow-x-auto px-1 pb-2${
+          fillWidth ? ' tb-kanban-scroll--fill md:w-full' : ''
+        }`}
       >
         {visibleCategories.map(({ id, label }) => (
-          <div key={id} data-category={id}>
+          <div
+            key={id}
+            data-category={id}
+            className={fillWidth ? 'md:flex md:flex-1 md:min-w-[280px] md:basis-0' : undefined}
+          >
             <Column
               categoryId={id}
               label={label}
@@ -629,10 +677,13 @@ export default function KanbanBoard({
               onCompleteTask={onCompleteTask}
               onCreateTask={onCreateTask}
               creating={creatingCategory === id}
+              fillWidth={fillWidth}
             />
           </div>
         ))}
-        {isAdmin && onAddCategory && <AddCategoryColumn onAddCategory={onAddCategory} />}
+        {isAdmin && onAddCategory && (
+          <AddCategoryColumn onAddCategory={onAddCategory} fillWidth={fillWidth} />
+        )}
       </div>
       <DragOverlay dropAnimation={null}>
         {activeTask && (

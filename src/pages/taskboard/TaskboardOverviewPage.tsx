@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
+import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import { countProjectTasksForFilter, sortProjectsByWorkload } from '../../lib/taskboard/filterUtils';
 import { withRetry } from '../../lib/taskboard/loadUtils';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
@@ -22,6 +23,7 @@ export default function TaskboardOverviewPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const { username, isAdmin } = useTaskboardAuth();
+  const { selected } = useTaskboardSelection();
   const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
   const { projectsToken, expandProjectId } = useTaskboardRefresh();
   const [searchParams] = useSearchParams();
@@ -97,7 +99,11 @@ export default function TaskboardOverviewPage() {
   };
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 md:px-10">
+    <div
+      className={`tb-taskboard-page px-6 md:px-10 mx-auto max-w-screen-2xl${
+        selected ? ' tb-taskboard-page--drawer-open' : ''
+      }`}
+    >
       <span className="tb-label block mb-4">Projects</span>
       <p className="text-sm tb-muted mb-6">
         Click a project to expand its tasks. You can open multiple projects at once.

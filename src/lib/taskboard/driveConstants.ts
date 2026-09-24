@@ -4,7 +4,13 @@ export const TASKBOARD_DRIVE_URL = `https://drive.google.com/drive/folders/${TAS
 
 export const TASKBOARD_PATH = '/taskboard';
 
+export const PROJECTS_PATH = '/projects';
+
 export const REMOTE_INST_PATH = '/remote-inst';
+
+export function installationDetailPath(installationId: string) {
+  return `${PROJECTS_PATH}/installation/${installationId}`;
+}
 
 export function canAccessTaskboardPrivateNav(username: string | null, isAdmin: boolean) {
   if (isAdmin) return true;

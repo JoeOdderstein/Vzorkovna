@@ -9,7 +9,7 @@ export type GlobalTaskCategoryId = (typeof TASK_CATEGORIES)[number]['id'];
 /** Global category ids (quotations, …) or project-specific custom slugs. */
 export type TaskCategory = string;
 
-export const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha'] as const;
+export const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha', 'Sasha', 'Misha', 'Tereza'] as const;
 export type Assignee = (typeof ASSIGNEES)[number];
 
 export const PRIORITIES = ['high', 'normal', 'low'] as const;

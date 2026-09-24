@@ -8,6 +8,8 @@ interface TaskCardProps {
   isSubtask?: boolean;
   onClick: () => void;
   onComplete?: (taskId: string) => void;
+  /** Use a div for the title so parent drag sensors are not blocked by nested buttons. */
+  titleAsDiv?: boolean;
   expandControl?: {
     collapsed: boolean;
     onToggle: () => void;
@@ -19,9 +21,12 @@ export default function TaskCard({
   isSubtask = false,
   onClick,
   onComplete,
+  titleAsDiv = false,
   expandControl,
 }: TaskCardProps) {
   const deadlineStatus = getDeadlineStatus(task.deadline, task.completed);
+  const titleClassName =
+    'min-w-0 flex-1 text-left hover:opacity-80 transition-opacity cursor-pointer';
 
   return (
     <div
@@ -46,31 +51,62 @@ export default function TaskCard({
         {isSubtask && (
           <span className="text-xs tb-muted mt-0.5 shrink-0">↳</span>
         )}
-        <button
-          type="button"
-          onClick={onClick}
-          className="min-w-0 flex-1 text-left hover:opacity-80 transition-opacity"
-        >
-          <p className={`text-sm leading-snug ${isSubtask ? 'tb-text-secondary' : 'tb-text'}`}>
-            {task.task_name || 'Untitled task'}
-          </p>
-          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span className="inline-flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${priorityDotClasses[task.priority]}`} />
-              <span className="text-xs tb-text-secondary">
-                {priorityLabels[task.priority]}
+        {titleAsDiv ? (
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={onClick}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                onClick();
+              }
+            }}
+            className={titleClassName}
+          >
+            <p className={`text-sm leading-snug ${isSubtask ? 'tb-text-secondary' : 'tb-text'}`}>
+              {task.task_name || 'Untitled task'}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${priorityDotClasses[task.priority]}`} />
+                <span className="text-xs tb-text-secondary">
+                  {priorityLabels[task.priority]}
+                </span>
               </span>
-            </span>
-            {task.deadline && (
-              <span className={`text-xs ${deadlineClasses[deadlineStatus]}`}>
-                {formatDeadline(task.deadline)}
-              </span>
-            )}
-            {task.assignees.length > 0 && (
-              <span className="text-xs tb-text-secondary">{formatAssignees(task.assignees)}</span>
-            )}
+              {task.deadline && (
+                <span className={`text-xs ${deadlineClasses[deadlineStatus]}`}>
+                  {formatDeadline(task.deadline)}
+                </span>
+              )}
+              {task.assignees.length > 0 && (
+                <span className="text-xs tb-text-secondary">{formatAssignees(task.assignees)}</span>
+              )}
+            </div>
           </div>
-        </button>
+        ) : (
+          <button type="button" onClick={onClick} className={titleClassName}>
+            <p className={`text-sm leading-snug ${isSubtask ? 'tb-text-secondary' : 'tb-text'}`}>
+              {task.task_name || 'Untitled task'}
+            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${priorityDotClasses[task.priority]}`} />
+                <span className="text-xs tb-text-secondary">
+                  {priorityLabels[task.priority]}
+                </span>
+              </span>
+              {task.deadline && (
+                <span className={`text-xs ${deadlineClasses[deadlineStatus]}`}>
+                  {formatDeadline(task.deadline)}
+                </span>
+              )}
+              {task.assignees.length > 0 && (
+                <span className="text-xs tb-text-secondary">{formatAssignees(task.assignees)}</span>
+              )}
+            </div>
+          </button>
+        )}
         {onComplete && (
           <input
             type="checkbox"

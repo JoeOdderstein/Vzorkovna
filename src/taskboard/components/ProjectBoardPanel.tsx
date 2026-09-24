@@ -227,6 +227,7 @@ export default function ProjectBoardPanel({
             creatingCategory={creatingCategory}
             isAdmin={isAdmin}
             onAddCategory={isAdmin ? handleAddCategory : undefined}
+            fillWidth={Boolean(selected)}
           />
         </div>
       )}
