@@ -10,22 +10,27 @@ const PRIORITY_WEIGHT: Record<Priority, number> = {
   low: 1,
 };
 
-export const ASSIGNEE_FILTERS: { id: AssigneeFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  ...[...ASSIGNEES].sort((a, b) => a.localeCompare(b)).map((id) => ({ id, label: id })),
-];
+export type AssigneeFilterItem = { id: AssigneeFilter; label: string };
 
-const ASSIGNEE_FILTER_ITEMS = ASSIGNEE_FILTERS.filter(
-  (filter): filter is { id: Assignee; label: string } => filter.id !== 'all'
-);
+const ALL_FILTER: AssigneeFilterItem = { id: 'all', label: 'All' };
+
+/** Filter chips for a set of assignee names (built-ins plus invited members). */
+export function buildAssigneeFilters(names: readonly string[] = ASSIGNEES): AssigneeFilterItem[] {
+  const unique = [...new Set(names)].sort((a, b) => a.localeCompare(b));
+  return [ALL_FILTER, ...unique.map((id) => ({ id, label: id }))];
+}
+
+export const ASSIGNEE_FILTERS: AssigneeFilterItem[] = buildAssigneeFilters();
 
 /** All first, logged-in assignee second, then others by open-task count (desc). */
 export function orderAssigneeFiltersForUser(
   currentAssignee: Assignee | null,
-  counts: Record<AssigneeFilter, number>
-): { id: AssigneeFilter; label: string }[] {
-  const allFilter = ASSIGNEE_FILTERS[0];
-  const others = [...ASSIGNEE_FILTER_ITEMS]
+  counts: Record<AssigneeFilter, number>,
+  names: readonly string[] = ASSIGNEES
+): AssigneeFilterItem[] {
+  const items = buildAssigneeFilters(names).filter((filter) => filter.id !== 'all');
+
+  const others = items
     .filter((filter) => filter.id !== currentAssignee)
     .sort((a, b) => {
       const countDiff = (counts[b.id] ?? 0) - (counts[a.id] ?? 0);
@@ -34,11 +39,11 @@ export function orderAssigneeFiltersForUser(
     });
 
   if (currentAssignee) {
-    const currentFilter = ASSIGNEE_FILTER_ITEMS.find((filter) => filter.id === currentAssignee);
-    if (currentFilter) return [allFilter, currentFilter, ...others];
+    const currentFilter = items.find((filter) => filter.id === currentAssignee);
+    if (currentFilter) return [ALL_FILTER, currentFilter, ...others];
   }
 
-  return [allFilter, ...others];
+  return [ALL_FILTER, ...others];
 }
 
 export function filterTasksByAssignee(tasks: Task[], filter: AssigneeFilter): Task[] {

@@ -5,6 +5,7 @@ import {
   isAdminUsername,
   verifySessionToken,
 } from '../_lib/auth.js';
+import { listMemberUsernames } from '../_lib/members.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -25,7 +26,17 @@ export default async function handler(req, res) {
     }
 
     const adminUsername = getAdminUsername();
-    const usernames = getTaskboardUsernames().filter((name) => name !== adminUsername);
+
+    let memberUsernames = [];
+    try {
+      memberUsernames = await listMemberUsernames();
+    } catch (err) {
+      console.error('Member username lookup failed:', err);
+    }
+
+    const usernames = [...new Set([...getTaskboardUsernames(), ...memberUsernames])].filter(
+      (name) => name !== adminUsername
+    );
 
     return res.status(200).json({ usernames, adminUsername });
   } catch {

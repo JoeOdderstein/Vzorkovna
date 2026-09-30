@@ -15,6 +15,7 @@ import { isSupabaseConfigured } from '../../lib/taskboard/config';
 import AddTaskFab from '../../taskboard/components/AddTaskFab';
 import AssigneeFilterBar from '../../taskboard/components/AssigneeFilterBar';
 import TaskDrawerHost from '../../taskboard/components/TaskDrawerHost';
+import ManageMembersHeaderAction from '../../taskboard/components/ManageMembersHeaderAction';
 import ManageProjectsHeaderAction from '../../taskboard/components/ManageProjectsHeaderAction';
 import TaskboardHeaderActions from '../../taskboard/components/TaskboardHeaderActions';
 import TaskboardThemeToggle from '../../taskboard/components/TaskboardThemeToggle';
@@ -64,7 +65,12 @@ function TaskboardShell() {
                     Archive
                   </Link>
                 </div>
-                {isAdmin && <ManageProjectsHeaderAction />}
+                {isAdmin && (
+                  <div className="flex items-center gap-2 shrink-0">
+                    <ManageProjectsHeaderAction />
+                    <ManageMembersHeaderAction />
+                  </div>
+                )}
               </div>
               <div className="tb-header-scroll-row md:justify-end">
                 <TaskboardThemeToggle />

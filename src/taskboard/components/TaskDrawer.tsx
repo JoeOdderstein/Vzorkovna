@@ -3,7 +3,8 @@ import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
 import type { Assignee, Priority, TaskCategory } from '../../lib/taskboard/constants';
-import { ASSIGNEES, PRIORITIES } from '../../lib/taskboard/constants';
+import { PRIORITIES } from '../../lib/taskboard/constants';
+import { useAssigneeNames } from '../../hooks/useAssigneeNames';
 import type { CategoryOption } from '../../lib/taskboard/types';
 import CategorySelect from './CategorySelect';
 import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
@@ -54,6 +55,7 @@ export default function TaskDrawer({
 }: TaskDrawerProps) {
   const { theme } = useTaskboardTheme();
   const { username } = useTaskboardAuth();
+  const assigneeNames = useAssigneeNames();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Task>>({});
   const [saving, setSaving] = useState(false);
@@ -297,7 +299,7 @@ export default function TaskDrawer({
 
           <Field label="Assigned to">
             <div className="flex flex-wrap gap-2">
-              {ASSIGNEES.map((a) => {
+              {assigneeNames.map((a) => {
                 const selected = (form.assignees ?? []).includes(a);
                 return (
                   <button

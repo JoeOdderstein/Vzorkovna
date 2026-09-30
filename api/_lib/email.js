@@ -321,3 +321,50 @@ export async function sendCommentNotificationEmail({
 
   if (error) throw error;
 }
+
+export async function sendInviteEmail({
+  to,
+  boardName,
+  username,
+  inviteUrl,
+  invitedBy,
+}) {
+  const resend = getResend();
+  const from = process.env.EMAIL_FROM;
+
+  if (!resend || !from) {
+    throw new Error('Email is not configured');
+  }
+
+  const safeName = escapeHtml(boardName || username);
+  const safeUsername = escapeHtml(username);
+  const safeInvitedBy = escapeHtml(invitedBy || 'an admin');
+  const safeInviteUrl = escapeHref(inviteUrl);
+
+  const html = `<!DOCTYPE html>
+<html>
+  <body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;margin:0;padding:24px;background:#f6f6f6;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#666;">Headlight Rabbits taskboard</p>
+      <h1 style="margin:0 0 16px;font-size:22px;">Set up your account</h1>
+      <p style="margin:0 0 16px;">Hi ${safeName}, <strong>${safeInvitedBy}</strong> invited you to the taskboard.</p>
+      <p style="margin:0 0 8px;color:#444;">Your username is <strong>${safeUsername}</strong>. Choose your own password with the button below. This link expires in 7 days.</p>
+      <p style="margin:24px 0 0;">
+        <a href="${safeInviteUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;">
+          Choose your password
+        </a>
+      </p>
+      <p style="margin:16px 0 0;font-size:12px;color:#888;word-break:break-all;">${safeInviteUrl}</p>
+    </div>
+  </body>
+</html>`;
+
+  const { error } = await resend.emails.send({
+    from,
+    to,
+    subject: 'Set up your Headlight Rabbits taskboard account',
+    html,
+  });
+
+  if (error) throw error;
+}

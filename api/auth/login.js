@@ -3,8 +3,8 @@ import {
   getAuthConfigError,
   isAdminUsername,
   setSessionCookie,
-  validateCredentials,
 } from '../_lib/auth.js';
+import { authenticateUser } from '../_lib/authenticate.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -23,11 +23,12 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Username and password required' });
     }
 
-    if (!validateCredentials(String(username), String(password))) {
+    const normalizedUsername = await authenticateUser(String(username), String(password));
+
+    if (!normalizedUsername) {
       return res.status(401).json({ error: 'Incorrect username or password' });
     }
 
-    const normalizedUsername = String(username);
     const token = await createSessionToken(normalizedUsername);
     setSessionCookie(res, token);
 

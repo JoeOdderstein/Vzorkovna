@@ -9,8 +9,10 @@ export type GlobalTaskCategoryId = (typeof TASK_CATEGORIES)[number]['id'];
 /** Global category ids (quotations, …) or project-specific custom slugs. */
 export type TaskCategory = string;
 
+/** Built-in names. Members added via Manage members are loaded from the server. */
 export const ASSIGNEES = ['Gus', 'Joost', 'Pasha', 'Ksusha', 'Sasha', 'Misha', 'Tereza'] as const;
-export type Assignee = (typeof ASSIGNEES)[number];
+/** Any display name from taskboard_members can be an assignee. */
+export type Assignee = string;
 
 export const PRIORITIES = ['high', 'normal', 'low'] as const;
 export type Priority = (typeof PRIORITIES)[number];

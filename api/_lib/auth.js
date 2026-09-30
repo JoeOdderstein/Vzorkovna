@@ -92,7 +92,7 @@ function safeEqual(a, b) {
   return timingSafeEqual(bufA, bufB);
 }
 
-function getAllowedUsers() {
+export function getAllowedUsers() {
   const users = [];
 
   const primaryUser = process.env.TASKBOARD_USERNAME ?? 'vzorkovna';

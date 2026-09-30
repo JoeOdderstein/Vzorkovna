@@ -3,6 +3,7 @@ import Cursor from './components/Cursor';
 import { TaskboardAuthProvider } from './context/TaskboardAuthContext';
 import { PROJECTS_PATH } from './lib/taskboard/driveConstants';
 import HomePage from './pages/HomePage';
+import InvitePage from './pages/InvitePage';
 import LoginPage from './pages/LoginPage';
 import ProjectDetailPage from './pages/ProjectDetailPage';
 import ArchivePage from './pages/taskboard/ArchivePage';
@@ -25,6 +26,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
+            <Route path="/invite" element={<InvitePage />} />
             <Route path={PROJECTS_PATH} element={<ProjectsLayout />}>
               <Route index element={<ProjectsPage />} />
               <Route path="installation/:installationId" element={<InstallationDetailPage />} />
