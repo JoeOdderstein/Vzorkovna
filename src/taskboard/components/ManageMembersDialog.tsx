@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   createMember,
+  deleteMember,
   fetchMembers,
   sendMemberInvite,
   type TaskboardMember,
@@ -30,6 +31,11 @@ function needsEmailSetup(member: TaskboardMember) {
   return !member.isAdmin && !member.hasPassword && !member.email && member.source !== 'env';
 }
 
+function canDeleteMember(member: TaskboardMember) {
+  if (member.isAdmin || member.source === 'env' || member.source === 'roster') return false;
+  return true;
+}
+
 export default function ManageMembersDialog({ open, onClose }: ManageMembersDialogProps) {
   const [members, setMembers] = useState<TaskboardMember[]>([]);
   const [membersReady, setMembersReady] = useState(true);
@@ -44,6 +50,7 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
   const [lastInviteUrl, setLastInviteUrl] = useState('');
   const [emailDrafts, setEmailDrafts] = useState<Record<string, string>>({});
   const [savingEmail, setSavingEmail] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
 
   const load = () => {
     setLoading(true);
@@ -163,6 +170,28 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
     }
   };
 
+  const handleDelete = async (member: TaskboardMember) => {
+    const label = member.board_name || member.username;
+    const confirmed = window.confirm(
+      `Remove login and profile for ${label} (${member.username})?\n\nThey can still appear on existing tasks as an assignee name. You can add them again later from this screen.`
+    );
+    if (!confirmed) return;
+
+    setDeleting(member.username);
+    setError('');
+    setNotice('');
+    try {
+      await deleteMember(member.username);
+      setMembers((prev) => prev.filter((item) => item.username !== member.username));
+      setNotice(`Removed ${label}.`);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove member.');
+    } finally {
+      setDeleting(null);
+    }
+  };
+
   const handleInvite = async (member: TaskboardMember) => {
     setInviting(member.username);
     setError('');
@@ -254,20 +283,32 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
                         </p>
                         <p className="text-xs tb-text-secondary mt-1">{statusLabel(member)}</p>
                       </div>
-                      {canSendInvite(member) && (
-                        <button
-                          type="button"
-                          onClick={() => handleInvite(member)}
-                          disabled={inviting === member.username}
-                          className="tb-btn-secondary text-xs shrink-0 disabled:opacity-50"
-                        >
-                          {inviting === member.username
-                            ? 'Sending…'
-                            : member.invitePending
-                              ? 'Resend invite'
-                              : 'Send invite'}
-                        </button>
-                      )}
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        {canSendInvite(member) && (
+                          <button
+                            type="button"
+                            onClick={() => handleInvite(member)}
+                            disabled={inviting === member.username}
+                            className="tb-btn-secondary text-xs disabled:opacity-50"
+                          >
+                            {inviting === member.username
+                              ? 'Sending…'
+                              : member.invitePending
+                                ? 'Resend invite'
+                                : 'Send invite'}
+                          </button>
+                        )}
+                        {canDeleteMember(member) && (
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(member)}
+                            disabled={deleting === member.username}
+                            className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
+                          >
+                            {deleting === member.username ? 'Removing…' : 'Remove'}
+                          </button>
+                        )}
+                      </div>
                     </div>
                     {needsEmailSetup(member) && (
                       <div className="flex flex-wrap items-center gap-2 pt-1">

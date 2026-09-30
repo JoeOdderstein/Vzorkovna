@@ -1,6 +1,8 @@
 import { useState, type ReactNode } from 'react';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
+import TechnicalDocumentationSection from '../components/installations/TechnicalDocumentationSection';
+import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 import { useInstallation } from '../hooks/useInstallations';
 import {
   INSTALLATION_LIFECYCLE_LABELS,
@@ -50,6 +52,7 @@ function MetaRow({ label, value }: { label: string; value: ReactNode }) {
 export default function InstallationDetailPage() {
   const { installationId } = useParams<{ installationId: string }>();
   const { installation, setInstallation, loading, error } = useInstallation(installationId);
+  const { isAdmin } = useTaskboardAuth();
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
@@ -216,17 +219,13 @@ export default function InstallationDetailPage() {
         </DetailSection>
 
         <DetailSection title="Technical documentation">
-          {technicalDocs.length === 0 ? (
-            <p className="text-sm tb-muted">No technical documents on file yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {technicalDocs.map((doc) => (
-                <li key={doc.id} className="text-sm tb-text">
-                  {doc.title}
-                </li>
-              ))}
-            </ul>
-          )}
+          {installationId ? (
+            <TechnicalDocumentationSection
+              installationId={installationId}
+              documents={technicalDocs}
+              isAdmin={isAdmin}
+            />
+          ) : null}
         </DetailSection>
 
         <DetailSection title="Electrical documentation">

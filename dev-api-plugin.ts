@@ -18,6 +18,7 @@ import { handleNotifyComment } from './api/_lib/notifyComment.js';
 import {
   handleAcceptInvite,
   handleCreateMember,
+  handleDeleteMember,
   handleGetInvite,
   handleListAssignees,
   handleListMembers,
@@ -130,6 +131,10 @@ export function taskboardDevApi(): Plugin {
             if (req.method === 'POST') {
               const raw = await readBody(req);
               return runApiHandler(handleCreateMember, req, res, raw ? JSON.parse(raw) : {});
+            }
+            if (req.method === 'DELETE') {
+              const raw = await readBody(req);
+              return runApiHandler(handleDeleteMember, req, res, raw ? JSON.parse(raw) : {});
             }
             return sendJson(res, 405, { error: 'Method not allowed' });
           }

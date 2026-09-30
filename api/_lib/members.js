@@ -385,6 +385,111 @@ export async function handleCreateMember(req, res) {
   return res.status(200).json({ member: mapMemberRow(data, envUsernames) });
 }
 
+function usernameFromDeleteRequest(req) {
+  const body = readRequestBody(req);
+  const fromBody = normalizeUsername(body.username);
+  if (fromBody) return fromBody;
+
+  if (req.query && typeof req.query.username === 'string') {
+    return normalizeUsername(req.query.username);
+  }
+
+  const url = String(req.url ?? '');
+  const q = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
+  return normalizeUsername(new URLSearchParams(q).get('username') ?? '');
+}
+
+export async function handleDeleteMember(req, res) {
+  if (req.method !== 'DELETE') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const admin = await requireAdmin(req, res);
+  if (!admin) return;
+
+  const username = usernameFromDeleteRequest(req);
+  if (!username) {
+    return res.status(400).json({ error: 'username is required' });
+  }
+  if (isAdminUsername(username)) {
+    return res.status(400).json({ error: 'The admin account cannot be removed.' });
+  }
+
+  const supabase = getSupabaseAdmin();
+  if (!supabase) {
+    return res.status(503).json({ error: 'SUPABASE_SERVICE_ROLE_KEY is not configured' });
+  }
+
+  const envUsernames = new Set(getAllowedUsers().map((user) => user.username));
+
+  const { data: memberRow, error: memberLookupError } = await supabase
+    .from('taskboard_members')
+    .select('username')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (memberLookupError && !membersTableMissing(memberLookupError)) {
+    console.error('Delete member lookup failed:', memberLookupError);
+    return res.status(500).json({ error: 'Could not remove member' });
+  }
+
+  const { data: profileRow, error: profileLookupError } = await supabase
+    .from('user_profiles')
+    .select('username')
+    .eq('username', username)
+    .maybeSingle();
+
+  if (profileLookupError) {
+    console.error('Delete profile lookup failed:', profileLookupError);
+    return res.status(500).json({ error: 'Could not remove profile' });
+  }
+
+  if (!memberRow && !profileRow) {
+    if (envUsernames.has(username)) {
+      return res.status(400).json({
+        error: 'Server login accounts cannot be removed here. Change them in Vercel env vars.',
+      });
+    }
+    return res.status(404).json({ error: 'No login or profile found for that username.' });
+  }
+
+  let removedMember = false;
+  let removedProfile = false;
+
+  if (memberRow) {
+    const { error: deleteMemberError } = await supabase
+      .from('taskboard_members')
+      .delete()
+      .eq('username', username);
+
+    if (deleteMemberError) {
+      console.error('Delete member failed:', deleteMemberError);
+      return res.status(500).json({ error: 'Could not remove member login' });
+    }
+    removedMember = true;
+  }
+
+  if (profileRow) {
+    const { error: deleteProfileError } = await supabase
+      .from('user_profiles')
+      .delete()
+      .eq('username', username);
+
+    if (deleteProfileError) {
+      console.error('Delete profile failed:', deleteProfileError);
+      return res.status(500).json({ error: 'Could not remove profile' });
+    }
+    removedProfile = true;
+  }
+
+  return res.status(200).json({
+    ok: true,
+    username,
+    removedMember,
+    removedProfile,
+  });
+}
+
 async function issueInvite(supabase, username, invitedBy) {
   const token = createInviteToken();
   const invite_token_hash = hashInviteToken(token);

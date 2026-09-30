@@ -28,6 +28,19 @@ export async function fetchMembers(): Promise<{
   };
 }
 
+export async function deleteMember(username: string): Promise<void> {
+  const res = await fetch('/api/auth/members', {
+    method: 'DELETE',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+  const data = await readJson(res);
+  if (!res.ok) {
+    throw new Error((data.error as string) || 'Could not remove member.');
+  }
+}
+
 export async function createMember(input: {
   username: string;
   board_name: string;
