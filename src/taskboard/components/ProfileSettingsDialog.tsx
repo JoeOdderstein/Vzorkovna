@@ -4,6 +4,10 @@ import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useUserProfile } from '../../context/UserProfileContext';
 import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
 import { getErrorMessage } from '../../lib/taskboard/profileErrors';
+import type { UserProfilePreferredLocale } from '../../lib/taskboard/types';
+import { clearTranslationCache } from '../../lib/taskboard/translateService';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { cachePreferredLocaleForUser } from '../../hooks/useTaskboardI18n';
 
 interface ProfileSettingsDialogProps {
   open: boolean;
@@ -12,9 +16,11 @@ interface ProfileSettingsDialogProps {
 
 export default function ProfileSettingsDialog({ open, onClose }: ProfileSettingsDialogProps) {
   const { username } = useTaskboardAuth();
+  const { t } = useTaskboardI18n();
   const { profile, loading, profilesReady, error, updateProfile } = useUserProfile();
   const [email, setEmail] = useState('');
   const [notifyOnAssign, setNotifyOnAssign] = useState(true);
+  const [preferredLocale, setPreferredLocale] = useState<UserProfilePreferredLocale>('en');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -28,6 +34,7 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
     if (!open || !profile) return;
     setEmail(profile.email ?? '');
     setNotifyOnAssign(profile.notify_on_assign);
+    setPreferredLocale(profile.preferred_locale ?? 'en');
     setFormError('');
   }, [open, profile]);
 
@@ -53,7 +60,10 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
       await updateProfile({
         email: email.trim() || null,
         notify_on_assign: notifyOnAssign,
+        preferred_locale: preferredLocale,
       });
+      clearTranslationCache();
+      if (username) cachePreferredLocaleForUser(username, preferredLocale);
       onClose();
     } catch (err) {
       setFormError(getErrorMessage(err, 'Could not save profile.'));
@@ -70,7 +80,7 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-4 border-b tb-calendar-border flex items-center justify-between shrink-0">
-          <h2 className="tb-heading">Profile</h2>
+          <h2 className="tb-heading">{t('profile.title')}</h2>
           <button
             type="button"
             onClick={onClose}
@@ -92,21 +102,20 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
           )}
 
           <div>
-            <p className="tb-field-label mb-1.5">Login username</p>
+            <p className="tb-field-label mb-1.5">{t('profile.loginUsername')}</p>
             <p className="text-sm tb-text">{username}</p>
           </div>
 
           <div>
-            <p className="tb-field-label mb-1.5">Your name on the taskboard</p>
-            <p className="text-sm tb-text">{boardName ?? 'Not configured'}</p>
+            <p className="tb-field-label mb-1.5">{t('profile.boardName')}</p>
+            <p className="text-sm tb-text">{boardName ?? t('profile.notConfigured')}</p>
             <p className="text-xs tb-muted mt-1.5">
-              Linked automatically from your login. Tasks assigned to{' '}
-              <strong>{boardName ?? 'your name'}</strong> on the board will notify the email below.
+              {t('profile.boardNameHint', { name: boardName ?? t('profile.boardName') })}
             </p>
           </div>
 
           <label className="block space-y-1.5">
-            <span className="tb-field-label">Email</span>
+            <span className="tb-field-label">{t('profile.email')}</span>
             <input
               type="email"
               value={email}
@@ -115,6 +124,22 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
               className="field-input w-full"
               disabled={loading || saving || !profilesReady}
             />
+          </label>
+
+          <label className="block space-y-1.5">
+            <span className="tb-field-label">{t('profile.readingLanguage')}</span>
+            <select
+              value={preferredLocale}
+              onChange={(e) =>
+                setPreferredLocale(e.target.value === 'uk' ? 'uk' : 'en')
+              }
+              disabled={loading || saving || !profilesReady}
+              className="field-input w-full"
+            >
+              <option value="en">{t('profile.readingEnglish')}</option>
+              <option value="uk">{t('profile.readingUkrainian')}</option>
+            </select>
+            <span className="block text-xs tb-muted">{t('profile.readingHint')}</span>
           </label>
 
           <label className="flex items-start gap-3">
@@ -126,12 +151,8 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
               className="tb-task-checkbox mt-0.5"
             />
             <span>
-              <span className="block text-sm tb-text">
-                Email me when I am assigned to a task or someone comments on my task
-              </span>
-              <span className="block text-xs tb-muted mt-1">
-                Requires a saved email above. Applies to tasks assigned to your board name.
-              </span>
+              <span className="block text-sm tb-text">{t('profile.notify')}</span>
+              <span className="block text-xs tb-muted mt-1">{t('profile.notifyHint')}</span>
             </span>
           </label>
 
@@ -143,10 +164,10 @@ export default function ProfileSettingsDialog({ open, onClose }: ProfileSettings
               disabled={loading || saving || !profilesReady || !username || !boardName}
               className="tb-btn-primary disabled:opacity-50"
             >
-              {saving ? 'Saving…' : 'Save profile'}
+              {saving ? t('common.saving') : t('profile.save')}
             </button>
             <button type="button" onClick={onClose} className="tb-link px-2 py-1">
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </form>

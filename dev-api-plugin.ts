@@ -15,6 +15,7 @@ import {
 import { authenticateUser } from './api/_lib/authenticate.js';
 import { handleNotifyAssignment } from './api/_lib/notifyAssignment.js';
 import { handleNotifyComment } from './api/_lib/notifyComment.js';
+import { handleTranslate } from './api/_lib/translate.js';
 import {
   handleAcceptInvite,
   handleCreateMember,
@@ -118,6 +119,11 @@ export function taskboardDevApi(): Plugin {
                 },
               } as never
             );
+          }
+
+          if (url === '/api/translate' && req.method === 'POST') {
+            const raw = await readBody(req);
+            return runApiHandler(handleTranslate, req, res, raw ? JSON.parse(raw) : {});
           }
 
           if (!url.startsWith('/api/auth')) {

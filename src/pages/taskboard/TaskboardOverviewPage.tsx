@@ -15,6 +15,8 @@ import {
 import type { Project, Task } from '../../lib/taskboard/types';
 import ProjectBoardPanel from '../../taskboard/components/ProjectBoardPanel';
 import ProjectRestrictedIcon from '../../taskboard/components/ProjectRestrictedIcon';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import TranslatableText from '../../taskboard/components/TranslatableText';
 
 export default function TaskboardOverviewPage() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -27,6 +29,7 @@ export default function TaskboardOverviewPage() {
   const { assigneeFilter, setTasksForCounts } = useTaskboardFilter();
   const { projectsToken, expandProjectId } = useTaskboardRefresh();
   const [searchParams] = useSearchParams();
+  const { t } = useTaskboardI18n();
 
   const refreshAllTasks = useCallback(() => {
     fetchAllActiveTasks()
@@ -46,7 +49,7 @@ export default function TaskboardOverviewPage() {
       })
       .catch(() => {
         if (cancelled) return;
-        setError('Could not load projects. Please try again.');
+        setError(t('overview.loadError'));
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -104,12 +107,10 @@ export default function TaskboardOverviewPage() {
         selected ? ' tb-taskboard-page--drawer-open' : ''
       }`}
     >
-      <span className="tb-label block mb-4">Projects</span>
-      <p className="text-sm tb-muted mb-6">
-        Click a project to expand its tasks. You can open multiple projects at once.
-      </p>
+      <span className="tb-label block mb-4">{t('overview.projectsLabel')}</span>
+      <p className="text-sm tb-muted mb-6">{t('overview.hint')}</p>
 
-      {loading && <p className="text-sm tb-muted">Loading projects…</p>}
+      {loading && <p className="text-sm tb-muted">{t('overview.loadingProjects')}</p>}
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {!loading && !error && (
@@ -133,7 +134,7 @@ export default function TaskboardOverviewPage() {
                     {count}
                   </span>
                   <span className="flex-1 flex items-center gap-2 text-base tb-text group-hover:opacity-80 transition-opacity">
-                    <span>{project.name}</span>
+                    <TranslatableText text={project.name} />
                     <ProjectRestrictedIcon project={project} />
                   </span>
                   {isOpen ? (

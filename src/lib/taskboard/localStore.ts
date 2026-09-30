@@ -535,8 +535,14 @@ export const localStore = {
 
   listUserProfiles: (): UserProfile[] => loadUserProfiles(),
 
-  getUserProfile: (username: string): UserProfile | null =>
-    loadUserProfiles().find((profile) => profile.username === username) ?? null,
+  getUserProfile: (username: string): UserProfile | null => {
+    const profile = loadUserProfiles().find((item) => item.username === username);
+    if (!profile) return null;
+    return {
+      ...profile,
+      preferred_locale: profile.preferred_locale === 'uk' ? 'uk' : 'en',
+    };
+  },
 
   upsertUserProfile: (profile: UserProfile): UserProfile => {
     const profiles = loadUserProfiles();

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useInstallations } from '../../hooks/useInstallations';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
   groupInstallationsByLocation,
   INSTALLATION_LIFECYCLE_LABELS,
@@ -9,8 +10,14 @@ import {
   lifecycleStatusLightClass,
   PI_CONNECT_POPUP_INSTALLATION_ID,
 } from '../../lib/installations/constants';
+import {
+  translateInstallationLifecycle,
+  translateInstallationLocation,
+  translateInstallationOperational,
+} from '../../lib/taskboard/i18n/messages';
 import AddInstallationDialog from './AddInstallationDialog';
 import InstallationStatusFilterBar from './InstallationStatusFilterBar';
+import TranslatableText from './TranslatableText';
 import type { InstallationOperationalStatus, InstallationRecord } from '../../lib/installations/types';
 import { installationDetailPath } from '../../lib/taskboard/driveConstants';
 import { openRemotePopupWindow } from '../../lib/taskboard/openRemotePopup';
@@ -26,20 +33,7 @@ function operationalLightClass(status: InstallationOperationalStatus) {
   }
 }
 
-function operationalStatusLabel(status: InstallationOperationalStatus) {
-  switch (status) {
-    case 'active':
-      return 'Active';
-    case 'issues':
-      return 'Issues detected';
-    case 'broken':
-      return 'Offline';
-  }
-}
-
 interface RemoteInstallationOverviewProps {
-  label: string;
-  description: string;
   variant?: 'projects' | 'remote-inst';
 }
 
@@ -50,13 +44,21 @@ function InstallationCard({
   installation: InstallationRecord;
   linkToDetail: boolean;
 }) {
+  const { t, locale } = useTaskboardI18n();
+
   const statusLabel = linkToDetail
-    ? INSTALLATION_LIFECYCLE_LABELS[installation.lifecycle_status]
-    : operationalStatusLabel(installation.operational_status);
+    ? translateInstallationLifecycle(
+        locale,
+        installation.lifecycle_status,
+        INSTALLATION_LIFECYCLE_LABELS[installation.lifecycle_status],
+      )
+    : translateInstallationOperational(locale, installation.operational_status);
 
   const content = (
     <>
-      <h2 className="text-base tb-text font-medium">{installation.name}</h2>
+      <h2 className="text-base tb-text font-medium">
+        <TranslatableText text={installation.name} />
+      </h2>
       <div className="mt-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           <span
@@ -71,7 +73,7 @@ function InstallationCard({
         </div>
         {linkToDetail || installation.remote_url ? (
           <span className="inline-flex items-center gap-1 text-xs tb-muted shrink-0">
-            Open
+            {t('projects.open')}
             <ExternalLink size={12} aria-hidden />
           </span>
         ) : null}
@@ -128,14 +130,20 @@ function InstallationCard({
 }
 
 export default function RemoteInstallationOverview({
-  label,
-  description,
   variant = 'remote-inst',
 }: RemoteInstallationOverviewProps) {
+  const { t, locale } = useTaskboardI18n();
   const { installations, loading, error } = useInstallations();
   const linkToDetail = variant === 'projects';
   const [statusFilter, setStatusFilter] = useState<InstallationLifecycleFilter>('all');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+
+  const pageLabel =
+    variant === 'projects' ? t('nav.projects') : t('nav.remoteInst');
+  const pageDescription =
+    variant === 'projects'
+      ? t('projects.pageDescription')
+      : t('projects.remotePageDescription');
 
   const filteredInstallations = useMemo(() => {
     if (statusFilter === 'all') return installations;
@@ -153,8 +161,8 @@ export default function RemoteInstallationOverview({
     <div className="max-w-screen-2xl mx-auto px-6 md:px-10">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-6">
         <div>
-          <span className="tb-label block mb-2">{label}</span>
-          <p className="text-sm tb-muted">{description}</p>
+          <span className="tb-label block mb-2">{pageLabel}</span>
+          <p className="text-sm tb-muted">{pageDescription}</p>
         </div>
         {linkToDetail ? (
           <button
@@ -162,12 +170,12 @@ export default function RemoteInstallationOverview({
             onClick={() => setAddDialogOpen(true)}
             className="tb-btn-primary shrink-0 whitespace-nowrap"
           >
-            Add project
+            {t('projects.addProject')}
           </button>
         ) : null}
       </div>
 
-      {loading ? <p className="text-sm tb-muted">Loading installations…</p> : null}
+      {loading ? <p className="text-sm tb-muted">{t('projects.loading')}</p> : null}
       {error ? <p className="text-sm tb-text-secondary">{error}</p> : null}
 
       {!loading && !error && linkToDetail ? (
@@ -180,24 +188,24 @@ export default function RemoteInstallationOverview({
 
       {!loading && !error ? (
         groups.length === 0 ? (
-          <p className="text-sm tb-muted">No installations match this status.</p>
+          <p className="text-sm tb-muted">{t('projects.noMatch')}</p>
         ) : (
-        <div className="space-y-10">
-          {groups.map((group) => (
-            <section key={group.location} aria-labelledby={`location-${group.location}`}>
-              <h2 id={`location-${group.location}`} className="tb-label block mb-4">
-                {group.label}
-              </h2>
-              <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                {group.installations.map((installation) => (
-                  <li key={installation.id}>
-                    <InstallationCard installation={installation} linkToDetail={linkToDetail} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          ))}
-        </div>
+          <div className="space-y-10">
+            {groups.map((group) => (
+              <section key={group.location} aria-labelledby={`location-${group.location}`}>
+                <h2 id={`location-${group.location}`} className="tb-label block mb-4">
+                  {translateInstallationLocation(locale, group.location, group.label)}
+                </h2>
+                <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {group.installations.map((installation) => (
+                    <li key={installation.id}>
+                      <InstallationCard installation={installation} linkToDetail={linkToDetail} />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
+          </div>
         )
       ) : null}
 

@@ -1,8 +1,14 @@
 import { useMemo } from 'react';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
   INSTALLATION_LIFECYCLE_FILTERS,
+  INSTALLATION_LIFECYCLE_LABELS,
   type InstallationLifecycleFilter,
 } from '../../lib/installations/constants';
+import {
+  formatMessage,
+  translateInstallationLifecycle,
+} from '../../lib/taskboard/i18n/messages';
 import type { InstallationRecord } from '../../lib/installations/types';
 
 interface InstallationStatusFilterBarProps {
@@ -24,6 +30,8 @@ export default function InstallationStatusFilterBar({
   statusFilter,
   onStatusFilterChange,
 }: InstallationStatusFilterBarProps) {
+  const { t, locale } = useTaskboardI18n();
+
   const counts = useMemo(() => {
     const map = {} as Record<InstallationLifecycleFilter, number>;
     for (const { id } of INSTALLATION_LIFECYCLE_FILTERS) {
@@ -34,9 +42,17 @@ export default function InstallationStatusFilterBar({
 
   return (
     <div className="tb-header-scroll-row tb-header-scroll-row--filters mb-8">
-      {INSTALLATION_LIFECYCLE_FILTERS.map(({ id, label }) => {
+      {INSTALLATION_LIFECYCLE_FILTERS.map(({ id }) => {
         const active = statusFilter === id;
         const count = counts[id] ?? 0;
+        const label =
+          id === 'all'
+            ? t('filter.all')
+            : translateInstallationLifecycle(
+                locale,
+                id,
+                INSTALLATION_LIFECYCLE_LABELS[id],
+              );
 
         return (
           <button
@@ -49,7 +65,9 @@ export default function InstallationStatusFilterBar({
             {count > 0 ? (
               <span
                 className="tb-filter-count"
-                aria-label={`${count} installation${count === 1 ? '' : 's'}`}
+                aria-label={formatMessage(t('projects.filter.countAria'), {
+                  count: String(count),
+                })}
               >
                 {count}
               </span>

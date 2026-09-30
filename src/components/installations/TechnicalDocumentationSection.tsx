@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react';
 import { FileText, Upload } from 'lucide-react';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import InstallationPdfViewer from './InstallationPdfViewer';
 import {
   deleteInstallationDocument,
@@ -8,6 +9,8 @@ import {
   uploadTechnicalPdf,
 } from '../../lib/installations/installationDocumentService';
 import type { InstallationDocument } from '../../lib/installations/types';
+import { formatMessage } from '../../lib/taskboard/i18n/messages';
+import TranslatableText from '../../taskboard/components/TranslatableText';
 
 interface TechnicalDocumentationSectionProps {
   installationId: string;
@@ -20,6 +23,7 @@ export default function TechnicalDocumentationSection({
   documents,
   isAdmin,
 }: TechnicalDocumentationSectionProps) {
+  const { t } = useTaskboardI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
@@ -39,9 +43,9 @@ export default function TechnicalDocumentationSection({
     setError('');
     try {
       const url = await getInstallationDocumentUrl(doc.storage_path);
-      setViewer({ url, title: doc.title || 'Technical document' });
+      setViewer({ url, title: doc.title || t('projects.tech.defaultViewerTitle') });
     } catch {
-      setError('Could not open this PDF. Try again.');
+      setError(t('projects.tech.openError'));
     } finally {
       setOpeningId(null);
     }
@@ -54,12 +58,12 @@ export default function TechnicalDocumentationSection({
     try {
       for (const file of Array.from(files)) {
         if (!isPdfFile(file)) {
-          throw new Error('Only PDF files can be uploaded here.');
+          throw new Error(t('projects.tech.pdfOnly'));
         }
         await uploadTechnicalPdf(installationId, file);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Upload failed.');
+      setError(err instanceof Error ? err.message : t('projects.tech.uploadFailed'));
     } finally {
       setUploading(false);
       if (inputRef.current) inputRef.current.value = '';
@@ -67,15 +71,15 @@ export default function TechnicalDocumentationSection({
   };
 
   const handleRemove = async (doc: InstallationDocument) => {
-    const label = doc.title || 'this document';
-    if (!window.confirm(`Remove "${label}" from technical documentation?`)) return;
+    const label = doc.title || t('projects.tech.defaultDoc');
+    if (!window.confirm(formatMessage(t('projects.tech.removeConfirm'), { label }))) return;
 
     setRemovingId(doc.id);
     setError('');
     try {
       await deleteInstallationDocument(doc);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not remove document.');
+      setError(err instanceof Error ? err.message : t('projects.tech.removeFailed'));
     } finally {
       setRemovingId(null);
     }
@@ -84,7 +88,7 @@ export default function TechnicalDocumentationSection({
   return (
     <>
       {documents.length === 0 && !isAdmin ? (
-        <p className="text-sm tb-muted">No technical documents on file yet.</p>
+        <p className="text-sm tb-muted">{t('projects.tech.noDocs')}</p>
       ) : (
         <ul className="space-y-2">
           {documents.map((doc) => (
@@ -99,9 +103,15 @@ export default function TechnicalDocumentationSection({
                 className="inline-flex items-center gap-2 text-sm tb-text hover:text-[var(--tb-accent)] disabled:opacity-50 text-left min-w-0"
               >
                 <FileText size={16} className="shrink-0 tb-muted" />
-                <span className="truncate">{doc.title || 'Document'}</span>
+                <span className="truncate">
+                  {doc.title ? (
+                    <TranslatableText text={doc.title} />
+                  ) : (
+                    t('projects.tech.defaultDoc')
+                  )}
+                </span>
                 {openingId === doc.id ? (
-                  <span className="text-xs tb-muted shrink-0">Opening…</span>
+                  <span className="text-xs tb-muted shrink-0">{t('projects.tech.opening')}</span>
                 ) : null}
               </button>
               {isAdmin ? (
@@ -111,7 +121,7 @@ export default function TechnicalDocumentationSection({
                   disabled={removingId === doc.id}
                   className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50 shrink-0"
                 >
-                  {removingId === doc.id ? 'Removing…' : 'Remove'}
+                  {removingId === doc.id ? t('projects.tech.removing') : t('common.remove')}
                 </button>
               ) : null}
             </li>
@@ -136,9 +146,9 @@ export default function TechnicalDocumentationSection({
             className="tb-btn-secondary inline-flex items-center gap-2 text-sm disabled:opacity-50"
           >
             <Upload size={16} />
-            {uploading ? 'Uploading…' : 'Upload PDF'}
+            {uploading ? t('projects.tech.uploading') : t('projects.tech.upload')}
           </button>
-          <p className="text-xs tb-muted mt-2">PDF only, up to 25 MB. Team members can open files here in the browser.</p>
+          <p className="text-xs tb-muted mt-2">{t('projects.tech.uploadHint')}</p>
         </div>
       ) : null}
 

@@ -96,6 +96,9 @@ export type CalendarEventInsert = Pick<CalendarEvent, 'title' | 'start_date' | '
 
 export type UserProfileTheme = 'light' | 'dark';
 
+/** English originals in DB; `uk` shows DeepL Ukrainian translations in the UI. */
+export type UserProfilePreferredLocale = 'en' | 'uk';
+
 export interface UserProfile {
   username: string;
   /** Personal name on the taskboard and in assignment emails. */
@@ -103,12 +106,13 @@ export interface UserProfile {
   email: string | null;
   theme: UserProfileTheme;
   notify_on_assign: boolean;
+  preferred_locale: UserProfilePreferredLocale;
   created_at: string;
   updated_at: string;
 }
 
 export type UserProfileUpdate = Partial<
-  Pick<UserProfile, 'board_name' | 'email' | 'theme' | 'notify_on_assign'>
+  Pick<UserProfile, 'board_name' | 'email' | 'theme' | 'notify_on_assign' | 'preferred_locale'>
 >;
 
 export interface TaskPhoto {

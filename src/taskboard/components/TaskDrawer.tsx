@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
@@ -23,6 +23,12 @@ import { useTaskPhotos } from '../../hooks/useTaskPhotos';
 import { fetchOrCreateUserProfile } from '../../lib/taskboard/userProfileService';
 import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
 import TaskCommentsSection from './TaskCommentsSection';
+import TranslatableText from './TranslatableText';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import {
+  translateCategoryLabel,
+  translatePriorityLabel,
+} from '../../lib/taskboard/i18n/messages';
 
 interface TaskDrawerProps {
   task: Task | null;
@@ -56,6 +62,15 @@ export default function TaskDrawer({
   const { theme } = useTaskboardTheme();
   const { username } = useTaskboardAuth();
   const assigneeNames = useAssigneeNames();
+  const { t, locale } = useTaskboardI18n();
+  const localizedCategories = useMemo(
+    () =>
+      categories.map((category) => ({
+        ...category,
+        label: translateCategoryLabel(locale, category.id, category.label),
+      })),
+    [categories, locale]
+  );
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [form, setForm] = useState<Partial<Task>>({});
   const [saving, setSaving] = useState(false);
@@ -243,23 +258,28 @@ export default function TaskDrawer({
       >
         <div className="tb-drawer-edge" aria-hidden="true" />
         <div className="sticky top-0 tb-drawer-header px-6 py-4 flex items-center justify-between">
-          <span className="tb-label">{isParent ? 'Task' : 'Subtask'}</span>
-          <button onClick={onClose} className="text-[#80868b] hover:text-[#202124] transition-colors" aria-label="Close">
+          <span className="tb-label">{isParent ? t('task.task') : t('task.subtask')}</span>
+          <button onClick={onClose} className="text-[#80868b] hover:text-[#202124] transition-colors" aria-label={t('common.close')}>
             <X size={20} />
           </button>
         </div>
 
         <div className="px-6 py-6 space-y-6">
-          <Field label="Task name">
+          <Field label={t('task.name')}>
             <input
               value={form.task_name ?? ''}
               onChange={(e) => setForm({ ...form, task_name: e.target.value })}
               onBlur={() => form.task_name !== task.task_name && save({ task_name: form.task_name ?? '' })}
               className="field-input"
             />
+            <TranslatableText
+              text={form.task_name ?? ''}
+              variant="hint"
+              className="mt-1.5"
+            />
           </Field>
 
-          <Field label="Description">
+          <Field label={t('task.description')}>
             <textarea
               data-task-description
               value={form.description ?? ''}
@@ -267,6 +287,12 @@ export default function TaskDrawer({
               onBlur={() => form.description !== task.description && save({ description: form.description ?? '' })}
               rows={4}
               className="field-input resize-y min-h-[100px]"
+            />
+            <TranslatableText
+              text={form.description ?? ''}
+              variant="hint"
+              multiline
+              className="mt-1.5"
             />
             <TaskDescriptionPhotos
               photos={photos}
@@ -297,7 +323,7 @@ export default function TaskDrawer({
             }}
           />
 
-          <Field label="Assigned to">
+          <Field label={t('task.assignedTo')}>
             <div className="flex flex-wrap gap-2">
               {assigneeNames.map((a) => {
                 const selected = (form.assignees ?? []).includes(a);
@@ -322,7 +348,7 @@ export default function TaskDrawer({
             </div>
           </Field>
 
-          <Field label="Priority">
+          <Field label={t('task.priority')}>
             <select
               value={form.priority ?? 'normal'}
               onChange={(e) => {
@@ -333,12 +359,14 @@ export default function TaskDrawer({
               className="field-input"
             >
               {PRIORITIES.map((p) => (
-                <option key={p} value={p}>{p.charAt(0).toUpperCase() + p.slice(1)}</option>
+                <option key={p} value={p}>
+                  {translatePriorityLabel(locale, p)}
+                </option>
               ))}
             </select>
           </Field>
 
-          <Field label="Deadline">
+          <Field label={t('task.deadline')}>
             <input
               type="date"
               value={form.deadline ?? ''}
@@ -351,10 +379,10 @@ export default function TaskDrawer({
             />
           </Field>
 
-          <Field label="Category">
+          <Field label={t('task.category')}>
             <CategorySelect
               id={`task-category-${task.id}`}
-              categories={categories}
+              categories={localizedCategories}
               value={form.category ?? category}
               onChange={async (val) => {
                 setForm({ ...form, category: val });
@@ -370,7 +398,7 @@ export default function TaskDrawer({
             />
           </Field>
 
-          <Field label="Completed">
+          <Field label={t('task.completed')}>
             <label className="flex items-center gap-3 cursor-pointer">
               <input
                 type="checkbox"
@@ -388,14 +416,14 @@ export default function TaskDrawer({
                 }}
                 className="accent-[#1a73e8]"
               />
-              <span className="text-sm tb-text-secondary">Mark as completed</span>
+              <span className="text-sm tb-text-secondary">{t('task.markCompleted')}</span>
             </label>
           </Field>
 
-          <Field label="Attachments">
+          <Field label={t('task.attachments')}>
             <input
               type="url"
-              placeholder="Google Drive link"
+              placeholder={t('task.drivePlaceholder')}
               value={form.google_drive_url ?? ''}
               onChange={(e) => setForm({ ...form, google_drive_url: e.target.value })}
               onBlur={() =>
@@ -442,12 +470,12 @@ export default function TaskDrawer({
               onClick={() => onAddSubtask(task.id)}
               className="tb-add-btn"
             >
-              + Subtask
+              {t('task.addSubtask')}
             </button>
           )}
 
           {error && <p className="text-xs text-red-600">{error}</p>}
-          {saving && <p className="text-xs tb-muted">Saving…</p>}
+          {saving && <p className="text-xs tb-muted">{t('common.saving')}</p>}
         </div>
       </aside>
     </div>,

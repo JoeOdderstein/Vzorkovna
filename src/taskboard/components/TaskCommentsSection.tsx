@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { TaskComment } from '../../lib/taskboard/types';
+import TranslatableText from './TranslatableText';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
   commentWasEdited,
   formatCommentTimestamp,
@@ -31,6 +33,7 @@ export default function TaskCommentsSection({
   const [draft, setDraft] = useState('');
   const [posting, setPosting] = useState(false);
   const [localError, setLocalError] = useState('');
+  const { t } = useTaskboardI18n();
 
   useEffect(() => {
     setExpanded(comments.length > 0);
@@ -76,7 +79,8 @@ export default function TaskCommentsSection({
         aria-expanded={expanded}
       >
         <span className="tb-field-label">
-          Comments{countLabel}
+          {t('comments.title')}
+          {countLabel}
           {loading && comments.length === 0 ? '…' : ''}
         </span>
         <ChevronDown
@@ -103,7 +107,7 @@ export default function TaskCommentsSection({
               ))}
             </ul>
           ) : (
-            !loading && <p className="text-[11px] tb-text-muted px-0.5">No comments yet.</p>
+            !loading && <p className="text-[11px] tb-text-muted px-0.5">{t('comments.empty')}</p>
           )}
 
           {currentUsername ? (
@@ -114,8 +118,8 @@ export default function TaskCommentsSection({
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={onComposerKeyDown}
                 rows={1}
-                placeholder="Add a comment…"
-                title="Enter to post, Shift+Enter for new line"
+                placeholder={t('comments.addPlaceholder')}
+                title={t('comments.enterHint')}
                 className="field-input tb-comments-input flex-1 min-h-[2rem] max-h-24 resize-y py-1.5 text-sm leading-snug"
                 disabled={posting}
               />
@@ -125,11 +129,11 @@ export default function TaskCommentsSection({
                 disabled={posting || !draft.trim()}
                 className="tb-btn-primary shrink-0 text-xs px-2.5 py-1.5 disabled:opacity-50"
               >
-                {posting ? '…' : 'Post'}
+                {posting ? t('comments.saving') : t('comments.post')}
               </button>
             </div>
           ) : (
-            <p className="text-[11px] tb-text-muted">Log in to comment.</p>
+            <p className="text-[11px] tb-text-muted">{t('comments.logIn')}</p>
           )}
 
           {displayError && <p className="text-[11px] text-red-600">{displayError}</p>}
@@ -150,6 +154,7 @@ function CommentRow({
   onEdit: (commentId: string, body: string) => Promise<void>;
   onDelete: (commentId: string) => Promise<void>;
 }) {
+  const { t } = useTaskboardI18n();
   const [editing, setEditing] = useState(false);
   const [editBody, setEditBody] = useState(comment.body);
   const [saving, setSaving] = useState(false);
@@ -196,7 +201,7 @@ function CommentRow({
 
   const handleDelete = async () => {
     if (deleting || saving) return;
-    if (!window.confirm('Delete this comment?')) return;
+    if (!window.confirm(t('comments.deleteConfirm'))) return;
     setDeleting(true);
     setEditError('');
     try {
@@ -228,7 +233,7 @@ function CommentRow({
               disabled={saving}
               className="tb-btn-primary text-[11px] px-2 py-1 disabled:opacity-50"
             >
-              {saving ? '…' : 'Save'}
+              {saving ? t('comments.saving') : t('common.save')}
             </button>
             <button
               type="button"
@@ -236,7 +241,7 @@ function CommentRow({
               disabled={saving}
               className="text-[11px] tb-text-secondary hover:underline px-1 py-1"
             >
-              Cancel
+              {t('common.cancel')}
             </button>
           </div>
         </div>
@@ -245,7 +250,9 @@ function CommentRow({
           <p className="text-xs leading-snug tb-text whitespace-pre-wrap break-words">
             <span className="font-medium">{name}</span>
             <span className="tb-text-muted font-normal"> · {time}</span>
-            {edited && <span className="tb-text-muted font-normal"> · edited</span>}
+            {edited && (
+              <span className="tb-text-muted font-normal"> · {t('comments.edited')}</span>
+            )}
             {canEdit && (
               <>
                 <span className="tb-text-muted"> · </span>
@@ -255,7 +262,7 @@ function CommentRow({
                   disabled={deleting}
                   className="text-[11px] tb-link-accent hover:underline font-normal align-baseline disabled:opacity-50"
                 >
-                  Edit
+                  {t('comments.edit')}
                 </button>
                 <span className="tb-text-muted"> · </span>
                 <button
@@ -264,13 +271,13 @@ function CommentRow({
                   disabled={deleting}
                   className="text-[11px] text-red-600 hover:underline font-normal align-baseline disabled:opacity-50"
                 >
-                  {deleting ? 'Deleting…' : 'Delete'}
+                  {deleting ? t('common.saving') : t('comments.delete')}
                 </button>
               </>
             )}
           </p>
-          <p className="text-xs tb-text-secondary whitespace-pre-wrap break-words leading-snug mt-0.5 pl-0">
-            {comment.body}
+          <p className="text-xs tb-text-secondary leading-snug mt-0.5 pl-0">
+            <TranslatableText text={comment.body} multiline className="tb-text-secondary" />
           </p>
           {editError && !editing && (
             <p className="text-[11px] text-red-600 mt-1">{editError}</p>

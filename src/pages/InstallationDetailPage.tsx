@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom';
 import TechnicalDocumentationSection from '../components/installations/TechnicalDocumentationSection';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 import { useInstallation } from '../hooks/useInstallations';
+import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 import {
   INSTALLATION_LIFECYCLE_LABELS,
   INSTALLATION_LIFECYCLE_STATUSES,
@@ -16,7 +17,12 @@ import type { InstallationLifecycleStatus } from '../lib/installations/types';
 import { formatInstallationDate } from '../lib/installations/format';
 import type { InstallationDocumentKind, InstallationRecord } from '../lib/installations/types';
 import { PROJECTS_PATH } from '../lib/taskboard/driveConstants';
+import {
+  translateInstallationLifecycle,
+  translateInstallationLocation,
+} from '../lib/taskboard/i18n/messages';
 import { openRemotePopupWindow } from '../lib/taskboard/openRemotePopup';
+import TranslatableText from '../taskboard/components/TranslatableText';
 
 function documentsByKind(
   documents: InstallationRecord['documents'],
@@ -53,6 +59,7 @@ export default function InstallationDetailPage() {
   const { installationId } = useParams<{ installationId: string }>();
   const { installation, setInstallation, loading, error } = useInstallation(installationId);
   const { isAdmin } = useTaskboardAuth();
+  const { t, locale } = useTaskboardI18n();
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
 
@@ -66,7 +73,7 @@ export default function InstallationDetailPage() {
       const updated = await updateInstallationLifecycleStatus(installation.id, nextStatus);
       setInstallation(updated);
     } catch {
-      setStatusError('Could not save status. Try again.');
+      setStatusError(t('projects.detail.statusSaveError'));
     } finally {
       setStatusSaving(false);
     }
@@ -75,7 +82,7 @@ export default function InstallationDetailPage() {
   if (loading) {
     return (
       <div className="max-w-screen-2xl mx-auto px-6 md:px-10">
-        <p className="text-sm tb-muted">Loading installation…</p>
+        <p className="text-sm tb-muted">{t('projects.detail.loading')}</p>
       </div>
     );
   }
@@ -88,9 +95,9 @@ export default function InstallationDetailPage() {
           className="inline-flex items-center gap-2 text-sm tb-muted hover:text-[var(--tb-accent)] mb-6"
         >
           <ArrowLeft size={16} aria-hidden />
-          Back to projects
+          {t('projects.detail.back')}
         </Link>
-        <p className="text-sm tb-text">{error ?? 'Installation not found.'}</p>
+        <p className="text-sm tb-text">{error ?? t('projects.detail.notFound')}</p>
       </div>
     );
   }
@@ -106,13 +113,15 @@ export default function InstallationDetailPage() {
         className="inline-flex items-center gap-2 text-sm tb-muted hover:text-[var(--tb-accent)] mb-6"
       >
         <ArrowLeft size={16} aria-hidden />
-        Back to projects
+        {t('projects.detail.back')}
       </Link>
 
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-8">
         <div>
-          <span className="tb-label block mb-2">Installation</span>
-          <h1 className="text-2xl tb-text font-medium">{installation.name}</h1>
+          <span className="tb-label block mb-2">{t('projects.detail.installationLabel')}</span>
+          <h1 className="text-2xl tb-text font-medium">
+            <TranslatableText text={installation.name} />
+          </h1>
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <span
               className={`tb-remote-inst-light ${lifecycleStatusLightClass(installation.lifecycle_status)}`}
@@ -120,8 +129,12 @@ export default function InstallationDetailPage() {
             />
             <span className="text-sm tb-text-secondary">
               {statusSaving
-                ? 'Saving…'
-                : INSTALLATION_LIFECYCLE_LABELS[installation.lifecycle_status]}
+                ? t('common.saving')
+                : translateInstallationLifecycle(
+                    locale,
+                    installation.lifecycle_status,
+                    INSTALLATION_LIFECYCLE_LABELS[installation.lifecycle_status],
+                  )}
             </span>
           </div>
         </div>
@@ -139,7 +152,7 @@ export default function InstallationDetailPage() {
                   )
                 }
               >
-                Open remote session
+                {t('projects.detail.openRemote')}
                 <ExternalLink size={14} aria-hidden />
               </button>
             ) : (
@@ -149,7 +162,7 @@ export default function InstallationDetailPage() {
                 rel="noopener noreferrer"
                 className="tb-btn-secondary inline-flex items-center gap-2"
               >
-                Open remote session
+                {t('projects.detail.openRemote')}
                 <ExternalLink size={14} aria-hidden />
               </a>
             )}
@@ -158,10 +171,17 @@ export default function InstallationDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        <DetailSection title="Overview">
-          <MetaRow label="Location" value={INSTALLATION_LOCATION_LABELS[installation.location]} />
+        <DetailSection title={t('projects.detail.overview')}>
           <MetaRow
-            label="Current status"
+            label={t('projects.detail.meta.location')}
+            value={translateInstallationLocation(
+              locale,
+              installation.location,
+              INSTALLATION_LOCATION_LABELS[installation.location],
+            )}
+          />
+          <MetaRow
+            label={t('projects.detail.meta.currentStatus')}
             value={
               <div className="flex flex-col items-start sm:items-end gap-1 w-full sm:w-auto">
                 <select
@@ -173,52 +193,69 @@ export default function InstallationDetailPage() {
                     )
                   }
                   className="field-input max-w-full sm:min-w-[14rem]"
-                  aria-label="Installation status"
+                  aria-label={t('projects.detail.statusAria')}
                 >
                   {INSTALLATION_LIFECYCLE_STATUSES.map((status) => (
                     <option key={status} value={status}>
-                      {INSTALLATION_LIFECYCLE_LABELS[status]}
+                      {translateInstallationLifecycle(
+                        locale,
+                        status,
+                        INSTALLATION_LIFECYCLE_LABELS[status],
+                      )}
                     </option>
                   ))}
                 </select>
                 {statusSaving ? (
-                  <span className="text-xs tb-muted">Saving…</span>
+                  <span className="text-xs tb-muted">{t('common.saving')}</span>
                 ) : statusError ? (
                   <span className="text-xs text-red-500">{statusError}</span>
                 ) : null}
               </div>
             }
           />
-          <MetaRow label="Responsible person" value={installation.responsible_person ?? '—'} />
           <MetaRow
-            label="Most recent inspection"
+            label={t('projects.detail.meta.responsible')}
+            value={installation.responsible_person ?? '—'}
+          />
+          <MetaRow
+            label={t('projects.detail.meta.lastInspection')}
             value={formatInstallationDate(installation.last_inspection_date)}
           />
           <MetaRow
-            label="Next maintenance"
+            label={t('projects.detail.meta.nextMaintenance')}
             value={formatInstallationDate(installation.next_maintenance_date)}
           />
           <MetaRow
-            label="Revizní zpráva"
-            value={installation.revizni_zprava_available ? 'On file' : 'Not on file'}
+            label={t('projects.detail.meta.revizniZprava')}
+            value={
+              installation.revizni_zprava_available
+                ? t('projects.detail.onFile')
+                : t('projects.detail.notOnFile')
+            }
           />
         </DetailSection>
 
-        <DetailSection title="Photographs">
+        <DetailSection title={t('projects.detail.photographs')}>
           {photos.length === 0 ? (
-            <p className="text-sm tb-muted">No photographs uploaded yet.</p>
+            <p className="text-sm tb-muted">{t('projects.detail.noPhotos')}</p>
           ) : (
             <ul className="grid gap-3 sm:grid-cols-2">
               {photos.map((photo) => (
                 <li key={photo.id} className="rounded-lg border border-[var(--tb-border)] p-3">
-                  <p className="text-sm tb-text">{photo.title || 'Photograph'}</p>
+                  <p className="text-sm tb-text">
+                    {photo.title ? (
+                      <TranslatableText text={photo.title} />
+                    ) : (
+                      t('projects.detail.defaultPhotograph')
+                    )}
+                  </p>
                 </li>
               ))}
             </ul>
           )}
         </DetailSection>
 
-        <DetailSection title="Technical documentation">
+        <DetailSection title={t('projects.detail.technical')}>
           {installationId ? (
             <TechnicalDocumentationSection
               installationId={installationId}
@@ -228,23 +265,23 @@ export default function InstallationDetailPage() {
           ) : null}
         </DetailSection>
 
-        <DetailSection title="Electrical documentation">
+        <DetailSection title={t('projects.detail.electrical')}>
           {electricalDocs.length === 0 ? (
-            <p className="text-sm tb-muted">No electrical documents on file yet.</p>
+            <p className="text-sm tb-muted">{t('projects.detail.noElectrical')}</p>
           ) : (
             <ul className="space-y-2">
               {electricalDocs.map((doc) => (
                 <li key={doc.id} className="text-sm tb-text">
-                  {doc.title}
+                  <TranslatableText text={doc.title} />
                 </li>
               ))}
             </ul>
           )}
         </DetailSection>
 
-        <DetailSection title="Malfunction & repair history">
+        <DetailSection title={t('projects.detail.malfunction')}>
           {installation.repairs.length === 0 ? (
-            <p className="text-sm tb-muted">No malfunctions or repairs recorded yet.</p>
+            <p className="text-sm tb-muted">{t('projects.detail.noRepairs')}</p>
           ) : (
             <ul className="space-y-4">
               {installation.repairs.map((repair) => (
@@ -253,14 +290,23 @@ export default function InstallationDetailPage() {
                   className="rounded-lg border border-[var(--tb-border)] p-4 space-y-2"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm tb-text font-medium">{repair.summary}</span>
+                    <span className="text-sm tb-text font-medium">
+                      <TranslatableText text={repair.summary} />
+                    </span>
                     <span className="text-xs tb-muted">
                       {formatInstallationDate(repair.occurred_on)}
                     </span>
                   </div>
                   <p className="text-sm tb-text-secondary">
-                    {repair.resolved ? 'Resolved' : 'Open'}
-                    {repair.notes ? ` — ${repair.notes}` : ''}
+                    {repair.resolved
+                      ? t('projects.detail.repairResolved')
+                      : t('projects.detail.repairOpen')}
+                    {repair.notes ? (
+                      <>
+                        {' — '}
+                        <TranslatableText text={repair.notes} />
+                      </>
+                    ) : null}
                   </p>
                 </li>
               ))}

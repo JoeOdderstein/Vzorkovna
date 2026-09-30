@@ -9,6 +9,7 @@ import {
   orderAssigneeFiltersForUser,
   type AssigneeFilter,
 } from '../../lib/taskboard/filterUtils';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { taskHasAssignee } from '../../lib/taskboard/assigneeUtils';
 import type { Task } from '../../lib/taskboard/types';
 
@@ -22,6 +23,7 @@ export default function AssigneeFilterBar() {
   const { profile } = useUserProfile();
   const { assigneeFilter, setAssigneeFilter, tasksForCounts } = useTaskboardFilter();
   const assigneeNames = useAssigneeNames();
+  const { t } = useTaskboardI18n();
 
   const counts = useMemo(() => {
     const map: Record<AssigneeFilter, number> = { all: 0 } as Record<AssigneeFilter, number>;
@@ -52,7 +54,7 @@ export default function AssigneeFilterBar() {
             onClick={() => setAssigneeFilter(id)}
             className={`tb-filter-btn relative ${active ? 'tb-filter-btn--active' : ''}`}
           >
-            {label}
+            {id === 'all' ? t('filter.all') : label}
             {count > 0 && (
               <span className="tb-filter-count" aria-label={`${count} task${count === 1 ? '' : 's'}`}>
                 {count}

@@ -12,6 +12,7 @@ import {
   TASKBOARD_PATH,
 } from '../lib/taskboard/driveConstants';
 import SiteLogo from './SiteLogo';
+import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 
 interface NavProps {
   activeSection: string;
@@ -33,6 +34,7 @@ export default function Nav({ activeSection }: NavProps) {
     isAppPage || location.pathname === '/login';
   const { authenticated, username, isAdmin, logout } = useTaskboardAuth();
   const showPrivateNav = canAccessTaskboardPrivateNav(username, isAdmin);
+  const { t } = useTaskboardI18n();
 
   const handleLogout = async () => {
     setMenuOpen(false);
@@ -146,7 +148,7 @@ export default function Nav({ activeSection }: NavProps) {
                     isTaskboardPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
                   }`}
                 >
-                  TASKBOARD
+                  {t('nav.taskboard').toUpperCase()}
                 </Link>
                 <Link
                   to={PROJECTS_PATH}
@@ -154,7 +156,7 @@ export default function Nav({ activeSection }: NavProps) {
                     isProjectsAppPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
                   }`}
                 >
-                  PROJECTS
+                  {t('nav.projects').toUpperCase()}
                 </Link>
                 {showPrivateNav && (
                   <a
@@ -163,7 +165,7 @@ export default function Nav({ activeSection }: NavProps) {
                     rel="noopener noreferrer"
                     className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
                   >
-                    DRIVE
+                    {t('nav.drive').toUpperCase()}
                   </a>
                 )}
                 {showPrivateNav && (
@@ -173,7 +175,7 @@ export default function Nav({ activeSection }: NavProps) {
                       isRemoteInstPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
                     }`}
                   >
-                    REMOTE INST
+                    {t('nav.remoteInst').toUpperCase()}
                   </Link>
                 )}
                 <button
@@ -181,7 +183,7 @@ export default function Nav({ activeSection }: NavProps) {
                   onClick={() => void handleLogout()}
                   className="nav-link font-sans text-xs tracking-[0.2em] uppercase site-link-muted hover:text-[var(--color-accent)] transition-colors duration-300"
                 >
-                  Logout
+                  {t('nav.logout').toUpperCase()}
                 </button>
               </div>
               <div className="md:hidden flex items-center gap-3 min-w-0">
@@ -194,7 +196,7 @@ export default function Nav({ activeSection }: NavProps) {
                   type="button"
                   className="site-link-muted transition-colors shrink-0"
                   onClick={() => setMenuOpen(true)}
-                  aria-label="Open menu"
+                  aria-label={t('nav.openMenu')}
                 >
                   <Menu size={22} strokeWidth={1.5} />
                 </button>
@@ -205,7 +207,7 @@ export default function Nav({ activeSection }: NavProps) {
               <button
                 className="md:hidden site-link-muted transition-colors"
                 onClick={() => setMenuOpen(true)}
-                aria-label="Open menu"
+                aria-label={t('nav.openMenu')}
               >
                 <Menu size={22} strokeWidth={1.5} />
               </button>
@@ -221,7 +223,7 @@ export default function Nav({ activeSection }: NavProps) {
               type="button"
               className="site-link-subtle transition-colors shrink-0"
               onClick={() => setMenuOpen(false)}
-              aria-label="Close menu"
+              aria-label={t('nav.closeMenu')}
             >
               <X size={22} strokeWidth={1.5} />
             </button>
@@ -235,14 +237,14 @@ export default function Nav({ activeSection }: NavProps) {
                   onClick={() => setMenuOpen(false)}
                   className={`site-mobile-nav-link${isTaskboardPage ? ' site-mobile-nav-link--active' : ''}`}
                 >
-                  Taskboard
+                  {t('nav.taskboard')}
                 </Link>
                 <Link
                   to={PROJECTS_PATH}
                   onClick={() => setMenuOpen(false)}
                   className={`site-mobile-nav-link${isProjectsAppPage ? ' site-mobile-nav-link--active' : ''}`}
                 >
-                  Projects
+                  {t('nav.projects')}
                 </Link>
                 {showPrivateNav && (
                   <a
@@ -252,7 +254,7 @@ export default function Nav({ activeSection }: NavProps) {
                     onClick={() => setMenuOpen(false)}
                     className="site-mobile-nav-link"
                   >
-                    Drive
+                    {t('nav.drive')}
                   </a>
                 )}
                 {showPrivateNav && (
@@ -261,7 +263,7 @@ export default function Nav({ activeSection }: NavProps) {
                     onClick={() => setMenuOpen(false)}
                     className={`site-mobile-nav-link${isRemoteInstPage ? ' site-mobile-nav-link--active' : ''}`}
                   >
-                    Remote Inst
+                    {t('nav.remoteInst')}
                   </Link>
                 )}
                 <button
@@ -269,7 +271,7 @@ export default function Nav({ activeSection }: NavProps) {
                   onClick={() => void handleLogout()}
                   className="site-mobile-nav-link site-mobile-nav-link--logout text-left"
                 >
-                  Logout
+                  {t('nav.logout')}
                 </button>
               </div>
             ) : (

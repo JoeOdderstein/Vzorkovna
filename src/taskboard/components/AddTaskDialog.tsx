@@ -14,6 +14,9 @@ import ProjectRestrictedIcon from './ProjectRestrictedIcon';
 import CategorySelect from './CategorySelect';
 import type { CategoryOption } from '../../lib/taskboard/types';
 import type { Project } from '../../lib/taskboard/types';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { translateCategoryLabel } from '../../lib/taskboard/i18n/messages';
+import TranslatableText from './TranslatableText';
 
 interface AddTaskDialogProps {
   open: boolean;
@@ -37,6 +40,7 @@ export default function AddTaskDialog({
   const [projectId, setProjectId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const { t, locale } = useTaskboardI18n();
 
   useEffect(() => {
     if (!open) return;
@@ -100,7 +104,7 @@ export default function AddTaskDialog({
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!projectId) {
-      setError('Choose a project.');
+      setError(t('addTask.chooseProjectError'));
       return;
     }
     setSubmitting(true);
@@ -109,7 +113,7 @@ export default function AddTaskDialog({
       await onCreate({ category, projectId });
       onClose();
     } catch {
-      setError('Could not create task.');
+      setError(t('addTask.createError'));
     } finally {
       setSubmitting(false);
     }
@@ -123,12 +127,12 @@ export default function AddTaskDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="sticky top-0 bg-white border-b border-[#dadce0] px-6 py-4 flex items-center justify-between">
-          <h2 className="tb-heading">New task</h2>
+          <h2 className="tb-heading">{t('addTask.title')}</h2>
           <button
             type="button"
             onClick={onClose}
             className="text-[#80868b] hover:text-[#202124] transition-colors"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X size={20} />
           </button>
@@ -136,10 +140,10 @@ export default function AddTaskDialog({
 
         <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
           <div>
-            <p className="tb-field-label mb-3">1. Choose project</p>
-            {loadingProjects && <p className="text-sm tb-muted">Loading projects…</p>}
+            <p className="tb-field-label mb-3">{t('addTask.chooseProject')}</p>
+            {loadingProjects && <p className="text-sm tb-muted">{t('addTask.loadingProjects')}</p>}
             {!loadingProjects && projects.length === 0 && (
-              <p className="text-sm text-red-600">No projects found.</p>
+              <p className="text-sm text-red-600">{t('addTask.noProjects')}</p>
             )}
             {!loadingProjects && projects.length > 0 && (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
@@ -155,7 +159,7 @@ export default function AddTaskDialog({
                         }`}
                       >
                         <span className="inline-flex items-center gap-2">
-                          <span>{p.name}</span>
+                          <TranslatableText text={p.name} />
                           <ProjectRestrictedIcon project={p} />
                         </span>
                       </button>
@@ -168,14 +172,17 @@ export default function AddTaskDialog({
 
           <div>
             <label htmlFor="new-task-category" className="tb-field-label block mb-2">
-              2. Choose category
+              {t('addTask.chooseCategory')}
             </label>
             {loadingCategories ? (
-              <p className="text-sm tb-muted">Loading categories…</p>
+              <p className="text-sm tb-muted">{t('addTask.loadingCategories')}</p>
             ) : (
               <CategorySelect
                 id="new-task-category"
-                categories={categories}
+                categories={categories.map((item) => ({
+                  ...item,
+                  label: translateCategoryLabel(locale, item.id, item.label),
+                }))}
                 value={category}
                 onChange={setCategory}
                 isAdmin={isAdmin}
@@ -205,14 +212,14 @@ export default function AddTaskDialog({
 
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={onClose} className="tb-link px-3 py-2">
-              Cancel
+              {t('common.cancel')}
             </button>
             <button
               type="submit"
               disabled={submitting || loadingProjects || !projectId}
               className="px-4 py-2 text-sm font-medium text-white tb-btn-primary rounded disabled:opacity-50 transition-colors"
             >
-              {submitting ? 'Creating…' : 'Create task'}
+              {submitting ? t('addTask.creating') : t('addTask.create')}
             </button>
           </div>
         </form>

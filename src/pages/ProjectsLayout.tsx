@@ -9,6 +9,7 @@ import { isSupabaseConfigured } from '../lib/taskboard/config';
 import ProfileSettingsDialog from '../taskboard/components/ProfileSettingsDialog';
 import TaskboardThemeToggle from '../taskboard/components/TaskboardThemeToggle';
 import TbIconTooltip from '../taskboard/components/TbIconTooltip';
+import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 
 function ProjectsShell() {
   const { authenticated, loading, sessionReady } = useTaskboardAuth();
@@ -16,6 +17,7 @@ function ProjectsShell() {
   const { loading: profileLoading } = useUserProfile();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const { t } = useTaskboardI18n();
   const waitingForSession = authenticated && isSupabaseConfigured() && !sessionReady;
 
   if (loading || waitingForSession || profileLoading) {
@@ -23,7 +25,7 @@ function ProjectsShell() {
       <>
         <Nav activeSection="login" />
         <main className="taskboard min-h-screen pt-28 px-8" data-theme={theme}>
-          <p className="text-sm tb-muted">Loading…</p>
+          <p className="text-sm tb-muted">{t('common.loading')}</p>
         </main>
       </>
     );
@@ -39,12 +41,12 @@ function ProjectsShell() {
       <div className="taskboard min-h-screen pt-24 pb-16" data-theme={theme}>
         <div className="max-w-screen-2xl mx-auto px-6 md:px-10 py-4 flex justify-end gap-4">
           <TaskboardThemeToggle />
-          <TbIconTooltip label="Profile">
+          <TbIconTooltip label={t('header.profile')}>
             <button
               type="button"
               onClick={() => setProfileOpen(true)}
               className="tb-btn-secondary px-2.5"
-              aria-label="Open profile settings"
+              aria-label={t('header.profileAria')}
             >
               <User size={18} />
             </button>

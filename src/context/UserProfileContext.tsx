@@ -16,6 +16,7 @@ import {
   updateUserProfile,
 } from '../lib/taskboard/userProfileService';
 import { getErrorMessage } from '../lib/taskboard/profileErrors';
+import { cachePreferredLocaleForUser } from '../hooks/useTaskboardI18n';
 
 interface UserProfileContextValue {
   profile: UserProfile | null;
@@ -26,7 +27,7 @@ interface UserProfileContextValue {
   refreshProfile: () => Promise<void>;
 }
 
-const UserProfileContext = createContext<UserProfileContextValue | null>(null);
+export const UserProfileContext = createContext<UserProfileContextValue | null>(null);
 
 export function UserProfileProvider({ children }: { children: React.ReactNode }) {
   const { username, authenticated, sessionReady } = useTaskboardAuth();
@@ -63,6 +64,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       if (opId !== loadOpRef.current) return;
 
       setProfile(nextProfile);
+      cachePreferredLocaleForUser(username, nextProfile.preferred_locale);
     } catch (err) {
       if (opId !== loadOpRef.current) return;
       setProfile(null);
@@ -88,6 +90,7 @@ export function UserProfileProvider({ children }: { children: React.ReactNode })
       try {
         const nextProfile = await updateUserProfile(username, updates);
         setProfile(nextProfile);
+        cachePreferredLocaleForUser(username, nextProfile.preferred_locale);
         setError('');
       } catch (err) {
         setProfile(previous);

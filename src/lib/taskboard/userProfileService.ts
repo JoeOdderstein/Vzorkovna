@@ -3,7 +3,12 @@ import { isLocalTaskboardMode } from './taskService';
 import { localStore } from './localStore';
 import { defaultBoardNameForUsername } from './boardNameUtils';
 import { getErrorMessage } from './profileErrors';
-import type { UserProfile, UserProfileTheme, UserProfileUpdate } from './types';
+import type {
+  UserProfile,
+  UserProfilePreferredLocale,
+  UserProfileTheme,
+  UserProfileUpdate,
+} from './types';
 
 const THEME_STORAGE_PREFIX = 'taskboard-theme';
 const LEGACY_THEME_STORAGE_KEY = 'taskboard-theme';
@@ -13,8 +18,21 @@ async function db() {
   return getSupabase();
 }
 
+function mapPreferredLocale(value: unknown): UserProfilePreferredLocale {
+  return value === 'uk' ? 'uk' : 'en';
+}
+
 function mapUserProfile(row: Record<string, unknown>): UserProfile {
-  return row as UserProfile;
+  return {
+    username: String(row.username),
+    board_name: row.board_name != null ? String(row.board_name) : null,
+    email: row.email != null ? String(row.email) : null,
+    theme: row.theme === 'dark' ? 'dark' : 'light',
+    notify_on_assign: row.notify_on_assign !== false,
+    preferred_locale: mapPreferredLocale(row.preferred_locale),
+    created_at: String(row.created_at ?? ''),
+    updated_at: String(row.updated_at ?? ''),
+  };
 }
 
 export function getCachedThemeForUser(username: string): UserProfileTheme | null {
@@ -53,6 +71,7 @@ function defaultProfile(username: string): UserProfile {
     email: null,
     theme: getCachedThemeForUser(username) ?? 'light',
     notify_on_assign: true,
+    preferred_locale: 'en',
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -60,8 +79,8 @@ function defaultProfile(username: string): UserProfile {
 
 function formatProfileError(error: { message?: string; code?: string }) {
   const message = error.message ?? '';
-  if (/user_profiles|relation|column/i.test(message)) {
-    return 'User profiles are not set up yet. Run supabase/migrations/009_user_profiles.sql and 010_user_profile_board_name.sql in Supabase SQL Editor.';
+  if (/preferred_locale|user_profiles|relation|column/i.test(message)) {
+    return 'User profiles need a database update. Run supabase/migrations/009_user_profiles.sql, 010_user_profile_board_name.sql, and 018_user_profile_preferred_locale.sql in Supabase SQL Editor.';
   }
   if (error.code === '23505' || /board_name|unique|duplicate/i.test(message)) {
     return 'That taskboard name is already linked to another account.';
@@ -106,6 +125,8 @@ function buildProfileRow(
     theme: updates.theme ?? existing?.theme ?? defaults.theme,
     notify_on_assign:
       updates.notify_on_assign ?? existing?.notify_on_assign ?? defaults.notify_on_assign,
+    preferred_locale:
+      updates.preferred_locale ?? existing?.preferred_locale ?? defaults.preferred_locale,
     created_at: existing?.created_at ?? defaults.created_at,
     updated_at: new Date().toISOString(),
   };
@@ -168,6 +189,7 @@ export async function fetchOrCreateUserProfile(username: string): Promise<UserPr
         email: profile.email,
         theme: profile.theme,
         notify_on_assign: profile.notify_on_assign,
+        preferred_locale: profile.preferred_locale,
       },
       { onConflict: 'username' }
     )
@@ -214,6 +236,7 @@ export async function updateUserProfile(
         email: row.email,
         theme: row.theme,
         notify_on_assign: row.notify_on_assign,
+        preferred_locale: row.preferred_locale,
       },
       { onConflict: 'username' }
     )

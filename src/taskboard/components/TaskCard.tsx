@@ -1,7 +1,10 @@
 import type { Task } from '../../lib/taskboard/types';
+import TranslatableText from './TranslatableText';
 import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
 import { deadlineClasses, formatDeadline, getDeadlineStatus } from '../../lib/taskboard/deadlineUtils';
-import { priorityBorderClasses, priorityDotClasses, priorityLabels } from '../../lib/taskboard/priorityUtils';
+import { priorityBorderClasses, priorityDotClasses } from '../../lib/taskboard/priorityUtils';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { translatePriorityLabel } from '../../lib/taskboard/i18n/messages';
 
 interface TaskCardProps {
   task: Task;
@@ -24,6 +27,8 @@ export default function TaskCard({
   titleAsDiv = false,
   expandControl,
 }: TaskCardProps) {
+  const { t, locale } = useTaskboardI18n();
+  const taskTitle = task.task_name || t('task.untitled');
   const deadlineStatus = getDeadlineStatus(task.deadline, task.completed);
   const titleClassName =
     'min-w-0 flex-1 text-left hover:opacity-80 transition-opacity cursor-pointer';
@@ -65,13 +70,13 @@ export default function TaskCard({
             className={titleClassName}
           >
             <p className={`text-sm leading-snug ${isSubtask ? 'tb-text-secondary' : 'tb-text'}`}>
-              {task.task_name || 'Untitled task'}
+              <TranslatableText text={taskTitle} />
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="inline-flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${priorityDotClasses[task.priority]}`} />
                 <span className="text-xs tb-text-secondary">
-                  {priorityLabels[task.priority]}
+                  {translatePriorityLabel(locale, task.priority)}
                 </span>
               </span>
               {task.deadline && (
@@ -87,13 +92,13 @@ export default function TaskCard({
         ) : (
           <button type="button" onClick={onClick} className={titleClassName}>
             <p className={`text-sm leading-snug ${isSubtask ? 'tb-text-secondary' : 'tb-text'}`}>
-              {task.task_name || 'Untitled task'}
+              <TranslatableText text={taskTitle} />
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
               <span className="inline-flex items-center gap-1.5">
                 <span className={`w-1.5 h-1.5 rounded-full ${priorityDotClasses[task.priority]}`} />
                 <span className="text-xs tb-text-secondary">
-                  {priorityLabels[task.priority]}
+                  {translatePriorityLabel(locale, task.priority)}
                 </span>
               </span>
               {task.deadline && (

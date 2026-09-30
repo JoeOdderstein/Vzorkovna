@@ -31,6 +31,8 @@ import {
   filterTasksForProjects,
 } from '../../lib/taskboard/taskService';
 import type { CalendarEvent, Project, Task } from '../../lib/taskboard/types';
+import TranslatableText from './TranslatableText';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 
 interface TaskCalendarDialogProps {
   open: boolean;
@@ -80,6 +82,7 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
   const { assigneeFilter } = useTaskboardFilter();
   const { projectsToken } = useTaskboardRefresh();
   const { openTask } = useTaskboardSelection();
+  const { t } = useTaskboardI18n();
 
   const [viewDate, setViewDate] = useState(() => new Date());
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -440,7 +443,11 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                                             {task.task_name || 'Untitled task'}
                                           </span>
                                           <span className="block truncate tb-calendar-task-sub opacity-80">
-                                            {projectNames[task.project_id] ?? 'Project'}
+                                            <TranslatableText
+                                              text={
+                                                projectNames[task.project_id] ?? t('common.project')
+                                              }
+                                            />
                                           </span>
                                         </button>
                                       </li>
@@ -502,7 +509,11 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                                     {task.task_name || 'Untitled task'}
                                   </span>
                                   <span className="block tb-calendar-agenda-task-sub opacity-80">
-                                    {projectNames[task.project_id] ?? 'Project'}
+                                    <TranslatableText
+                                      text={
+                                        projectNames[task.project_id] ?? t('common.project')
+                                      }
+                                    />
                                   </span>
                                 </button>
                               </li>

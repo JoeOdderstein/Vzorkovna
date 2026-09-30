@@ -22,6 +22,8 @@ import type { Task, TaskGroup, CategoryOption } from '../../lib/taskboard/types'
 import type { TaskCategory } from '../../lib/taskboard/constants';
 import { buildGroupsByCategory, isCategoryColumnId } from '../../lib/taskboard/categoryUtils';
 import TaskCard from './TaskCard';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { translateCategoryLabel } from '../../lib/taskboard/i18n/messages';
 
 const NEST_DWELL_MS = 750;
 const NEST_MOVEMENT_THRESHOLD = 6;
@@ -410,6 +412,7 @@ export default function KanbanBoard({
   onAddCategory,
   fillWidth = false,
 }: KanbanBoardProps) {
+  const { locale } = useTaskboardI18n();
   const [activeId, setActiveId] = useState<string | null>(null);
   const [nestReadyId, setNestReadyId] = useState<string | null>(null);
   const [promoteReadyCategory, setPromoteReadyCategory] = useState<TaskCategory | null>(null);
@@ -664,7 +667,7 @@ export default function KanbanBoard({
           >
             <Column
               categoryId={id}
-              label={label}
+              label={translateCategoryLabel(locale, id, label)}
               groups={groupsByCategory[id] ?? []}
               collapsed={collapsed}
               nestReadyId={nestReadyId}
