@@ -27,11 +27,13 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/invite" element={<InvitePage />} />
+            <Route path={`${PROJECTS_PATH}/installation/:installationId`} element={<ProjectsLayout />}>
+              <Route index element={<InstallationDetailPage />} />
+            </Route>
             <Route path={PROJECTS_PATH} element={<ProjectsLayout />}>
               <Route index element={<ProjectsPage />} />
-              <Route path="installation/:installationId" element={<InstallationDetailPage />} />
             </Route>
-            <Route path="/projects/:id" element={<ProjectDetailPage />} />
+            <Route path="/work/:id" element={<ProjectDetailPage />} />
             <Route path="/taskboard" element={<TaskboardLayout />}>
               <Route index element={<TaskboardOverviewPage />} />
               <Route path="projects/:slug" element={<ProjectBoardPage />} />

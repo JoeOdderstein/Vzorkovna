@@ -62,7 +62,6 @@ export default function InstallationDetailPage() {
   const { t, locale } = useTaskboardI18n();
   const [statusSaving, setStatusSaving] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
-
   async function handleLifecycleStatusChange(nextStatus: InstallationLifecycleStatus) {
     if (!installation || nextStatus === installation.lifecycle_status) return;
 

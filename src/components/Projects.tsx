@@ -101,13 +101,13 @@ function ProjectBlock({ project, index }: { project: Project; index: number }) {
           hasDetailPage ? 'cursor-pointer group/section' : ''
         }`}
         style={{ backgroundColor: 'var(--color-black)' }}
-        onClick={hasDetailPage ? () => navigate(`/projects/${project.id}`) : undefined}
+        onClick={hasDetailPage ? () => navigate(`/work/${project.id}`) : undefined}
         onKeyDown={
           hasDetailPage
             ? (e) => {
                 if (e.key === 'Enter' || e.key === ' ') {
                   e.preventDefault();
-                  navigate(`/projects/${project.id}`);
+                  navigate(`/work/${project.id}`);
                 }
               }
             : undefined

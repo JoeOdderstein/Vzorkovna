@@ -3,7 +3,7 @@ import { User } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import Nav from '../components/Nav';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
-import { UserProfileProvider, useUserProfile } from '../context/UserProfileContext';
+import { UserProfileProvider } from '../context/UserProfileContext';
 import { TaskboardThemeProvider, useTaskboardTheme } from '../context/TaskboardThemeContext';
 import { isSupabaseConfigured } from '../lib/taskboard/config';
 import ProfileSettingsDialog from '../taskboard/components/ProfileSettingsDialog';
@@ -14,13 +14,12 @@ import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 function ProjectsShell() {
   const { authenticated, loading, sessionReady } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
-  const { loading: profileLoading } = useUserProfile();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
   const { t } = useTaskboardI18n();
   const waitingForSession = authenticated && isSupabaseConfigured() && !sessionReady;
 
-  if (loading || waitingForSession || profileLoading) {
+  if (loading || waitingForSession) {
     return (
       <>
         <Nav activeSection="login" />
