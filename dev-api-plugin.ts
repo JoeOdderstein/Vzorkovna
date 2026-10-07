@@ -30,7 +30,7 @@ function pathFromUrl(url: string) {
   return pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
 }
 
-/** Local dev API — same routing as Vercel `api/[[...path]].js`. */
+/** Local dev API — same routing as Vercel `api/index.js` + /api/:path* rewrite. */
 export function taskboardDevApi(): Plugin {
   return {
     name: 'taskboard-dev-api',

@@ -29,6 +29,12 @@ const ROUTES = {
 };
 
 export function normalizeApiPath(req) {
+  // Vercel rewrite to /api preserves the original URL in req.url (preferred).
+  const rawUrl = typeof req.url === 'string' ? req.url : '';
+  const pathname = rawUrl.split('?')[0] ?? '';
+  const fromUrl = pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
+  if (fromUrl) return fromUrl;
+
   const fromQuery = req.query?.path;
   if (Array.isArray(fromQuery)) {
     return fromQuery.filter(Boolean).join('/');
@@ -37,9 +43,7 @@ export function normalizeApiPath(req) {
     return fromQuery.replace(/^\/+/, '');
   }
 
-  const rawUrl = typeof req.url === 'string' ? req.url : '';
-  const pathname = rawUrl.split('?')[0] ?? '';
-  return pathname.replace(/^\/api\/?/, '').replace(/\/$/, '');
+  return '';
 }
 
 export async function dispatchApi(req, res) {

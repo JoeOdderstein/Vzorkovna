@@ -1,6 +1,6 @@
 /**
- * Single Vercel Serverless Function for all /api/* routes (Hobby plan limit).
- * Route modules live in api/_lib/handlers/ (not counted as separate functions).
+ * Single Serverless Function for all /api/* routes (Vercel Hobby limit).
+ * Nested paths are rewritten here via vercel.json; req.url keeps the original path.
  */
 import { dispatchApi } from './_lib/dispatchApi.js';
 
