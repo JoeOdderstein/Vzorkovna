@@ -73,12 +73,23 @@ export async function handleNotifyBugReport(req, res) {
 
   const { data: repair, error: repairError } = await supabase
     .from('installation_repairs')
-    .select('id, installation_id, summary, notes, occurred_on, reported_by, kind')
+    .select('id, installation_id, summary, notes, occurred_on, reported_by, kind, notify_usernames')
     .eq('id', repairId)
     .maybeSingle();
 
   if (repairError || !repair || repair.installation_id !== installationId) {
     return res.status(404).json({ error: 'Bug report not found' });
+  }
+
+  const existingNotify = Array.isArray(repair.notify_usernames)
+    ? repair.notify_usernames.filter((u) => typeof u === 'string' && u.trim())
+    : [];
+  const mergedNotify = [...new Set([...existingNotify, ...notifyUsernames])];
+  if (notifyUsernames.length > 0) {
+    await supabase
+      .from('installation_repairs')
+      .update({ notify_usernames: mergedNotify })
+      .eq('id', repairId);
   }
 
   const { data: installation } = await supabase

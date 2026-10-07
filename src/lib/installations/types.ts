@@ -34,6 +34,7 @@ export interface InstallationRepair {
   notes: string;
   kind: InstallationRepairKind;
   reported_by: string | null;
+  notify_usernames: string[];
   created_at: string;
 }
 
@@ -52,6 +53,8 @@ export interface Installation {
   name: string;
   location: InstallationLocation;
   lifecycle_status: InstallationLifecycleStatus;
+  /** User picked lifecycle on the detail page; open bugs won't override until bugs are cleared. */
+  lifecycle_status_manual_override: boolean;
   operational_status: InstallationOperationalStatus;
   responsible_person: string | null;
   last_inspection_date: string | null;

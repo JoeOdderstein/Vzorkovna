@@ -12,6 +12,7 @@ export type InstallationLocalPatch = Partial<
     | 'name'
     | 'location'
     | 'lifecycle_status'
+    | 'lifecycle_status_manual_override'
     | 'operational_status'
     | 'responsible_person'
     | 'last_inspection_date'

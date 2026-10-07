@@ -176,11 +176,11 @@ export default function InstallationDetailPage() {
         {t('projects.detail.back')}
       </Link>
 
-      <div className="mb-6">
+      <div className="mb-6 md:hidden">
         <button
           type="button"
           onClick={() => setBugDialogOpen(true)}
-          className="w-full sm:w-auto px-8 py-4 text-base font-bold tracking-wide rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-md"
+          className="w-full px-8 py-4 text-base font-bold tracking-wide rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-md"
         >
           {t('projects.bug.reportButton')}
         </button>
@@ -213,9 +213,16 @@ export default function InstallationDetailPage() {
           </div>
         </div>
 
-        {installation.remote_url ? (
-          <div className="flex flex-wrap gap-2 shrink-0">
-            {installation.id === PI_CONNECT_POPUP_INSTALLATION_ID ? (
+        <div className="flex flex-wrap gap-2 shrink-0 md:justify-end">
+          <button
+            type="button"
+            onClick={() => setBugDialogOpen(true)}
+            className="hidden md:inline-flex px-6 py-3 text-sm font-bold tracking-wide rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-md items-center"
+          >
+            {t('projects.bug.reportButton')}
+          </button>
+          {installation.remote_url ? (
+            installation.id === PI_CONNECT_POPUP_INSTALLATION_ID ? (
               <button
                 type="button"
                 className="tb-btn-secondary inline-flex items-center gap-2"
@@ -239,9 +246,9 @@ export default function InstallationDetailPage() {
                 {t('projects.detail.openRemote')}
                 <ExternalLink size={14} aria-hidden />
               </a>
-            )}
-          </div>
-        ) : null}
+            )
+          ) : null}
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-2">

@@ -3,19 +3,30 @@ import { Upload, X } from 'lucide-react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useUserProfile } from '../../context/UserProfileContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
-import { uploadInstallationDocument } from '../../lib/installations/installationDocumentService';
+import {
+  deleteInstallationDocument,
+  getInstallationDocumentUrl,
+  uploadInstallationDocument,
+} from '../../lib/installations/installationDocumentService';
 import {
   fetchNotifyRecipients,
   notifyBugReport,
   type NotifyRecipient,
 } from '../../lib/installations/notifyBugReport';
-import { createInstallationBugReport } from '../../lib/installations/installationService';
+import {
+  createInstallationBugReport,
+  updateInstallationBugReport,
+} from '../../lib/installations/installationService';
+import type { InstallationDocument, InstallationRepair } from '../../lib/installations/types';
 
 interface ReportBugDialogProps {
   open: boolean;
   installationId: string;
   onClose: () => void;
   onSubmitted: () => void;
+  /** When set, dialog edits an existing bug report instead of creating one. */
+  repair?: InstallationRepair | null;
+  existingPhotos?: InstallationDocument[];
 }
 
 function todayIsoDate() {
@@ -31,6 +42,8 @@ export default function ReportBugDialog({
   installationId,
   onClose,
   onSubmitted,
+  repair = null,
+  existingPhotos = [],
 }: ReportBugDialogProps) {
   const { t } = useTaskboardI18n();
   const { username } = useTaskboardAuth();
@@ -45,15 +58,22 @@ export default function ReportBugDialog({
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [occurredOn, setOccurredOn] = useState(todayIsoDate());
+  const [attachedPhotos, setAttachedPhotos] = useState<InstallationDocument[]>([]);
+  const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
+  const [removingPhotoId, setRemovingPhotoId] = useState<string | null>(null);
 
-  const reportedDate = todayIsoDate();
+  const isEdit = Boolean(repair);
 
   useEffect(() => {
     if (!open) return;
-    setTitle('');
-    setDescription('');
+    setTitle(repair?.summary ?? '');
+    setDescription(repair?.notes ?? '');
+    setOccurredOn(repair?.occurred_on ?? todayIsoDate());
     setPhotos([]);
-    setSelectedUsernames([]);
+    setSelectedUsernames(repair?.notify_usernames ?? []);
+    setAttachedPhotos(existingPhotos);
+    setPhotoUrls({});
     setError('');
     setSubmitting(false);
 
@@ -62,7 +82,23 @@ export default function ReportBugDialog({
       .then(setRecipients)
       .catch(() => setRecipients([]))
       .finally(() => setLoadingRecipients(false));
-  }, [open]);
+  }, [open, repair?.id, repair?.summary, repair?.notes, repair?.occurred_on, existingPhotos]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    for (const photo of attachedPhotos) {
+      if (!photo.storage_path) continue;
+      void getInstallationDocumentUrl(photo.storage_path).then((url) => {
+        if (!cancelled) {
+          setPhotoUrls((prev) => ({ ...prev, [photo.id]: url }));
+        }
+      });
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [open, attachedPhotos]);
 
   if (!open) return null;
 
@@ -87,26 +123,55 @@ export default function ReportBugDialog({
     setError('');
 
     try {
-      const repair = await createInstallationBugReport(installationId, {
-        title: title.trim(),
-        description: description.trim(),
-        reportedBy: username,
-        occurredOn: reportedDate,
-      });
+      const previousNotify = repair?.notify_usernames ?? [];
 
-      for (const file of photos) {
-        await uploadInstallationDocument(installationId, 'photo', file, repair.id);
-      }
+      if (isEdit && repair) {
+        await updateInstallationBugReport(repair.id, {
+          title: title.trim(),
+          description: description.trim(),
+          occurredOn,
+          notifyUsernames: selectedUsernames,
+        });
 
-      if (selectedUsernames.length > 0) {
-        try {
-          await notifyBugReport({
-            repairId: repair.id,
-            installationId,
-            notifyUsernames: selectedUsernames,
-          });
-        } catch (notifyErr) {
-          console.warn('Bug saved but email notify failed:', notifyErr);
+        for (const file of photos) {
+          await uploadInstallationDocument(installationId, 'photo', file, repair.id);
+        }
+
+        const newlyNotified = selectedUsernames.filter((u) => !previousNotify.includes(u));
+        if (newlyNotified.length > 0) {
+          try {
+            await notifyBugReport({
+              repairId: repair.id,
+              installationId,
+              notifyUsernames: newlyNotified,
+            });
+          } catch (notifyErr) {
+            console.warn('Bug saved but email notify failed:', notifyErr);
+          }
+        }
+      } else {
+        const created = await createInstallationBugReport(installationId, {
+          title: title.trim(),
+          description: description.trim(),
+          reportedBy: username,
+          occurredOn,
+          notifyUsernames: selectedUsernames,
+        });
+
+        for (const file of photos) {
+          await uploadInstallationDocument(installationId, 'photo', file, created.id);
+        }
+
+        if (selectedUsernames.length > 0) {
+          try {
+            await notifyBugReport({
+              repairId: created.id,
+              installationId,
+              notifyUsernames: selectedUsernames,
+            });
+          } catch (notifyErr) {
+            console.warn('Bug saved but email notify failed:', notifyErr);
+          }
         }
       }
 
@@ -119,8 +184,21 @@ export default function ReportBugDialog({
     }
   };
 
-  const reporterLabel =
-    profile?.board_name?.trim() || profile?.username || username || '—';
+  const reporterLabel = isEdit
+    ? repair?.reported_by ?? '—'
+    : profile?.board_name?.trim() || profile?.username || username || '—';
+
+  const removeAttachedPhoto = async (photo: InstallationDocument) => {
+    setRemovingPhotoId(photo.id);
+    try {
+      await deleteInstallationDocument(photo);
+      setAttachedPhotos((prev) => prev.filter((p) => p.id !== photo.id));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('projects.bug.photoRemoveError'));
+    } finally {
+      setRemovingPhotoId(null);
+    }
+  };
 
   return (
     <div className="taskboard fixed inset-0 z-[90] flex items-center justify-center px-4 py-8">
@@ -133,7 +211,7 @@ export default function ReportBugDialog({
       >
         <div className="sticky top-0 border-b border-[var(--tb-border)] px-6 py-4 flex items-center justify-between bg-[var(--tb-bg)]">
           <h2 id="report-bug-title" className="tb-heading">
-            {t('projects.bug.dialogTitle')}
+            {isEdit ? t('projects.bug.editDialogTitle') : t('projects.bug.dialogTitle')}
           </h2>
           <button type="button" onClick={onClose} className="tb-muted hover:text-[var(--tb-text)]" aria-label={t('common.close')}>
             <X size={20} />
@@ -142,8 +220,21 @@ export default function ReportBugDialog({
 
         <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5">
           <div>
-            <label className="tb-field-label block mb-1">{t('projects.bug.date')}</label>
-            <p className="text-sm tb-text">{formatDisplayDate(reportedDate)}</p>
+            <label htmlFor="bug-date" className="tb-field-label block mb-1">
+              {t('projects.bug.date')}
+            </label>
+            {isEdit ? (
+              <input
+                id="bug-date"
+                type="date"
+                required
+                value={occurredOn}
+                onChange={(e) => setOccurredOn(e.target.value)}
+                className="field-input w-full text-sm"
+              />
+            ) : (
+              <p className="text-sm tb-text">{formatDisplayDate(occurredOn)}</p>
+            )}
           </div>
 
           <div>
@@ -202,6 +293,35 @@ export default function ReportBugDialog({
               <Upload size={16} />
               {t('projects.admin.upload')}
             </button>
+            {attachedPhotos.length > 0 ? (
+              <ul className="mt-3 flex flex-wrap gap-2">
+                {attachedPhotos.map((photo) => {
+                  const url = photoUrls[photo.id];
+                  return (
+                    <li key={photo.id} className="relative">
+                      {url ? (
+                        <img
+                          src={url}
+                          alt={photo.title || 'Bug photo'}
+                          className="h-16 w-16 object-cover rounded-md border border-[var(--tb-border)]"
+                        />
+                      ) : (
+                        <span className="text-xs tb-muted block h-16 w-16">…</span>
+                      )}
+                      <button
+                        type="button"
+                        disabled={removingPhotoId === photo.id}
+                        onClick={() => void removeAttachedPhoto(photo)}
+                        className="absolute -top-1.5 -right-1.5 rounded-full bg-[var(--tb-bg)] border border-[var(--tb-border)] p-0.5 text-red-600 hover:text-red-800 disabled:opacity-50"
+                        aria-label={t('common.remove')}
+                      >
+                        <X size={12} />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
             {photos.length > 0 ? (
               <ul className="mt-2 text-xs tb-muted space-y-1">
                 {photos.map((file) => (
@@ -247,7 +367,11 @@ export default function ReportBugDialog({
               {t('common.cancel')}
             </button>
             <button type="submit" disabled={submitting} className="tb-btn-primary disabled:opacity-50">
-              {submitting ? t('projects.bug.submitting') : t('projects.bug.submit')}
+              {submitting
+                ? t('common.saving')
+                : isEdit
+                  ? t('projects.bug.saveChanges')
+                  : t('projects.bug.submit')}
             </button>
           </div>
         </form>

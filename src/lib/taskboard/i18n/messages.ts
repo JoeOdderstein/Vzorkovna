@@ -212,6 +212,9 @@ const en = {
 
   'projects.bug.reportButton': 'REPORT BUG',
   'projects.bug.dialogTitle': 'Report a bug',
+  'projects.bug.editDialogTitle': 'Edit bug report',
+  'projects.bug.saveChanges': 'Save changes',
+  'projects.bug.photoRemoveError': 'Could not remove photo.',
   'projects.bug.date': 'Date',
   'projects.bug.reporter': 'Reported by',
   'projects.bug.titleLabel': 'Problem title',
@@ -231,6 +234,10 @@ const en = {
   'projects.bug.commentPlaceholder': 'Add a comment…',
   'projects.bug.commentError': 'Could not post comment.',
   'projects.bug.commentsLoadError': 'Could not load comments.',
+  'projects.bug.markResolved': 'Mark as resolved',
+  'projects.bug.reopen': 'Reopen',
+  'projects.bug.showDetails': 'Show details',
+  'projects.bug.hideDetails': 'Hide details',
 
   'projects.tech.noDocs': 'No technical documents on file yet.',
   'projects.tech.opening': 'Opening…',
@@ -458,6 +465,9 @@ const uk: Record<MessageKey, string> = {
 
   'projects.bug.reportButton': 'ПОВІДОМИТИ ПРО БАГ',
   'projects.bug.dialogTitle': 'Повідомити про баг',
+  'projects.bug.editDialogTitle': 'Редагувати звіт про баг',
+  'projects.bug.saveChanges': 'Зберегти',
+  'projects.bug.photoRemoveError': 'Не вдалося видалити фото.',
   'projects.bug.date': 'Дата',
   'projects.bug.reporter': 'Автор',
   'projects.bug.titleLabel': 'Заголовок проблеми',
@@ -477,6 +487,10 @@ const uk: Record<MessageKey, string> = {
   'projects.bug.commentPlaceholder': 'Додати коментар…',
   'projects.bug.commentError': 'Не вдалося опублікувати коментар.',
   'projects.bug.commentsLoadError': 'Не вдалося завантажити коментарі.',
+  'projects.bug.markResolved': 'Позначити як усунено',
+  'projects.bug.reopen': 'Відкрити знову',
+  'projects.bug.showDetails': 'Показати деталі',
+  'projects.bug.hideDetails': 'Приховати деталі',
 
   'projects.tech.noDocs': 'Технічних документів ще немає.',
   'projects.tech.opening': 'Відкриття…',

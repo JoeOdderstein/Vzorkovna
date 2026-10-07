@@ -39,6 +39,7 @@ function normalizeInstallation(row: Record<string, unknown>): InstallationRecord
     id: String(row.id),
     name: String(row.name),
     lifecycle_status: row.lifecycle_status as InstallationRecord['lifecycle_status'],
+    lifecycle_status_manual_override: Boolean(row.lifecycle_status_manual_override),
     operational_status: row.operational_status as InstallationRecord['operational_status'],
     responsible_person: row.responsible_person ? String(row.responsible_person) : null,
     last_inspection_date: row.last_inspection_date ? String(row.last_inspection_date) : null,
@@ -81,6 +82,9 @@ function normalizeRepair(row: Record<string, unknown>): InstallationRepair {
     notes: String(row.notes ?? ''),
     kind,
     reported_by: row.reported_by ? String(row.reported_by) : null,
+    notify_usernames: Array.isArray(row.notify_usernames)
+      ? row.notify_usernames.map((u) => String(u))
+      : [],
     created_at: String(row.created_at ?? ''),
   };
 }
@@ -213,7 +217,11 @@ export async function updateInstallationFields(
 
   if (isSupabaseConfigured()) {
     const supabase = await db();
-    const { error } = await supabase.from('installations').update(cleaned).eq('id', id);
+    const dbPayload: Record<string, unknown> = { ...cleaned };
+    if (cleaned.lifecycle_status !== undefined) {
+      dbPayload.lifecycle_status_manual_override = true;
+    }
+    const { error } = await supabase.from('installations').update(dbPayload).eq('id', id);
 
     if (!error) {
       const updated = await getInstallationById(id);
@@ -224,7 +232,11 @@ export async function updateInstallationFields(
     }
   }
 
-  mergeLocalInstallationPatch(id, cleaned);
+  const localPatch: Record<string, unknown> = { ...cleaned };
+  if (cleaned.lifecycle_status !== undefined) {
+    localPatch.lifecycle_status_manual_override = true;
+  }
+  mergeLocalInstallationPatch(id, localPatch);
   const updated = await getInstallationById(id);
   if (!updated) {
     throw new Error('Installation not found');
@@ -239,6 +251,64 @@ export async function updateInstallationLifecycleStatus(
   lifecycle_status: InstallationLifecycleStatus,
 ): Promise<InstallationRecord> {
   return updateInstallationFields(id, { lifecycle_status });
+}
+
+async function countOpenBugReports(installationId: string): Promise<number> {
+  const supabase = await db();
+  const { count, error } = await supabase
+    .from('installation_repairs')
+    .select('id', { count: 'exact', head: true })
+    .eq('installation_id', installationId)
+    .eq('kind', 'bug_report')
+    .eq('resolved', false);
+
+  if (error) return 0;
+  return count ?? 0;
+}
+
+/** Keeps lifecycle in sync with unresolved bug reports (respects manual lifecycle edits). */
+export async function syncInstallationLifecycleFromOpenBugs(
+  installationId: string,
+): Promise<void> {
+  if (!isSupabaseConfigured()) return;
+
+  const supabase = await db();
+  const openCount = await countOpenBugReports(installationId);
+
+  const { data: inst, error: instError } = await supabase
+    .from('installations')
+    .select('lifecycle_status, lifecycle_status_manual_override')
+    .eq('id', installationId)
+    .maybeSingle();
+
+  if (instError || !inst) return;
+
+  const manual = Boolean(inst.lifecycle_status_manual_override);
+
+  if (openCount > 0) {
+    if (manual || inst.lifecycle_status === 'maintenance_needed') return;
+
+    const { error } = await supabase
+      .from('installations')
+      .update({
+        lifecycle_status: 'maintenance_needed',
+        lifecycle_status_manual_override: false,
+      })
+      .eq('id', installationId);
+
+    if (!error) notifyInstallationsUpdated();
+    return;
+  }
+
+  const { error } = await supabase
+    .from('installations')
+    .update({
+      lifecycle_status: 'operational',
+      lifecycle_status_manual_override: false,
+    })
+    .eq('id', installationId);
+
+  if (!error) notifyInstallationsUpdated();
 }
 
 export type CreateRepairInput = {
@@ -265,6 +335,7 @@ export async function createInstallationRepair(
     notes: input.notes?.trim() ?? '',
     kind: 'repair',
     reported_by: null,
+    notify_usernames: [],
     created_at: new Date().toISOString(),
   };
 
@@ -279,6 +350,7 @@ export async function createInstallationRepair(
         resolved: repair.resolved,
         notes: repair.notes,
         kind: 'repair',
+        notify_usernames: [],
       })
       .select('*')
       .single();
@@ -308,9 +380,18 @@ export async function updateInstallationRepair(
 
   if (isSupabaseConfigured()) {
     const supabase = await db();
+    const { data: before } = await supabase
+      .from('installation_repairs')
+      .select('installation_id, kind')
+      .eq('id', repairId)
+      .maybeSingle();
+
     const { error } = await supabase.from('installation_repairs').update(patch).eq('id', repairId);
     if (!error) {
       notifyInstallationsUpdated();
+      if (before?.kind === 'bug_report' && before.installation_id) {
+        await syncInstallationLifecycleFromOpenBugs(String(before.installation_id));
+      }
       return;
     }
   }
@@ -321,9 +402,18 @@ export async function updateInstallationRepair(
 export async function deleteInstallationRepair(repairId: string): Promise<void> {
   if (isSupabaseConfigured()) {
     const supabase = await db();
+    const { data: before } = await supabase
+      .from('installation_repairs')
+      .select('installation_id, kind')
+      .eq('id', repairId)
+      .maybeSingle();
+
     const { error } = await supabase.from('installation_repairs').delete().eq('id', repairId);
     if (!error) {
       notifyInstallationsUpdated();
+      if (before?.kind === 'bug_report' && before.installation_id) {
+        await syncInstallationLifecycleFromOpenBugs(String(before.installation_id));
+      }
       return;
     }
   }
@@ -336,6 +426,7 @@ export type CreateBugReportInput = {
   description: string;
   reportedBy: string;
   occurredOn: string;
+  notifyUsernames?: string[];
 };
 
 export async function createInstallationBugReport(
@@ -353,6 +444,8 @@ export async function createInstallationBugReport(
     throw new Error('Bug reports require Supabase to be connected.');
   }
 
+  const notifyUsernames = [...new Set((input.notifyUsernames ?? []).map((u) => u.trim()).filter(Boolean))];
+
   const supabase = await db();
   const { data, error } = await supabase
     .from('installation_repairs')
@@ -364,6 +457,7 @@ export async function createInstallationBugReport(
       resolved: false,
       kind: 'bug_report',
       reported_by: input.reportedBy,
+      notify_usernames: notifyUsernames,
     })
     .select('*')
     .single();
@@ -373,7 +467,59 @@ export async function createInstallationBugReport(
   }
 
   notifyInstallationsUpdated();
+  await syncInstallationLifecycleFromOpenBugs(installationId);
   return normalizeRepair(data as Record<string, unknown>);
+}
+
+export type UpdateBugReportInput = {
+  title: string;
+  description: string;
+  occurredOn: string;
+  notifyUsernames?: string[];
+};
+
+export async function updateInstallationBugReport(
+  repairId: string,
+  input: UpdateBugReportInput,
+): Promise<void> {
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (!title) throw new Error('Title is required');
+  if (!description) throw new Error('Description is required');
+  if (!input.occurredOn) throw new Error('Date is required');
+
+  if (!isSupabaseConfigured()) {
+    throw new Error('Bug reports require Supabase to be connected.');
+  }
+
+  const notifyUsernames = [...new Set((input.notifyUsernames ?? []).map((u) => u.trim()).filter(Boolean))];
+
+  const supabase = await db();
+  const { data: existing, error: loadError } = await supabase
+    .from('installation_repairs')
+    .select('kind')
+    .eq('id', repairId)
+    .maybeSingle();
+
+  if (loadError || !existing || existing.kind !== 'bug_report') {
+    throw new Error('Could not update bug report.');
+  }
+
+  const { error } = await supabase
+    .from('installation_repairs')
+    .update({
+      summary: title,
+      notes: description,
+      occurred_on: input.occurredOn,
+      notify_usernames: notifyUsernames,
+    })
+    .eq('id', repairId);
+
+  if (error) {
+    throw new Error('Could not update bug report.');
+  }
+
+  notifyInstallationsUpdated();
 }
 
 export async function createInstallation(
@@ -396,6 +542,7 @@ export async function createInstallation(
     name,
     location: input.location,
     lifecycle_status: 'concept',
+    lifecycle_status_manual_override: false,
     operational_status: 'active',
     responsible_person: input.responsible_person?.trim() || null,
     last_inspection_date: null,

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ExternalLink } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useInstallations } from '../../hooks/useInstallations';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
@@ -133,6 +134,7 @@ export default function RemoteInstallationOverview({
   variant = 'remote-inst',
 }: RemoteInstallationOverviewProps) {
   const { t, locale } = useTaskboardI18n();
+  const { isAdmin } = useTaskboardAuth();
   const { installations, loading, error } = useInstallations();
   const linkToDetail = variant === 'projects';
   const [statusFilter, setStatusFilter] = useState<InstallationLifecycleFilter>('all');
@@ -164,7 +166,7 @@ export default function RemoteInstallationOverview({
           <span className="tb-label block mb-2">{pageLabel}</span>
           <p className="text-sm tb-muted">{pageDescription}</p>
         </div>
-        {linkToDetail ? (
+        {linkToDetail && isAdmin ? (
           <button
             type="button"
             onClick={() => setAddDialogOpen(true)}
@@ -209,7 +211,7 @@ export default function RemoteInstallationOverview({
         )
       ) : null}
 
-      {linkToDetail ? (
+      {linkToDetail && isAdmin ? (
         <AddInstallationDialog open={addDialogOpen} onClose={() => setAddDialogOpen(false)} />
       ) : null}
     </div>

@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus } from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChevronDown, ChevronUp, Pencil, Plus } from 'lucide-react';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { formatInstallationDate } from '../../lib/installations/format';
 import {
@@ -10,7 +11,9 @@ import {
 import type { InstallationDocument, InstallationRepair } from '../../lib/installations/types';
 import { getInstallationDocumentUrl } from '../../lib/installations/installationDocumentService';
 import TranslatableText from '../../taskboard/components/TranslatableText';
+import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 import RepairCommentsSection from './RepairCommentsSection';
+import ReportBugDialog from './ReportBugDialog';
 
 interface InstallationRepairsSectionProps {
   installationId: string;
@@ -124,6 +127,7 @@ function RepairEditor({
 
 function RepairPhotoStrip({ photos }: { photos: InstallationDocument[] }) {
   const [urls, setUrls] = useState<Record<string, string>>({});
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -140,30 +144,83 @@ function RepairPhotoStrip({ photos }: { photos: InstallationDocument[] }) {
     };
   }, [photos]);
 
+  const openLightbox = useCallback(
+    (photoId: string) => {
+      const index = photos.findIndex((photo) => photo.id === photoId);
+      if (index >= 0 && urls[photoId]) setLightboxIndex(index);
+    },
+    [photos, urls],
+  );
+
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+
+  const lightboxPhoto =
+    lightboxIndex != null && lightboxIndex >= 0 && lightboxIndex < photos.length
+      ? photos[lightboxIndex]
+      : null;
+  const lightboxUrl = lightboxPhoto ? urls[lightboxPhoto.id] : null;
+
   if (photos.length === 0) return null;
 
   return (
-    <ul className="flex flex-wrap gap-2 mt-3">
-      {photos.map((photo) => {
-        const url = urls[photo.id];
-        return (
-          <li key={photo.id}>
-            {url ? (
-              <a href={url} target="_blank" rel="noopener noreferrer">
-                <img
-                  src={url}
-                  alt={photo.title || 'Bug photo'}
-                  className="h-16 w-16 object-cover rounded-md border border-[var(--tb-border)]"
-                />
-              </a>
-            ) : (
-              <span className="text-xs tb-muted">{photo.title || '…'}</span>
-            )}
-          </li>
-        );
-      })}
-    </ul>
+    <>
+      <ul className="flex flex-wrap gap-2 mt-2 list-none m-0 p-0">
+        {photos.map((photo) => {
+          const url = urls[photo.id];
+          return (
+            <li key={photo.id} className="shrink-0">
+              {url ? (
+                <button
+                  type="button"
+                  onClick={() => openLightbox(photo.id)}
+                  className="group relative rounded-md border border-[var(--tb-border)] overflow-hidden bg-[var(--tb-bg)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tb-accent)]"
+                  title={photo.title || 'View photo'}
+                >
+                  <img
+                    src={url}
+                    alt={photo.title || 'Bug photo'}
+                    className="block h-20 w-20 object-cover"
+                  />
+                  <span className="pointer-events-none absolute inset-x-0 bottom-0 bg-black/50 py-0.5 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                    View
+                  </span>
+                </button>
+              ) : (
+                <span className="flex h-20 w-20 items-center justify-center text-xs tb-muted border border-[var(--tb-border)] rounded-md">
+                  {photo.title || '…'}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+
+      {lightboxPhoto && lightboxUrl ? (
+        <TaskPhotoLightbox
+          imageUrl={lightboxUrl}
+          fileName={lightboxPhoto.title || 'Bug photo'}
+          onClose={closeLightbox}
+          hasPrevious={lightboxIndex != null && lightboxIndex > 0}
+          hasNext={lightboxIndex != null && lightboxIndex < photos.length - 1}
+          onPrevious={() =>
+            setLightboxIndex((i) => (i != null && i > 0 ? i - 1 : i))
+          }
+          onNext={() =>
+            setLightboxIndex((i) =>
+              i != null && i < photos.length - 1 ? i + 1 : i,
+            )
+          }
+        />
+      ) : null}
+    </>
   );
+}
+
+function sortRepairs(list: InstallationRepair[]): InstallationRepair[] {
+  return [...list].sort((a, b) => {
+    if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
+    return b.occurred_on.localeCompare(a.occurred_on);
+  });
 }
 
 export default function InstallationRepairsSection({
@@ -173,9 +230,40 @@ export default function InstallationRepairsSection({
   isAdmin,
 }: InstallationRepairsSectionProps) {
   const { t } = useTaskboardI18n();
+  const { authenticated } = useTaskboardAuth();
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [resolvingId, setResolvingId] = useState<string | null>(null);
+  const [expandedResolvedIds, setExpandedResolvedIds] = useState<Set<string>>(() => new Set());
+  const [editingBug, setEditingBug] = useState<InstallationRepair | null>(null);
+
+  const sortedRepairs = useMemo(() => sortRepairs(repairs), [repairs]);
+
+  const toggleResolvedExpanded = (repairId: string) => {
+    setExpandedResolvedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(repairId)) next.delete(repairId);
+      else next.add(repairId);
+      return next;
+    });
+  };
+
+  const setRepairResolved = async (repair: InstallationRepair, resolved: boolean) => {
+    setResolvingId(repair.id);
+    try {
+      await updateInstallationRepair(repair.id, { resolved });
+      if (resolved) {
+        setExpandedResolvedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(repair.id);
+          return next;
+        });
+      }
+    } finally {
+      setResolvingId(null);
+    }
+  };
 
   const photosByRepair = useMemo(() => {
     const map = new Map<string, InstallationDocument[]>();
@@ -203,83 +291,193 @@ export default function InstallationRepairsSection({
       {repairs.length === 0 && !isAdmin ? (
         <p className="text-sm tb-muted">{t('projects.detail.noRepairs')}</p>
       ) : (
-        <ul className="space-y-4">
-          {repairs.map((repair) =>
-            editingId === repair.id ? (
-              <li key={repair.id}>
-                <RepairEditor
-                  installationId={installationId}
-                  initial={repair}
-                  onCancel={() => setEditingId(null)}
-                  onDone={() => setEditingId(null)}
-                />
-              </li>
-            ) : (
+        <ul className="space-y-3">
+          {sortedRepairs.map((repair) => {
+            if (editingId === repair.id && repair.kind !== 'bug_report') {
+              return (
+                <li key={repair.id}>
+                  <RepairEditor
+                    installationId={installationId}
+                    initial={repair}
+                    onCancel={() => setEditingId(null)}
+                    onDone={() => setEditingId(null)}
+                  />
+                </li>
+              );
+            }
+
+            const isCompactResolved = repair.resolved && !expandedResolvedIds.has(repair.id);
+
+            if (isCompactResolved) {
+              return (
+                <li
+                  key={repair.id}
+                  className="rounded-md border border-[var(--tb-border)] px-3 py-2 opacity-80"
+                >
+                  <div className="flex flex-wrap items-center gap-2 justify-between gap-y-1">
+                    <button
+                      type="button"
+                      onClick={() => toggleResolvedExpanded(repair.id)}
+                      className="flex items-center gap-1.5 min-w-0 text-left text-xs tb-text font-medium hover:opacity-90"
+                    >
+                      <ChevronDown size={14} className="shrink-0 tb-muted" aria-hidden />
+                      <span className="truncate">
+                        <TranslatableText text={repair.summary} />
+                      </span>
+                    </button>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-[10px] tb-muted uppercase tracking-wide">
+                        {t('projects.detail.repairResolved')}
+                      </span>
+                      {repair.kind === 'bug_report' && authenticated ? (
+                        <button
+                          type="button"
+                          disabled={resolvingId === repair.id}
+                          onClick={() => void setRepairResolved(repair, false)}
+                          className="text-[10px] tb-btn-secondary py-0.5 px-2 disabled:opacity-50"
+                        >
+                          {t('projects.bug.reopen')}
+                        </button>
+                      ) : null}
+                      {repair.kind === 'bug_report' && authenticated ? (
+                        <button
+                          type="button"
+                          onClick={() => setEditingBug(repair)}
+                          className="text-[10px] tb-btn-secondary py-0.5 px-2 inline-flex items-center gap-1"
+                        >
+                          <Pencil size={11} />
+                          {t('projects.admin.edit')}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </li>
+              );
+            }
+
+            const isActiveBug = repair.kind === 'bug_report' && !repair.resolved;
+            const headerActions = (
+              <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
+                {repair.kind === 'bug_report' && authenticated && !repair.resolved ? (
+                  <button
+                    type="button"
+                    disabled={resolvingId === repair.id}
+                    onClick={() => void setRepairResolved(repair, true)}
+                    className="text-[11px] tb-btn-primary py-1 px-2.5 whitespace-nowrap disabled:opacity-50"
+                  >
+                    {t('projects.bug.markResolved')}
+                  </button>
+                ) : null}
+                {repair.resolved ? (
+                  <button
+                    type="button"
+                    onClick={() => toggleResolvedExpanded(repair.id)}
+                    className="text-[11px] tb-btn-secondary inline-flex items-center gap-1 py-1 px-2"
+                  >
+                    <ChevronUp size={12} />
+                    {t('projects.bug.hideDetails')}
+                  </button>
+                ) : null}
+                {repair.kind === 'bug_report' && authenticated && repair.resolved ? (
+                  <button
+                    type="button"
+                    disabled={resolvingId === repair.id}
+                    onClick={() => void setRepairResolved(repair, false)}
+                    className="text-[11px] tb-btn-secondary py-1 px-2 disabled:opacity-50"
+                  >
+                    {t('projects.bug.reopen')}
+                  </button>
+                ) : null}
+                {repair.kind === 'bug_report' && authenticated ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingBug(repair)}
+                    className="text-[11px] tb-btn-secondary inline-flex items-center gap-1 py-1 px-2"
+                  >
+                    <Pencil size={12} />
+                    {t('projects.admin.edit')}
+                  </button>
+                ) : null}
+                {isAdmin && repair.kind !== 'bug_report' ? (
+                  <button
+                    type="button"
+                    onClick={() => setEditingId(repair.id)}
+                    className="text-[11px] tb-btn-secondary inline-flex items-center gap-1 py-1 px-2"
+                    title={t('projects.admin.edit')}
+                  >
+                    <Pencil size={12} />
+                    <span className="sr-only">{t('projects.admin.edit')}</span>
+                  </button>
+                ) : null}
+                {isAdmin ? (
+                  <button
+                    type="button"
+                    disabled={removingId === repair.id}
+                    onClick={() => void handleDelete(repair)}
+                    className="text-[11px] text-red-600 hover:text-red-800 py-1 px-1 disabled:opacity-50"
+                  >
+                    {t('common.remove')}
+                  </button>
+                ) : null}
+              </div>
+            );
+
+            return (
               <li
                 key={repair.id}
-                className="rounded-lg border border-[var(--tb-border)] p-4 space-y-2"
+                className={`rounded-lg border border-[var(--tb-border)] ${
+                  isActiveBug ? 'p-3 space-y-1.5' : repair.resolved ? 'p-3 space-y-2 opacity-90' : 'p-4 space-y-2'
+                }`}
               >
-                <div className="flex flex-wrap items-center gap-2 justify-between">
-                  <div className="flex flex-wrap items-center gap-2 min-w-0">
-                    {repair.kind === 'bug_report' ? (
-                      <span className="text-[10px] font-semibold tracking-wider uppercase px-2 py-0.5 rounded bg-red-600/15 text-red-700">
-                        {t('projects.bug.badge')}
+                <div className="flex items-start gap-3 justify-between">
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                      {repair.kind === 'bug_report' ? (
+                        <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded bg-red-600/15 text-red-700 shrink-0">
+                          {t('projects.bug.badge')}
+                        </span>
+                      ) : null}
+                      <span className="text-sm tb-text font-medium leading-snug">
+                        <TranslatableText text={repair.summary} />
                       </span>
-                    ) : null}
-                    <span className="text-sm tb-text font-medium">
-                      <TranslatableText text={repair.summary} />
-                    </span>
+                    </div>
+                    <p className="text-[11px] tb-muted leading-tight">
+                      {formatInstallationDate(repair.occurred_on)}
+                      {' · '}
+                      {repair.resolved
+                        ? t('projects.detail.repairResolved')
+                        : t('projects.detail.repairOpen')}
+                      {repair.reported_by ? (
+                        <>
+                          {' · '}
+                          {t('projects.bug.reportedBy', { name: repair.reported_by })}
+                        </>
+                      ) : null}
+                    </p>
                   </div>
-                  <span className="text-xs tb-muted shrink-0">
-                    {formatInstallationDate(repair.occurred_on)}
-                  </span>
+                  {headerActions}
                 </div>
 
                 {repair.notes ? (
-                  <p className="text-sm tb-text-secondary whitespace-pre-wrap">
+                  <p
+                    className={`tb-text-secondary whitespace-pre-wrap leading-snug ${
+                      isActiveBug ? 'text-xs pt-0.5' : 'text-sm'
+                    }`}
+                  >
                     <TranslatableText text={repair.notes} multiline />
                   </p>
                 ) : null}
 
-                <p className="text-xs tb-muted">
-                  {repair.resolved
-                    ? t('projects.detail.repairResolved')
-                    : t('projects.detail.repairOpen')}
-                  {repair.reported_by ? (
-                    <>
-                      {' · '}
-                      {t('projects.bug.reportedBy', { name: repair.reported_by })}
-                    </>
-                  ) : null}
-                </p>
-
                 <RepairPhotoStrip photos={photosByRepair.get(repair.id) ?? []} />
 
-                {isAdmin ? (
-                  <div className="flex flex-wrap gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setEditingId(repair.id)}
-                      className="text-xs tb-btn-secondary inline-flex items-center gap-1"
-                    >
-                      <Pencil size={12} />
-                      {t('projects.admin.edit')}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={removingId === repair.id}
-                      onClick={() => void handleDelete(repair)}
-                      className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
-                    >
-                      {t('common.remove')}
-                    </button>
-                  </div>
-                ) : null}
-
-                <RepairCommentsSection repairId={repair.id} />
+                <RepairCommentsSection
+                  repairId={repair.id}
+                  installationId={installationId}
+                  compact={isActiveBug}
+                />
               </li>
-            ),
-          )}
+            );
+          })}
         </ul>
       )}
 
@@ -301,6 +499,15 @@ export default function InstallationRepairsSection({
           {t('projects.repair.add')}
         </button>
       ) : null}
+
+      <ReportBugDialog
+        open={editingBug !== null}
+        installationId={installationId}
+        repair={editingBug}
+        existingPhotos={editingBug ? (photosByRepair.get(editingBug.id) ?? []) : []}
+        onClose={() => setEditingBug(null)}
+        onSubmitted={() => setEditingBug(null)}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import authNotifyRecipients from './handlers/auth-notify-recipients.js';
 import authSession from './handlers/auth-session.js';
 import authUsernames from './handlers/auth-usernames.js';
 import installationsNotifyBug from './handlers/installations-notify-bug.js';
+import installationsNotifyRepairComment from './handlers/installations-notify-repair-comment.js';
 import tasksNotifyAssignment from './handlers/tasks-notify-assignment.js';
 import tasksNotifyComment from './handlers/tasks-notify-comment.js';
 import translate from './handlers/translate.js';
@@ -25,6 +26,7 @@ const ROUTES = {
   'tasks/notify-assignment': tasksNotifyAssignment,
   'tasks/notify-comment': tasksNotifyComment,
   'installations/notify-bug': installationsNotifyBug,
+  'installations/notify-repair-comment': installationsNotifyRepairComment,
   translate: translate,
 };
 
