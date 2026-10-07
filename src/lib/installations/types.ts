@@ -18,9 +18,12 @@ export interface InstallationDocument {
   title: string;
   storage_path: string | null;
   external_url: string | null;
+  repair_id: string | null;
   sort_order: number;
   created_at: string;
 }
+
+export type InstallationRepairKind = 'repair' | 'bug_report';
 
 export interface InstallationRepair {
   id: string;
@@ -29,7 +32,19 @@ export interface InstallationRepair {
   summary: string;
   resolved: boolean;
   notes: string;
+  kind: InstallationRepairKind;
+  reported_by: string | null;
   created_at: string;
+}
+
+export interface InstallationRepairComment {
+  id: string;
+  repair_id: string;
+  author_username: string;
+  author_display_name: string;
+  body: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Installation {

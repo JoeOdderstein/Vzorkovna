@@ -23,9 +23,11 @@ import {
   handleGetInvite,
   handleListAssignees,
   handleListMembers,
+  handleListNotifyRecipients,
   handleSendInvite,
   listMemberUsernames,
 } from './api/_lib/members.js';
+import { handleNotifyBugReport } from './api/_lib/notifyBugReport.js';
 
 function readBody(req: IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -126,6 +128,19 @@ export function taskboardDevApi(): Plugin {
             return runApiHandler(handleTranslate, req, res, raw ? JSON.parse(raw) : {});
           }
 
+          if (url === '/api/installations/notify-bug' && req.method === 'POST') {
+            const raw = await readBody(req);
+            const body = raw ? JSON.parse(raw) : {};
+            return handleNotifyBugReport(
+              { ...req, method: req.method, headers: req.headers, body } as never,
+              {
+                status: (code: number) => ({
+                  json: (payload: unknown) => sendJson(res, code, payload),
+                }),
+              } as never,
+            );
+          }
+
           if (!url.startsWith('/api/auth')) {
             return sendJson(res, 404, { error: 'Not found' });
           }
@@ -163,6 +178,10 @@ export function taskboardDevApi(): Plugin {
 
           if (url === '/api/auth/assignees' && req.method === 'GET') {
             return runApiHandler(handleListAssignees, req, res);
+          }
+
+          if (url === '/api/auth/notify-recipients' && req.method === 'GET') {
+            return runApiHandler(handleListNotifyRecipients, req, res);
           }
 
           if (url === '/api/auth/login' && req.method === 'POST') {

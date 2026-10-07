@@ -666,6 +666,49 @@ export async function handleListAssignees(req, res) {
   });
 }
 
+export async function handleListNotifyRecipients(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const token = getTokenFromRequest(req);
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    await verifySessionToken(token);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const byUsername = new Map();
+
+  const supabase = getSupabaseAdmin();
+  if (supabase) {
+    try {
+      const profiles = await fetchUserProfiles(supabase);
+      for (const row of profiles) {
+        const username = String(row.username ?? '').trim();
+        const email = row.email?.trim();
+        if (!username || !email) continue;
+        byUsername.set(username, {
+          username,
+          board_name: row.board_name ?? defaultBoardNameForUsername(username) ?? username,
+          email,
+        });
+      }
+    } catch (error) {
+      console.error('Notify recipients profile lookup failed:', error);
+    }
+  }
+
+  const recipients = [...byUsername.values()].sort((a, b) =>
+    a.board_name.localeCompare(b.board_name),
+  );
+
+  return res.status(200).json({ recipients });
+}
+
 function getQueryToken(req) {
   if (req.query && typeof req.query.token === 'string') return req.query.token;
   const url = String(req.url ?? '');

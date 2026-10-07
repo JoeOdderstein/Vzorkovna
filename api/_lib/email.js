@@ -322,6 +322,98 @@ export async function sendCommentNotificationEmail({
   if (error) throw error;
 }
 
+function formatIsoDate(isoDate) {
+  if (!isoDate) return '';
+  const match = /^(\d{4}-\d{2}-\d{2})/.exec(String(isoDate));
+  if (!match) return String(isoDate);
+  const date = new Date(`${match[1]}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return match[1];
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function buildBugReportHtml({
+  recipientName,
+  reporterName,
+  projectName,
+  bugTitle,
+  description,
+  occurredOn,
+  projectUrl,
+  photoUrls,
+  totalPhotoCount,
+}) {
+  const safeRecipient = escapeHtml(recipientName);
+  const safeReporter = escapeHtml(reporterName);
+  const safeProject = escapeHtml(projectName);
+  const safeTitle = escapeHtml(bugTitle);
+  const safeDescription = escapeHtml(description);
+  const safeUrl = projectUrl ? escapeHref(projectUrl) : '';
+  const dateLine = occurredOn
+    ? `<p style="margin:0 0 16px;color:#444;">Reported: <strong>${formatIsoDate(occurredOn)}</strong></p>`
+    : '';
+
+  const openButton = projectUrl
+    ? `<a href="${safeUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;margin:16px 0 0;">
+          View project
+        </a>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+  <body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;margin:0;padding:24px;background:#f6f6f6;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#666;">Headlight Rabbits — installation bug report</p>
+      <h1 style="margin:0 0 16px;font-size:22px;">Bug reported on ${safeProject}</h1>
+      <p style="margin:0 0 16px;">Hi ${safeRecipient}, <strong>${safeReporter}</strong> reported a problem:</p>
+      <p style="margin:0 0 8px;font-size:18px;font-weight:600;">${safeTitle}</p>
+      ${dateLine}
+      <div style="margin:0 0 16px;padding:12px 14px;background:#f6f6f6;border-radius:8px;border-left:3px solid #c0392b;">
+        <p style="margin:0;white-space:pre-wrap;color:#333;">${safeDescription}</p>
+      </div>
+      ${buildEmailPhotoThumbnailsHtml({ photoUrls, totalPhotoCount, taskUrl: projectUrl })}
+      ${openButton}
+      ${projectUrl ? `<p style="margin:16px 0 0;font-size:12px;color:#888;word-break:break-all;">${safeUrl}</p>` : ''}
+    </div>
+  </body>
+</html>`;
+}
+
+export async function sendBugReportEmail({
+  to,
+  recipientName,
+  reporterName,
+  projectName,
+  bugTitle,
+  description,
+  occurredOn,
+  projectUrl,
+  photoUrls = [],
+  totalPhotoCount = 0,
+}) {
+  const resend = getResend();
+  const from = process.env.EMAIL_FROM;
+
+  if (!resend || !from) {
+    throw new Error('Email is not configured');
+  }
+
+  const subject = `Bug report: ${bugTitle} (${projectName})`;
+  const html = buildBugReportHtml({
+    recipientName,
+    reporterName,
+    projectName,
+    bugTitle,
+    description,
+    occurredOn,
+    projectUrl,
+    photoUrls,
+    totalPhotoCount,
+  });
+
+  const { error } = await resend.emails.send({ from, to, subject, html });
+  if (error) throw error;
+}
+
 export async function sendInviteEmail({
   to,
   boardName,

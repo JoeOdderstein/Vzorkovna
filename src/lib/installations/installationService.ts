@@ -5,9 +5,9 @@ import {
   loadLocalCreatedInstallations,
 } from './localInstallationCreates';
 import {
-  getLocalLifecycleOverride,
+  applyLocalInstallationPatches,
+  mergeLocalInstallationPatch,
   notifyInstallationsUpdated,
-  setLocalLifecycleOverride,
 } from './localInstallationOverrides';
 import { INSTALLATION_SEED_RECORDS } from './seedData';
 import type {
@@ -62,12 +62,16 @@ function normalizeDocument(row: Record<string, unknown>): InstallationDocument {
     title: String(row.title ?? ''),
     storage_path: row.storage_path ? String(row.storage_path) : null,
     external_url: row.external_url ? String(row.external_url) : null,
+    repair_id: row.repair_id ? String(row.repair_id) : null,
     sort_order: Number(row.sort_order ?? 0),
     created_at: String(row.created_at ?? ''),
   };
 }
 
 function normalizeRepair(row: Record<string, unknown>): InstallationRepair {
+  const kindRaw = row.kind;
+  const kind: InstallationRepair['kind'] =
+    kindRaw === 'bug_report' ? 'bug_report' : 'repair';
   return {
     id: String(row.id),
     installation_id: String(row.installation_id),
@@ -75,6 +79,8 @@ function normalizeRepair(row: Record<string, unknown>): InstallationRepair {
     summary: String(row.summary ?? ''),
     resolved: Boolean(row.resolved),
     notes: String(row.notes ?? ''),
+    kind,
+    reported_by: row.reported_by ? String(row.reported_by) : null,
     created_at: String(row.created_at ?? ''),
   };
 }
@@ -107,16 +113,8 @@ function attachRelations(
   }));
 }
 
-function applyLocalOverrides(records: InstallationRecord[]): InstallationRecord[] {
-  return records.map((record) => {
-    const lifecycle_status = getLocalLifecycleOverride(record.id) ?? record.lifecycle_status;
-    if (lifecycle_status === record.lifecycle_status) return record;
-    return { ...record, lifecycle_status };
-  });
-}
-
 function mergeLocalCreates(records: InstallationRecord[]): InstallationRecord[] {
-  const merged = applyLocalOverrides(records);
+  const merged = applyLocalInstallationPatches(records);
   const seen = new Set(merged.map((record) => record.id));
   for (const created of loadLocalCreatedInstallations()) {
     if (!seen.has(created.id)) {
@@ -174,7 +172,9 @@ export async function listInstallations(): Promise<InstallationRecord[]> {
   );
   const repairs = (repairRows ?? []).map((row) => normalizeRepair(row as Record<string, unknown>));
 
-  return attachRelations(installations, documents, repairs);
+  return applyLocalInstallationPatches(
+    attachRelations(installations, documents, repairs),
+  );
 }
 
 export async function getInstallationById(id: string): Promise<InstallationRecord | null> {
@@ -182,16 +182,38 @@ export async function getInstallationById(id: string): Promise<InstallationRecor
   return installations.find((installation) => installation.id === id) ?? null;
 }
 
-export async function updateInstallationLifecycleStatus(
+export type InstallationUpdatePatch = Partial<
+  Pick<
+    InstallationRecord,
+    | 'name'
+    | 'location'
+    | 'lifecycle_status'
+    | 'operational_status'
+    | 'responsible_person'
+    | 'last_inspection_date'
+    | 'next_maintenance_date'
+    | 'revizni_zprava_available'
+    | 'remote_url'
+  >
+>;
+
+export async function updateInstallationFields(
   id: string,
-  lifecycle_status: InstallationLifecycleStatus,
+  patch: InstallationUpdatePatch,
 ): Promise<InstallationRecord> {
+  const cleaned: InstallationUpdatePatch = { ...patch };
+  if (cleaned.name !== undefined) {
+    cleaned.name = cleaned.name.trim();
+    if (!cleaned.name) throw new Error('Project name is required');
+  }
+  if (cleaned.responsible_person === '') cleaned.responsible_person = null;
+  if (cleaned.remote_url === '') cleaned.remote_url = null;
+  if (cleaned.last_inspection_date === '') cleaned.last_inspection_date = null;
+  if (cleaned.next_maintenance_date === '') cleaned.next_maintenance_date = null;
+
   if (isSupabaseConfigured()) {
     const supabase = await db();
-    const { error } = await supabase
-      .from('installations')
-      .update({ lifecycle_status })
-      .eq('id', id);
+    const { error } = await supabase.from('installations').update(cleaned).eq('id', id);
 
     if (!error) {
       const updated = await getInstallationById(id);
@@ -202,7 +224,7 @@ export async function updateInstallationLifecycleStatus(
     }
   }
 
-  setLocalLifecycleOverride(id, lifecycle_status);
+  mergeLocalInstallationPatch(id, cleaned);
   const updated = await getInstallationById(id);
   if (!updated) {
     throw new Error('Installation not found');
@@ -210,6 +232,148 @@ export async function updateInstallationLifecycleStatus(
 
   notifyInstallationsUpdated();
   return updated;
+}
+
+export async function updateInstallationLifecycleStatus(
+  id: string,
+  lifecycle_status: InstallationLifecycleStatus,
+): Promise<InstallationRecord> {
+  return updateInstallationFields(id, { lifecycle_status });
+}
+
+export type CreateRepairInput = {
+  occurred_on: string;
+  summary: string;
+  resolved?: boolean;
+  notes?: string;
+};
+
+export async function createInstallationRepair(
+  installationId: string,
+  input: CreateRepairInput,
+): Promise<InstallationRepair> {
+  const summary = input.summary.trim();
+  if (!summary) throw new Error('Summary is required');
+  if (!input.occurred_on) throw new Error('Date is required');
+
+  const repair: InstallationRepair = {
+    id: `repair-${installationId}-${Date.now()}`,
+    installation_id: installationId,
+    occurred_on: input.occurred_on,
+    summary,
+    resolved: Boolean(input.resolved),
+    notes: input.notes?.trim() ?? '',
+    kind: 'repair',
+    reported_by: null,
+    created_at: new Date().toISOString(),
+  };
+
+  if (isSupabaseConfigured()) {
+    const supabase = await db();
+    const { data, error } = await supabase
+      .from('installation_repairs')
+      .insert({
+        installation_id: installationId,
+        occurred_on: repair.occurred_on,
+        summary: repair.summary,
+        resolved: repair.resolved,
+        notes: repair.notes,
+        kind: 'repair',
+      })
+      .select('*')
+      .single();
+
+    if (!error && data) {
+      notifyInstallationsUpdated();
+      return normalizeRepair(data as Record<string, unknown>);
+    }
+  }
+
+  throw new Error('Could not save repair. Connect Supabase or try again.');
+}
+
+export async function updateInstallationRepair(
+  repairId: string,
+  input: Partial<CreateRepairInput>,
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (input.summary !== undefined) {
+    const summary = input.summary.trim();
+    if (!summary) throw new Error('Summary is required');
+    patch.summary = summary;
+  }
+  if (input.occurred_on !== undefined) patch.occurred_on = input.occurred_on;
+  if (input.resolved !== undefined) patch.resolved = input.resolved;
+  if (input.notes !== undefined) patch.notes = input.notes.trim();
+
+  if (isSupabaseConfigured()) {
+    const supabase = await db();
+    const { error } = await supabase.from('installation_repairs').update(patch).eq('id', repairId);
+    if (!error) {
+      notifyInstallationsUpdated();
+      return;
+    }
+  }
+
+  throw new Error('Could not update repair.');
+}
+
+export async function deleteInstallationRepair(repairId: string): Promise<void> {
+  if (isSupabaseConfigured()) {
+    const supabase = await db();
+    const { error } = await supabase.from('installation_repairs').delete().eq('id', repairId);
+    if (!error) {
+      notifyInstallationsUpdated();
+      return;
+    }
+  }
+
+  throw new Error('Could not delete repair.');
+}
+
+export type CreateBugReportInput = {
+  title: string;
+  description: string;
+  reportedBy: string;
+  occurredOn: string;
+};
+
+export async function createInstallationBugReport(
+  installationId: string,
+  input: CreateBugReportInput,
+): Promise<InstallationRepair> {
+  const title = input.title.trim();
+  const description = input.description.trim();
+  if (!title) throw new Error('Title is required');
+  if (!description) throw new Error('Description is required');
+  if (!input.reportedBy) throw new Error('You must be logged in to report a bug.');
+  if (!input.occurredOn) throw new Error('Date is required');
+
+  if (!isSupabaseConfigured()) {
+    throw new Error('Bug reports require Supabase to be connected.');
+  }
+
+  const supabase = await db();
+  const { data, error } = await supabase
+    .from('installation_repairs')
+    .insert({
+      installation_id: installationId,
+      occurred_on: input.occurredOn,
+      summary: title,
+      notes: description,
+      resolved: false,
+      kind: 'bug_report',
+      reported_by: input.reportedBy,
+    })
+    .select('*')
+    .single();
+
+  if (error || !data) {
+    throw new Error('Could not submit bug report.');
+  }
+
+  notifyInstallationsUpdated();
+  return normalizeRepair(data as Record<string, unknown>);
 }
 
 export async function createInstallation(
