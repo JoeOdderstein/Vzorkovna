@@ -2,7 +2,7 @@ import {
   getTokenFromRequest,
   isAdminUsername,
   verifySessionToken,
-} from '../_lib/auth.js';
+} from '../auth.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

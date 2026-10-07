@@ -1,4 +1,4 @@
-import { handleNotifyComment } from '../_lib/notifyComment.js';
+import { handleNotifyComment } from '../notifyComment.js';
 
 export default async function handler(req, res) {
   try {

@@ -1,4 +1,4 @@
-import { handleTranslate } from './_lib/translate.js';
+import { handleTranslate } from '../translate.js';
 
 export default async function handler(req, res) {
   try {

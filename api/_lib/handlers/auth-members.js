@@ -1,4 +1,4 @@
-import { handleCreateMember, handleDeleteMember, handleListMembers } from '../_lib/members.js';
+import { handleCreateMember, handleDeleteMember, handleListMembers } from '../members.js';
 
 export default async function handler(req, res) {
   try {

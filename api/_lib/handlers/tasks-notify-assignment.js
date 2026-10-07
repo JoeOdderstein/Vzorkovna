@@ -1,4 +1,4 @@
-import { handleNotifyAssignment } from '../_lib/notifyAssignment.js';
+import { handleNotifyAssignment } from '../notifyAssignment.js';
 
 export default async function handler(req, res) {
   try {

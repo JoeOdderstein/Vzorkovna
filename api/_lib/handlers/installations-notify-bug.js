@@ -1,4 +1,4 @@
-import { handleNotifyBugReport } from '../_lib/notifyBugReport.js';
+import { handleNotifyBugReport } from '../notifyBugReport.js';
 
 export default async function handler(req, res) {
   try {

@@ -1,4 +1,4 @@
-import { handleAcceptInvite, handleGetInvite } from '../_lib/members.js';
+import { handleAcceptInvite, handleGetInvite } from '../members.js';
 
 export default async function handler(req, res) {
   try {

@@ -4,8 +4,8 @@ import {
   getTokenFromRequest,
   isAdminUsername,
   verifySessionToken,
-} from '../_lib/auth.js';
-import { listMemberUsernames } from '../_lib/members.js';
+} from '../auth.js';
+import { listMemberUsernames } from '../members.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {

@@ -1,4 +1,4 @@
-import { handleListAssignees } from '../_lib/members.js';
+import { handleListAssignees } from '../members.js';
 
 export default async function handler(req, res) {
   try {

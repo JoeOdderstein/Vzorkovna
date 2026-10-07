@@ -3,8 +3,8 @@ import {
   getAuthConfigError,
   isAdminUsername,
   setSessionCookie,
-} from '../_lib/auth.js';
-import { authenticateUser } from '../_lib/authenticate.js';
+} from '../auth.js';
+import { authenticateUser } from '../authenticate.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

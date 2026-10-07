@@ -1,4 +1,4 @@
-import { handleSendInvite } from '../_lib/members.js';
+import { handleSendInvite } from '../members.js';
 
 export default async function handler(req, res) {
   try {
