@@ -321,35 +321,16 @@ export default function InstallationRepairsSection({
                       className="flex items-center gap-1.5 min-w-0 text-left text-xs tb-text font-medium hover:opacity-90"
                     >
                       <ChevronDown size={14} className="shrink-0 tb-muted" aria-hidden />
-                      <span className="truncate">
+                      <span className="truncate min-w-0">
                         <TranslatableText text={repair.summary} />
                       </span>
-                    </button>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-[10px] tb-muted uppercase tracking-wide">
-                        {t('projects.detail.repairResolved')}
+                      <span className="text-[10px] tb-muted font-normal shrink-0">
+                        {formatInstallationDate(repair.occurred_on)}
                       </span>
-                      {repair.kind === 'bug_report' && authenticated ? (
-                        <button
-                          type="button"
-                          disabled={resolvingId === repair.id}
-                          onClick={() => void setRepairResolved(repair, false)}
-                          className="text-[10px] tb-btn-secondary py-0.5 px-2 disabled:opacity-50"
-                        >
-                          {t('projects.bug.reopen')}
-                        </button>
-                      ) : null}
-                      {repair.kind === 'bug_report' && authenticated ? (
-                        <button
-                          type="button"
-                          onClick={() => setEditingBug(repair)}
-                          className="text-[10px] tb-btn-secondary py-0.5 px-2 inline-flex items-center gap-1"
-                        >
-                          <Pencil size={11} />
-                          {t('projects.admin.edit')}
-                        </button>
-                      ) : null}
-                    </div>
+                    </button>
+                    <span className="text-[10px] tb-muted uppercase tracking-wide shrink-0">
+                      {t('projects.detail.repairResolved')}
+                    </span>
                   </div>
                 </li>
               );
@@ -379,16 +360,26 @@ export default function InstallationRepairsSection({
                   </button>
                 ) : null}
                 {repair.kind === 'bug_report' && authenticated && repair.resolved ? (
-                  <button
-                    type="button"
-                    disabled={resolvingId === repair.id}
-                    onClick={() => void setRepairResolved(repair, false)}
-                    className="text-[11px] tb-btn-secondary py-1 px-2 disabled:opacity-50"
-                  >
-                    {t('projects.bug.reopen')}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      disabled={resolvingId === repair.id}
+                      onClick={() => void setRepairResolved(repair, false)}
+                      className="text-[11px] tb-btn-secondary py-1 px-2 disabled:opacity-50"
+                    >
+                      {t('projects.bug.reopen')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEditingBug(repair)}
+                      className="text-[11px] tb-btn-secondary inline-flex items-center gap-1 py-1 px-2"
+                    >
+                      <Pencil size={12} />
+                      {t('projects.admin.edit')}
+                    </button>
+                  </>
                 ) : null}
-                {repair.kind === 'bug_report' && authenticated ? (
+                {repair.kind === 'bug_report' && authenticated && !repair.resolved ? (
                   <button
                     type="button"
                     onClick={() => setEditingBug(repair)}
