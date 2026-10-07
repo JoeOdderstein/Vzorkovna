@@ -444,7 +444,11 @@ export async function createInstallationBugReport(
     throw new Error('Bug reports require Supabase to be connected.');
   }
 
-  const notifyUsernames = [...new Set((input.notifyUsernames ?? []).map((u) => u.trim()).filter(Boolean))];
+  const notifyUsernames = [
+    ...new Set(
+      (input.notifyUsernames ?? []).map((u) => u.trim().toLowerCase()).filter(Boolean),
+    ),
+  ];
 
   const supabase = await db();
   const { data, error } = await supabase
@@ -492,7 +496,11 @@ export async function updateInstallationBugReport(
     throw new Error('Bug reports require Supabase to be connected.');
   }
 
-  const notifyUsernames = [...new Set((input.notifyUsernames ?? []).map((u) => u.trim()).filter(Boolean))];
+  const notifyUsernames = [
+    ...new Set(
+      (input.notifyUsernames ?? []).map((u) => u.trim().toLowerCase()).filter(Boolean),
+    ),
+  ];
 
   const supabase = await db();
   const { data: existing, error: loadError } = await supabase

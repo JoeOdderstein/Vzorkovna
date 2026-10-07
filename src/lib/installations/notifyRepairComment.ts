@@ -5,6 +5,7 @@ export function notifyRepairComment(payload: {
   repairId: string;
   commentId: string;
   installationId: string;
+  notifyUsernames?: string[];
 }): void {
   if (!isSupabaseConfigured()) return;
 
@@ -19,6 +20,14 @@ export function notifyRepairComment(payload: {
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
           console.warn('[installations] repair comment notification failed:', res.status, data);
+          return;
+        }
+        if ((data.notified ?? 0) === 0) {
+          const skipped = Array.isArray(data.skipped) ? data.skipped : [];
+          console.warn(
+            '[installations] repair comment notification: no email sent.',
+            skipped.length > 0 ? skipped : data,
+          );
         }
       })
       .catch((err) => {

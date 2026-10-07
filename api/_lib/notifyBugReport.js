@@ -25,10 +25,14 @@ function siteBaseUrl() {
 }
 
 async function profileByUsername(supabase, username) {
+  const login = String(username ?? '')
+    .trim()
+    .toLowerCase();
+  if (!login) return null;
   const { data } = await supabase
     .from('user_profiles')
     .select('username, email, board_name')
-    .eq('username', username)
+    .eq('username', login)
     .maybeSingle();
   return data;
 }
@@ -84,7 +88,13 @@ export async function handleNotifyBugReport(req, res) {
   const existingNotify = Array.isArray(repair.notify_usernames)
     ? repair.notify_usernames.filter((u) => typeof u === 'string' && u.trim())
     : [];
-  const mergedNotify = [...new Set([...existingNotify, ...notifyUsernames])];
+  const normalize = (u) =>
+    String(u ?? '')
+      .trim()
+      .toLowerCase();
+  const mergedNotify = [
+    ...new Set([...existingNotify, ...notifyUsernames].map(normalize).filter(Boolean)),
+  ];
   if (notifyUsernames.length > 0) {
     await supabase
       .from('installation_repairs')

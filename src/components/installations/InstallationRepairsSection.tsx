@@ -473,6 +473,7 @@ export default function InstallationRepairsSection({
                 <RepairCommentsSection
                   repairId={repair.id}
                   installationId={installationId}
+                  notifyUsernames={repair.notify_usernames}
                   compact={isActiveBug}
                 />
               </li>

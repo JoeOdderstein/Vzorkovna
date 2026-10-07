@@ -8,17 +8,20 @@ import {
 } from '../../lib/installations/repairCommentService';
 import { notifyRepairComment } from '../../lib/installations/notifyRepairComment';
 import type { InstallationRepairComment } from '../../lib/installations/types';
+import CommentAuthorBlock from '../CommentAuthorBlock';
 import TranslatableText from '../../taskboard/components/TranslatableText';
 
 interface RepairCommentsSectionProps {
   repairId: string;
   installationId: string;
+  notifyUsernames?: string[];
   compact?: boolean;
 }
 
 export default function RepairCommentsSection({
   repairId,
   installationId,
+  notifyUsernames = [],
   compact = false,
 }: RepairCommentsSectionProps) {
   const { t } = useTaskboardI18n();
@@ -68,6 +71,7 @@ export default function RepairCommentsSection({
         repairId,
         commentId: comment.id,
         installationId,
+        notifyUsernames,
       });
       setBody('');
       await load();
@@ -100,14 +104,16 @@ export default function RepairCommentsSection({
         <ul className={`${compact ? 'space-y-2 mb-2' : 'space-y-3 mb-4'}`}>
           {comments.map((comment) => (
             <li key={comment.id} className={compact ? 'text-xs' : 'text-sm'}>
-              <p className="text-[11px] tb-muted mb-0.5">
-                {comment.author_display_name || comment.author_username}
-              </p>
-              <TranslatableText
-                text={comment.body}
-                multiline
-                className={`tb-text-secondary ${compact ? 'text-xs leading-snug' : ''}`}
-              />
+              <CommentAuthorBlock username={comment.author_username}>
+                <p className={`tb-comment-author-name mb-0.5 ${compact ? 'text-[11px]' : 'text-xs'}`}>
+                  {comment.author_display_name || comment.author_username}
+                </p>
+                <TranslatableText
+                  text={comment.body}
+                  multiline
+                  className={`tb-text-secondary ${compact ? 'text-xs leading-snug' : ''}`}
+                />
+              </CommentAuthorBlock>
             </li>
           ))}
         </ul>

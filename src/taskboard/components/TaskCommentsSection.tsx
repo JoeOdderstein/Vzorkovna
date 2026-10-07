@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 import type { TaskComment } from '../../lib/taskboard/types';
+import CommentAuthorBlock from '../../components/CommentAuthorBlock';
 import TranslatableText from './TranslatableText';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
@@ -246,9 +247,9 @@ function CommentRow({
           </div>
         </div>
       ) : (
-        <>
+        <CommentAuthorBlock username={comment.author_username} className="rounded-none -mx-0.5">
           <p className="text-xs leading-snug tb-text whitespace-pre-wrap break-words">
-            <span className="font-medium">{name}</span>
+            <span className="tb-comment-author-name">{name}</span>
             <span className="tb-text-muted font-normal"> · {time}</span>
             {edited && (
               <span className="tb-text-muted font-normal"> · {t('comments.edited')}</span>
@@ -282,7 +283,7 @@ function CommentRow({
           {editError && !editing && (
             <p className="text-[11px] text-red-600 mt-1">{editError}</p>
           )}
-        </>
+        </CommentAuthorBlock>
       )}
     </li>
   );
