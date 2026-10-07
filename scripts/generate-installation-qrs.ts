@@ -50,7 +50,15 @@ function resolveSiteUrl(): string {
     );
     process.exit(1);
   }
-  return fromEnv.trim().replace(/\/$/, '');
+  const url = fromEnv.trim().replace(/\/$/, '');
+  if (url.includes('your-app.vercel.app')) {
+    console.error(
+      'VITE_PUBLIC_SITE_URL is still the .env.example placeholder.\n' +
+        'Set it to your live domain, e.g. VITE_PUBLIC_SITE_URL=https://headlightrabbits.com',
+    );
+    process.exit(1);
+  }
+  return url;
 }
 
 function pngFilename(id: string, name: string) {

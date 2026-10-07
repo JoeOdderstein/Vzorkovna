@@ -25,9 +25,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     ],
-    // base: './' uses relative paths so the site works when uploaded to any
-    // folder on a traditional web host (e.g. public_html/ or a subdirectory).
-    base: './',
+    // Absolute base so deep links (e.g. /projects/installation/…) load /assets/* correctly on Vercel.
+    // For a subdirectory on classic hosting, set VITE_BASE=./ in the build env.
+    base: env.VITE_BASE || '/',
     build: {
       outDir: 'dist',
       // Generate a clean dist on every build
