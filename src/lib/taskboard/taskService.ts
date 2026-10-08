@@ -17,6 +17,7 @@ import {
 } from './projectVisibility';
 import { seedDefaultCategoriesForProject } from './categoryService';
 import { notifyTaskAssignment } from './notifyAssignment';
+import { syncBugFromTaskCompletion } from '../installations/bugReportTaskSync';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -295,7 +296,10 @@ export function groupTasksByCategory(tasks: Task[], category: TaskCategory): Tas
   }));
 }
 
-export async function createTask(input: TaskInsert) {
+export async function createTask(
+  input: TaskInsert,
+  options?: { skipAssignmentNotify?: boolean },
+) {
   if (isLocalTaskboardMode()) return localStore.createTask(input);
 
   const supabase = await db();
@@ -351,7 +355,7 @@ export async function createTask(input: TaskInsert) {
 
   if (error) throw error;
   const task = normalizeTask(data);
-  if (task.assignees.length > 0) {
+  if (task.assignees.length > 0 && !options?.skipAssignmentNotify) {
     notifyTaskAssignment(task.id, []);
   }
   return task;
@@ -360,7 +364,7 @@ export async function createTask(input: TaskInsert) {
 export async function updateTask(
   id: string,
   updates: TaskUpdate,
-  options?: { previousAssignees?: Assignee[] }
+  options?: { previousAssignees?: Assignee[]; skipBugSync?: boolean },
 ) {
   if (isLocalTaskboardMode()) return localStore.updateTask(id, updates);
 
@@ -393,6 +397,9 @@ export async function updateTask(
   const task = normalizeTask(data);
   if (updates.assignees !== undefined) {
     notifyTaskAssignment(id, previousAssignees ?? []);
+  }
+  if (updates.completed !== undefined && !options?.skipBugSync) {
+    await syncBugFromTaskCompletion(id, Boolean(updates.completed));
   }
   return task;
 }

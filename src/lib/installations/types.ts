@@ -35,6 +35,7 @@ export interface InstallationRepair {
   kind: InstallationRepairKind;
   reported_by: string | null;
   notify_usernames: string[];
+  linked_task_id: string | null;
   created_at: string;
 }
 
@@ -61,6 +62,8 @@ export interface Installation {
   next_maintenance_date: string | null;
   revizni_zprava_available: boolean;
   remote_url: string | null;
+  /** Taskboard project used when auto-creating tasks from bug reports. */
+  taskboard_project_id: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

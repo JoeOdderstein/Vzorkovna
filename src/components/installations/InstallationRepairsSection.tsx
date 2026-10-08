@@ -15,6 +15,8 @@ import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 import RepairCommentsSection from './RepairCommentsSection';
 import ReportBugDialog from './ReportBugDialog';
 
+const EMPTY_BUG_PHOTOS: InstallationDocument[] = [];
+
 interface InstallationRepairsSectionProps {
   installationId: string;
   repairs: InstallationRepair[];
@@ -496,7 +498,9 @@ export default function InstallationRepairsSection({
         open={editingBug !== null}
         installationId={installationId}
         repair={editingBug}
-        existingPhotos={editingBug ? (photosByRepair.get(editingBug.id) ?? []) : []}
+        existingPhotos={
+          editingBug ? (photosByRepair.get(editingBug.id) ?? EMPTY_BUG_PHOTOS) : EMPTY_BUG_PHOTOS
+        }
         onClose={() => setEditingBug(null)}
         onSubmitted={() => setEditingBug(null)}
       />

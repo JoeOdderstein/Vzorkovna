@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import Cursor from './components/Cursor';
 import { TaskboardAuthProvider } from './context/TaskboardAuthContext';
 import { PROJECTS_PATH } from './lib/taskboard/driveConstants';
@@ -16,6 +16,9 @@ import ProjectsPage from './pages/ProjectsPage';
 import RemoteInstLayout from './pages/RemoteInstLayout';
 import RemoteInstPage from './pages/RemoteInstPage';
 import RemoteInstPopupPage from './pages/RemoteInstPopupPage';
+import InvoicesLayout from './pages/InvoicesLayout';
+import InvoicesPage from './pages/InvoicesPage';
+import { INVOICES_PATH } from './lib/taskboard/driveConstants';
 
 export default function App() {
   return (
@@ -40,8 +43,12 @@ export default function App() {
               <Route path="archive" element={<ArchivePage />} />
             </Route>
             <Route path="/remote-inst/popup/:installationId" element={<RemoteInstPopupPage />} />
-            <Route path="/remote-inst" element={<RemoteInstLayout />}>
+            <Route path="/remote-inst" element={<Navigate to="/messages" replace />} />
+            <Route path="/messages" element={<RemoteInstLayout />}>
               <Route index element={<RemoteInstPage />} />
+            </Route>
+            <Route path={INVOICES_PATH} element={<InvoicesLayout />}>
+              <Route index element={<InvoicesPage />} />
             </Route>
           </Routes>
         </div>

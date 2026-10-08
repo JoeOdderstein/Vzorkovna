@@ -2,11 +2,9 @@ import { useEffect, useState } from 'react';
 import { Navigate, useParams } from 'react-router-dom';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 import { getInstallationById } from '../lib/installations/installationService';
-import { canAccessTaskboardPrivateNav } from '../lib/taskboard/driveConstants';
-
 export default function RemoteInstPopupPage() {
   const { installationId } = useParams<{ installationId: string }>();
-  const { authenticated, loading, username, isAdmin } = useTaskboardAuth();
+  const { authenticated, loading } = useTaskboardAuth();
   const [name, setName] = useState<string | null>(null);
   const [remoteUrl, setRemoteUrl] = useState<string | null>(null);
   const [lookupDone, setLookupDone] = useState(false);
@@ -52,10 +50,6 @@ export default function RemoteInstPopupPage() {
 
   if (!authenticated) {
     return <Navigate to="/login" replace />;
-  }
-
-  if (!canAccessTaskboardPrivateNav(username, isAdmin)) {
-    return <Navigate to="/taskboard" replace />;
   }
 
   if (!remoteUrl) {

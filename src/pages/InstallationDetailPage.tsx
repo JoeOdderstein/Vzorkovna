@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react';
 import { Link, useParams } from 'react-router-dom';
 import InstallationDocumentsPanel from '../components/installations/InstallationDocumentsPanel';
@@ -27,6 +27,8 @@ import {
   translateInstallationLocation,
 } from '../lib/taskboard/i18n/messages';
 import { openRemotePopupWindow } from '../lib/taskboard/openRemotePopup';
+import { fetchProjects } from '../lib/taskboard/taskService';
+import type { Project } from '../lib/taskboard/types';
 import ReportBugDialog from '../components/installations/ReportBugDialog';
 import TranslatableText from '../taskboard/components/TranslatableText';
 
@@ -97,6 +99,13 @@ export default function InstallationDetailPage() {
   const { t, locale } = useTaskboardI18n();
   const [editField, setEditField] = useState<InstallationEditableField | null>(null);
   const [bugDialogOpen, setBugDialogOpen] = useState(false);
+  const [taskboardProjects, setTaskboardProjects] = useState<Project[]>([]);
+
+  useEffect(() => {
+    void fetchProjects()
+      .then(setTaskboardProjects)
+      .catch(() => setTaskboardProjects([]));
+  }, []);
 
   async function handleFieldSave(field: InstallationEditableField, value: string | boolean) {
     if (!installation) return;
@@ -126,6 +135,9 @@ export default function InstallationDetailPage() {
         break;
       case 'remote_url':
         patch.remote_url = String(value);
+        break;
+      case 'taskboard_project_id':
+        patch.taskboard_project_id = String(value).trim() || null;
         break;
     }
 
@@ -165,6 +177,11 @@ export default function InstallationDetailPage() {
     installation.lifecycle_status,
     INSTALLATION_LIFECYCLE_LABELS[installation.lifecycle_status],
   );
+
+  const taskboardProjectLabel = installation.taskboard_project_id
+    ? (taskboardProjects.find((p) => p.id === installation.taskboard_project_id)?.name ??
+      '—')
+    : t('projects.detail.taskboardProjectAuto');
 
   return (
     <div className="max-w-screen-2xl mx-auto px-6 md:px-10 pb-8">
@@ -309,6 +326,14 @@ export default function InstallationDetailPage() {
             isAdmin={isAdmin}
             onEdit={() => setEditField('remote_url')}
           />
+          {isAdmin ? (
+            <AdminMetaRow
+              label={t('projects.detail.meta.taskboardProject')}
+              value={taskboardProjectLabel}
+              isAdmin={isAdmin}
+              onEdit={() => setEditField('taskboard_project_id')}
+            />
+          ) : null}
         </DetailSection>
 
         <DetailSection title={t('projects.detail.photographs')}>

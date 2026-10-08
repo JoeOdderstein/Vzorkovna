@@ -6,7 +6,9 @@ export const TASKBOARD_PATH = '/taskboard';
 
 export const PROJECTS_PATH = '/projects';
 
-export const REMOTE_INST_PATH = '/remote-inst';
+export const MESSAGES_PATH = '/messages';
+
+export const INVOICES_PATH = '/invoices';
 
 export function installationDetailPath(installationId: string) {
   return `${PROJECTS_PATH}/installation/${installationId}`;

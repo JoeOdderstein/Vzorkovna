@@ -845,6 +845,19 @@ body {
   flex-shrink: 0;
 }
 
+.taskboard .tb-invoice-checkbox {
+  width: 1.625rem;
+  height: 1.625rem;
+  accent-color: var(--tb-accent);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.taskboard .tb-invoice-checkbox:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .taskboard .tb-expand-btn {
   display: inline-flex;
   align-items: center;

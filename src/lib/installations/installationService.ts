@@ -18,6 +18,13 @@ import type {
   InstallationRepair,
 } from './types';
 import { ensureUniqueSlug, slugifyProjectName } from '../taskboard/projectUtils';
+import {
+  createLinkedTaskForBugReport,
+  deleteLinkedTaskForBugRepair,
+  syncLinkedTaskFromBugEdit,
+  syncTaskFromBugResolution,
+} from './bugReportTaskSync';
+import { patchInstallationRow } from './installationDbPatch';
 
 export type CreateInstallationInput = {
   name: string;
@@ -46,6 +53,9 @@ function normalizeInstallation(row: Record<string, unknown>): InstallationRecord
     next_maintenance_date: row.next_maintenance_date ? String(row.next_maintenance_date) : null,
     revizni_zprava_available: Boolean(row.revizni_zprava_available),
     remote_url: row.remote_url ? String(row.remote_url) : null,
+    taskboard_project_id: row.taskboard_project_id
+      ? String(row.taskboard_project_id)
+      : null,
     location: (row.location as InstallationRecord['location']) ?? 'vzorkovna',
     sort_order: Number(row.sort_order ?? 0),
     created_at: String(row.created_at ?? ''),
@@ -85,6 +95,7 @@ function normalizeRepair(row: Record<string, unknown>): InstallationRepair {
     notify_usernames: Array.isArray(row.notify_usernames)
       ? row.notify_usernames.map((u) => String(u))
       : [],
+    linked_task_id: row.linked_task_id ? String(row.linked_task_id) : null,
     created_at: String(row.created_at ?? ''),
   };
 }
@@ -198,6 +209,7 @@ export type InstallationUpdatePatch = Partial<
     | 'next_maintenance_date'
     | 'revizni_zprava_available'
     | 'remote_url'
+    | 'taskboard_project_id'
   >
 >;
 
@@ -212,30 +224,31 @@ export async function updateInstallationFields(
   }
   if (cleaned.responsible_person === '') cleaned.responsible_person = null;
   if (cleaned.remote_url === '') cleaned.remote_url = null;
+  if (cleaned.taskboard_project_id === '') cleaned.taskboard_project_id = null;
   if (cleaned.last_inspection_date === '') cleaned.last_inspection_date = null;
   if (cleaned.next_maintenance_date === '') cleaned.next_maintenance_date = null;
-
-  if (isSupabaseConfigured()) {
-    const supabase = await db();
-    const dbPayload: Record<string, unknown> = { ...cleaned };
-    if (cleaned.lifecycle_status !== undefined) {
-      dbPayload.lifecycle_status_manual_override = true;
-    }
-    const { error } = await supabase.from('installations').update(dbPayload).eq('id', id);
-
-    if (!error) {
-      const updated = await getInstallationById(id);
-      if (updated) {
-        notifyInstallationsUpdated();
-        return updated;
-      }
-    }
-  }
 
   const localPatch: Record<string, unknown> = { ...cleaned };
   if (cleaned.lifecycle_status !== undefined) {
     localPatch.lifecycle_status_manual_override = true;
   }
+
+  if (isSupabaseConfigured()) {
+    const dbPayload: Record<string, unknown> = { ...cleaned };
+    if (cleaned.lifecycle_status !== undefined) {
+      dbPayload.lifecycle_status_manual_override = true;
+    }
+    await patchInstallationRow(id, dbPayload);
+    mergeLocalInstallationPatch(id, localPatch);
+
+    const updated = await getInstallationById(id);
+    if (!updated) {
+      throw new Error('Installation not found');
+    }
+    notifyInstallationsUpdated();
+    return updated;
+  }
+
   mergeLocalInstallationPatch(id, localPatch);
   const updated = await getInstallationById(id);
   if (!updated) {
@@ -253,63 +266,9 @@ export async function updateInstallationLifecycleStatus(
   return updateInstallationFields(id, { lifecycle_status });
 }
 
-async function countOpenBugReports(installationId: string): Promise<number> {
-  const supabase = await db();
-  const { count, error } = await supabase
-    .from('installation_repairs')
-    .select('id', { count: 'exact', head: true })
-    .eq('installation_id', installationId)
-    .eq('kind', 'bug_report')
-    .eq('resolved', false);
+import { syncInstallationLifecycleFromOpenBugs } from './installationLifecycleSync';
 
-  if (error) return 0;
-  return count ?? 0;
-}
-
-/** Keeps lifecycle in sync with unresolved bug reports (respects manual lifecycle edits). */
-export async function syncInstallationLifecycleFromOpenBugs(
-  installationId: string,
-): Promise<void> {
-  if (!isSupabaseConfigured()) return;
-
-  const supabase = await db();
-  const openCount = await countOpenBugReports(installationId);
-
-  const { data: inst, error: instError } = await supabase
-    .from('installations')
-    .select('lifecycle_status, lifecycle_status_manual_override')
-    .eq('id', installationId)
-    .maybeSingle();
-
-  if (instError || !inst) return;
-
-  const manual = Boolean(inst.lifecycle_status_manual_override);
-
-  if (openCount > 0) {
-    if (manual || inst.lifecycle_status === 'maintenance_needed') return;
-
-    const { error } = await supabase
-      .from('installations')
-      .update({
-        lifecycle_status: 'maintenance_needed',
-        lifecycle_status_manual_override: false,
-      })
-      .eq('id', installationId);
-
-    if (!error) notifyInstallationsUpdated();
-    return;
-  }
-
-  const { error } = await supabase
-    .from('installations')
-    .update({
-      lifecycle_status: 'operational',
-      lifecycle_status_manual_override: false,
-    })
-    .eq('id', installationId);
-
-  if (!error) notifyInstallationsUpdated();
-}
+export { syncInstallationLifecycleFromOpenBugs };
 
 export type CreateRepairInput = {
   occurred_on: string;
@@ -336,6 +295,7 @@ export async function createInstallationRepair(
     kind: 'repair',
     reported_by: null,
     notify_usernames: [],
+    linked_task_id: null,
     created_at: new Date().toISOString(),
   };
 
@@ -389,8 +349,13 @@ export async function updateInstallationRepair(
     const { error } = await supabase.from('installation_repairs').update(patch).eq('id', repairId);
     if (!error) {
       notifyInstallationsUpdated();
-      if (before?.kind === 'bug_report' && before.installation_id) {
-        await syncInstallationLifecycleFromOpenBugs(String(before.installation_id));
+      if (before?.kind === 'bug_report') {
+        if (input.resolved !== undefined) {
+          await syncTaskFromBugResolution(repairId, Boolean(input.resolved));
+        }
+        if (before.installation_id) {
+          await syncInstallationLifecycleFromOpenBugs(String(before.installation_id));
+        }
       }
       return;
     }
@@ -407,6 +372,10 @@ export async function deleteInstallationRepair(repairId: string): Promise<void> 
       .select('installation_id, kind')
       .eq('id', repairId)
       .maybeSingle();
+
+    if (before?.kind === 'bug_report') {
+      await deleteLinkedTaskForBugRepair(repairId);
+    }
 
     const { error } = await supabase.from('installation_repairs').delete().eq('id', repairId);
     if (!error) {
@@ -472,7 +441,16 @@ export async function createInstallationBugReport(
 
   notifyInstallationsUpdated();
   await syncInstallationLifecycleFromOpenBugs(installationId);
-  return normalizeRepair(data as Record<string, unknown>);
+
+  const repair = normalizeRepair(data as Record<string, unknown>);
+  const { data: installation } = await supabase
+    .from('installations')
+    .select('name')
+    .eq('id', installationId)
+    .maybeSingle();
+  await createLinkedTaskForBugReport(repair, installation?.name ?? installationId);
+
+  return repair;
 }
 
 export type UpdateBugReportInput = {
@@ -528,6 +506,7 @@ export async function updateInstallationBugReport(
   }
 
   notifyInstallationsUpdated();
+  await syncLinkedTaskFromBugEdit(repairId);
 }
 
 export async function createInstallation(
@@ -557,6 +536,7 @@ export async function createInstallation(
     next_maintenance_date: null,
     revizni_zprava_available: false,
     remote_url: null,
+    taskboard_project_id: null,
     sort_order,
     created_at: now,
     updated_at: now,

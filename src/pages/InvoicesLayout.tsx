@@ -3,27 +3,28 @@ import { User } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import Nav from '../components/Nav';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
-import { UserProfileProvider, useUserProfile } from '../context/UserProfileContext';
+import { UserProfileProvider } from '../context/UserProfileContext';
 import { TaskboardThemeProvider, useTaskboardTheme } from '../context/TaskboardThemeContext';
 import { isSupabaseConfigured } from '../lib/taskboard/config';
 import ProfileSettingsDialog from '../taskboard/components/ProfileSettingsDialog';
 import TaskboardThemeToggle from '../taskboard/components/TaskboardThemeToggle';
 import TbIconTooltip from '../taskboard/components/TbIconTooltip';
+import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 
-function RemoteInstShell() {
-  const { authenticated, loading, sessionReady } = useTaskboardAuth();
+function InvoicesShell() {
+  const { authenticated, loading, sessionReady, canAccessInvoices } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
-  const { loading: profileLoading } = useUserProfile();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
+  const { t } = useTaskboardI18n();
   const waitingForSession = authenticated && isSupabaseConfigured() && !sessionReady;
 
-  if (loading || waitingForSession || profileLoading) {
+  if (loading || waitingForSession) {
     return (
       <>
         <Nav activeSection="login" />
         <main className="taskboard min-h-screen pt-28 px-8" data-theme={theme}>
-          <p className="text-sm tb-muted">Loading…</p>
+          <p className="text-sm tb-muted">{t('common.loading')}</p>
         </main>
       </>
     );
@@ -33,18 +34,22 @@ function RemoteInstShell() {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   }
 
+  if (!canAccessInvoices) {
+    return <Navigate to="/taskboard" replace />;
+  }
+
   return (
     <>
       <Nav activeSection="login" />
       <div className="taskboard min-h-screen pt-24 pb-16" data-theme={theme}>
         <div className="max-w-screen-2xl mx-auto px-6 md:px-10 py-4 flex justify-end gap-4">
           <TaskboardThemeToggle />
-          <TbIconTooltip label="Profile">
+          <TbIconTooltip label={t('header.profile')}>
             <button
               type="button"
               onClick={() => setProfileOpen(true)}
               className="tb-btn-secondary px-2.5"
-              aria-label="Open profile settings"
+              aria-label={t('header.profileAria')}
             >
               <User size={18} />
             </button>
@@ -57,11 +62,11 @@ function RemoteInstShell() {
   );
 }
 
-export default function RemoteInstLayout() {
+export default function InvoicesLayout() {
   return (
     <UserProfileProvider>
       <TaskboardThemeProvider>
-        <RemoteInstShell />
+        <InvoicesShell />
       </TaskboardThemeProvider>
     </UserProfileProvider>
   );

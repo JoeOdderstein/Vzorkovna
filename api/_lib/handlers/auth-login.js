@@ -4,6 +4,7 @@ import {
   isAdminUsername,
   setSessionCookie,
 } from '../auth.js';
+import { userCanAccessInvoices } from '../invoiceAccess.js';
 import { authenticateUser } from '../authenticate.js';
 
 export default async function handler(req, res) {
@@ -32,11 +33,15 @@ export default async function handler(req, res) {
     const token = await createSessionToken(normalizedUsername);
     setSessionCookie(res, token);
 
+    const isAdmin = isAdminUsername(normalizedUsername);
+    const canAccessInvoices = await userCanAccessInvoices(normalizedUsername, isAdmin);
+
     return res.status(200).json({
       ok: true,
       accessToken: token,
       username: normalizedUsername,
-      isAdmin: isAdminUsername(normalizedUsername),
+      isAdmin,
+      canAccessInvoices,
     });
   } catch (err) {
     console.error('Login error:', err);

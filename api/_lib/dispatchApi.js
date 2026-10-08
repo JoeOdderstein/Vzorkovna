@@ -4,11 +4,14 @@ import authLogin from './handlers/auth-login.js';
 import authLogout from './handlers/auth-logout.js';
 import authMembers from './handlers/auth-members.js';
 import authMembersInvite from './handlers/auth-members-invite.js';
+import authInvoiceAccess from './handlers/auth-invoice-access.js';
 import authNotifyRecipients from './handlers/auth-notify-recipients.js';
 import authSession from './handlers/auth-session.js';
 import authUsernames from './handlers/auth-usernames.js';
 import installationsNotifyBug from './handlers/installations-notify-bug.js';
 import installationsNotifyRepairComment from './handlers/installations-notify-repair-comment.js';
+import invoicesNotifyUpload from './handlers/invoices-notify-upload.js';
+import invoicesNotifyForwarded from './handlers/invoices-notify-forwarded.js';
 import tasksNotifyAssignment from './handlers/tasks-notify-assignment.js';
 import tasksNotifyComment from './handlers/tasks-notify-comment.js';
 import translate from './handlers/translate.js';
@@ -19,6 +22,7 @@ const ROUTES = {
   'auth/session': authSession,
   'auth/members': authMembers,
   'auth/members-invite': authMembersInvite,
+  'auth/invoice-access': authInvoiceAccess,
   'auth/invite': authInvite,
   'auth/assignees': authAssignees,
   'auth/usernames': authUsernames,
@@ -27,6 +31,8 @@ const ROUTES = {
   'tasks/notify-comment': tasksNotifyComment,
   'installations/notify-bug': installationsNotifyBug,
   'installations/notify-repair-comment': installationsNotifyRepairComment,
+  'invoices/notify-upload': invoicesNotifyUpload,
+  'invoices/notify-forwarded': invoicesNotifyForwarded,
   translate: translate,
 };
 

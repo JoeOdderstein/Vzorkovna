@@ -16,8 +16,27 @@ function readBody(req: IncomingMessage): Promise<string> {
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
   res.statusCode = status;
-  res.setHeader('Content-Type', 'application/json');
+  if (!res.getHeader('Content-Type')) {
+    res.setHeader('Content-Type', 'application/json');
+  }
   res.end(JSON.stringify(body));
+}
+
+/** Minimal Vercel-style response for local `/api/*` handlers (cookies, JSON). */
+function createDevApiResponse(res: ServerResponse) {
+  return {
+    setHeader(name: string, value: string | number | readonly string[]) {
+      res.setHeader(name, value);
+      return this;
+    },
+    status(code: number) {
+      return {
+        json(body: unknown) {
+          sendJson(res, code, body);
+        },
+      };
+    },
+  };
 }
 
 function syncDevEnv() {
@@ -66,11 +85,7 @@ export function taskboardDevApi(): Plugin {
               query: { path: apiPath.split('/').filter(Boolean) },
               body,
             } as never,
-            {
-              status: (code: number) => ({
-                json: (payload: unknown) => sendJson(res, code, payload),
-              }),
-            } as never,
+            createDevApiResponse(res) as never,
           );
         } catch {
           sendJson(res, 500, { error: 'Server error' });

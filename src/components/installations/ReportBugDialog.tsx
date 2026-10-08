@@ -29,6 +29,8 @@ interface ReportBugDialogProps {
   existingPhotos?: InstallationDocument[];
 }
 
+const EMPTY_PHOTOS: InstallationDocument[] = [];
+
 function todayIsoDate() {
   const d = new Date();
   const y = d.getFullYear();
@@ -43,7 +45,7 @@ export default function ReportBugDialog({
   onClose,
   onSubmitted,
   repair = null,
-  existingPhotos = [],
+  existingPhotos = EMPTY_PHOTOS,
 }: ReportBugDialogProps) {
   const { t } = useTaskboardI18n();
   const { username } = useTaskboardAuth();
@@ -67,6 +69,7 @@ export default function ReportBugDialog({
 
   useEffect(() => {
     if (!open) return;
+
     setTitle(repair?.summary ?? '');
     setDescription(repair?.notes ?? '');
     setOccurredOn(repair?.occurred_on ?? todayIsoDate());
@@ -77,12 +80,24 @@ export default function ReportBugDialog({
     setError('');
     setSubmitting(false);
 
+    let cancelled = false;
     setLoadingRecipients(true);
     void fetchNotifyRecipients()
-      .then(setRecipients)
-      .catch(() => setRecipients([]))
-      .finally(() => setLoadingRecipients(false));
-  }, [open, repair?.id, repair?.summary, repair?.notes, repair?.occurred_on, existingPhotos]);
+      .then((rows) => {
+        if (!cancelled) setRecipients(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setRecipients([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingRecipients(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // Reset only when the dialog opens or switches create ↔ edit — not on every parent re-render.
+  }, [open, installationId, repair?.id]);
 
   useEffect(() => {
     if (!open) return;

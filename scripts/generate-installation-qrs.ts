@@ -14,6 +14,11 @@ import QRCode from 'qrcode';
 import { readFileSync, existsSync } from 'node:fs';
 import { INSTALLATION_SEED_RECORDS } from '../src/lib/installations/seedData';
 import { installationDetailPath } from '../src/lib/taskboard/driveConstants';
+import { buildPrintableQrSections } from './build-printable-qr-sections';
+import {
+  PRINTABLE_A4_QR_PDF_FILENAME,
+  writePrintableA4QrListPdf,
+} from './installation-qr-printable-pdf';
 
 const DEFAULT_OUTPUT = join(homedir(), 'Desktop', 'Harring Studios', 'QR CODES');
 
@@ -102,7 +107,13 @@ async function main() {
   }
 
   await writeFile(join(outDir, 'urls.txt'), `${indexLines.join('\n')}\n`, 'utf8');
+
+  const pdfPath = join(outDir, PRINTABLE_A4_QR_PDF_FILENAME);
+  const sections = await buildPrintableQrSections(INSTALLATION_SEED_RECORDS, outDir);
+  await writePrintableA4QrListPdf(pdfPath, sections);
+
   console.log(`\nWrote ${INSTALLATION_SEED_RECORDS.length} PNGs to:\n  ${outDir}`);
+  console.log(`Printable A4 PDF:\n  ${pdfPath}`);
 }
 
 main().catch((err) => {

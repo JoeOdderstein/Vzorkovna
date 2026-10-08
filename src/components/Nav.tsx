@@ -6,8 +6,9 @@ import { SITE_DATA } from '../data';
 import { useTaskboardAuth } from '../context/TaskboardAuthContext';
 import {
   canAccessTaskboardPrivateNav,
+  INVOICES_PATH,
   PROJECTS_PATH,
-  REMOTE_INST_PATH,
+  MESSAGES_PATH,
   TASKBOARD_DRIVE_URL,
   TASKBOARD_PATH,
 } from '../lib/taskboard/driveConstants';
@@ -28,11 +29,13 @@ export default function Nav({ activeSection }: NavProps) {
   const isProjectsAppPage =
     location.pathname === PROJECTS_PATH ||
     location.pathname.startsWith(`${PROJECTS_PATH}/installation/`);
-  const isRemoteInstPage = location.pathname.startsWith(REMOTE_INST_PATH);
-  const isAppPage = isTaskboardPage || isProjectsAppPage || isRemoteInstPage;
+  const isMessagesPage = location.pathname.startsWith(MESSAGES_PATH);
+  const isInvoicesPage = location.pathname.startsWith(INVOICES_PATH);
+  const isAppPage =
+    isTaskboardPage || isProjectsAppPage || isMessagesPage || isInvoicesPage;
   const hideSiteNavLinks =
     isAppPage || location.pathname === '/login';
-  const { authenticated, username, isAdmin, logout } = useTaskboardAuth();
+  const { authenticated, username, isAdmin, canAccessInvoices, logout } = useTaskboardAuth();
   const showPrivateNav = canAccessTaskboardPrivateNav(username, isAdmin);
   const { t } = useTaskboardI18n();
 
@@ -168,16 +171,24 @@ export default function Nav({ activeSection }: NavProps) {
                     {t('nav.drive').toUpperCase()}
                   </a>
                 )}
-                {showPrivateNav && (
+                <Link
+                  to={MESSAGES_PATH}
+                  className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                    isMessagesPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                  }`}
+                >
+                  {t('nav.remoteInst').toUpperCase()}
+                </Link>
+                {canAccessInvoices ? (
                   <Link
-                    to={REMOTE_INST_PATH}
+                    to={INVOICES_PATH}
                     className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
-                      isRemoteInstPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                      isInvoicesPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
                     }`}
                   >
-                    {t('nav.remoteInst').toUpperCase()}
+                    {t('nav.invoices').toUpperCase()}
                   </Link>
-                )}
+                ) : null}
                 <button
                   type="button"
                   onClick={() => void handleLogout()}
@@ -257,15 +268,22 @@ export default function Nav({ activeSection }: NavProps) {
                     {t('nav.drive')}
                   </a>
                 )}
-                {showPrivateNav && (
+                <Link
+                  to={MESSAGES_PATH}
+                  onClick={() => setMenuOpen(false)}
+                  className={`site-mobile-nav-link${isMessagesPage ? ' site-mobile-nav-link--active' : ''}`}
+                >
+                  {t('nav.remoteInst')}
+                </Link>
+                {canAccessInvoices ? (
                   <Link
-                    to={REMOTE_INST_PATH}
+                    to={INVOICES_PATH}
                     onClick={() => setMenuOpen(false)}
-                    className={`site-mobile-nav-link${isRemoteInstPage ? ' site-mobile-nav-link--active' : ''}`}
+                    className={`site-mobile-nav-link${isInvoicesPage ? ' site-mobile-nav-link--active' : ''}`}
                   >
-                    {t('nav.remoteInst')}
+                    {t('nav.invoices')}
                   </Link>
-                )}
+                ) : null}
                 <button
                   type="button"
                   onClick={() => void handleLogout()}

@@ -8,8 +8,10 @@ interface AuthContextValue {
   sessionReady: boolean;
   username: string | null;
   isAdmin: boolean;
+  canAccessInvoices: boolean;
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
 const TaskboardAuthContext = createContext<AuthContextValue | null>(null);
@@ -20,13 +22,15 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
   const [sessionReady, setSessionReady] = useState(false);
   const [username, setUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [canAccessInvoices, setCanAccessInvoices] = useState(false);
   const authOpRef = useRef(0);
 
   const applySession = useCallback(
     async (
       accessToken: string,
       sessionUsername?: string | null,
-      sessionIsAdmin = false
+      sessionIsAdmin = false,
+      sessionCanAccessInvoices = false,
     ) => {
     authOpRef.current += 1;
 
@@ -38,6 +42,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
     setSessionReady(true);
     setUsername(sessionUsername ?? null);
     setIsAdmin(sessionIsAdmin);
+    setCanAccessInvoices(sessionIsAdmin || sessionCanAccessInvoices);
     setLoading(false);
   },
   []);
@@ -54,6 +59,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setSessionReady(false);
         setUsername(null);
         setIsAdmin(false);
+        setCanAccessInvoices(false);
         if (isSupabaseConfigured()) await clearSupabaseSession();
         return;
       }
@@ -66,15 +72,18 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
           await setSupabaseSession(data.accessToken);
         }
         if (opId !== authOpRef.current) return;
+        const sessionIsAdmin = Boolean(data.isAdmin);
         setAuthenticated(true);
         setSessionReady(true);
         setUsername(typeof data.username === 'string' ? data.username : null);
-        setIsAdmin(Boolean(data.isAdmin));
+        setIsAdmin(sessionIsAdmin);
+        setCanAccessInvoices(sessionIsAdmin || Boolean(data.canAccessInvoices));
       } else {
         setAuthenticated(false);
         setSessionReady(false);
         setUsername(null);
         setIsAdmin(false);
+        setCanAccessInvoices(false);
       }
     } catch {
       if (opId !== authOpRef.current) return;
@@ -82,6 +91,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setSessionReady(false);
       setUsername(null);
       setIsAdmin(false);
+      setCanAccessInvoices(false);
     } finally {
       if (opId === authOpRef.current) setLoading(false);
     }
@@ -111,7 +121,8 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
           await applySession(
             data.accessToken,
             typeof data.username === 'string' ? data.username : username,
-            Boolean(data.isAdmin)
+            Boolean(data.isAdmin),
+            Boolean(data.canAccessInvoices),
           );
         }
         return null;
@@ -138,13 +149,34 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setSessionReady(false);
       setUsername(null);
       setIsAdmin(false);
+      setCanAccessInvoices(false);
       setLoading(false);
     }
   }, []);
 
   const value = useMemo(
-    () => ({ authenticated, loading, sessionReady, username, isAdmin, login, logout }),
-    [authenticated, loading, sessionReady, username, isAdmin, login, logout]
+    () => ({
+      authenticated,
+      loading,
+      sessionReady,
+      username,
+      isAdmin,
+      canAccessInvoices,
+      login,
+      logout,
+      refreshSession: checkSession,
+    }),
+    [
+      authenticated,
+      loading,
+      sessionReady,
+      username,
+      isAdmin,
+      canAccessInvoices,
+      login,
+      logout,
+      checkSession,
+    ],
   );
 
   return <TaskboardAuthContext.Provider value={value}>{children}</TaskboardAuthContext.Provider>;

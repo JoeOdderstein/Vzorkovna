@@ -8,6 +8,8 @@ import {
   INSTALLATION_LOCATIONS,
 } from '../../lib/installations/constants';
 import type { InstallationRecord } from '../../lib/installations/types';
+import { fetchProjects } from '../../lib/taskboard/taskService';
+import type { Project } from '../../lib/taskboard/types';
 import {
   translateInstallationLifecycle,
   translateInstallationLocation,
@@ -21,7 +23,8 @@ export type InstallationEditableField =
   | 'last_inspection_date'
   | 'next_maintenance_date'
   | 'revizni_zprava_available'
-  | 'remote_url';
+  | 'remote_url'
+  | 'taskboard_project_id';
 
 interface InstallationFieldEditDialogProps {
   open: boolean;
@@ -52,6 +55,8 @@ function fieldLabel(
       return t('projects.detail.meta.revizniZprava');
     case 'remote_url':
       return t('projects.detail.meta.remoteUrl');
+    case 'taskboard_project_id':
+      return t('projects.detail.meta.taskboardProject');
   }
 }
 
@@ -67,6 +72,8 @@ export default function InstallationFieldEditDialog({
   const [boolValue, setBoolValue] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [taskboardProjects, setTaskboardProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
 
   useEffect(() => {
     if (!open || !field) return;
@@ -97,8 +104,20 @@ export default function InstallationFieldEditDialog({
       case 'remote_url':
         setValue(installation.remote_url ?? '');
         break;
+      case 'taskboard_project_id':
+        setValue(installation.taskboard_project_id ?? '');
+        break;
     }
   }, [open, field, installation]);
+
+  useEffect(() => {
+    if (!open || field !== 'taskboard_project_id') return;
+    setLoadingProjects(true);
+    void fetchProjects()
+      .then(setTaskboardProjects)
+      .catch(() => setTaskboardProjects([]))
+      .finally(() => setLoadingProjects(false));
+  }, [open, field]);
 
   if (!open || !field) return null;
 
@@ -202,6 +221,25 @@ export default function InstallationFieldEditDialog({
               />
               {t('projects.detail.onFile')}
             </label>
+          ) : null}
+
+          {field === 'taskboard_project_id' ? (
+            loadingProjects ? (
+              <p className="text-sm tb-muted">{t('common.loading')}</p>
+            ) : (
+              <select
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="field-input w-full"
+              >
+                <option value="">{t('projects.detail.taskboardProjectAuto')}</option>
+                {taskboardProjects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            )
           ) : null}
 
           {error ? <p className="text-sm text-red-500">{error}</p> : null}

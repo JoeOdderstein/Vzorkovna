@@ -19,6 +19,7 @@ export type InstallationLocalPatch = Partial<
     | 'next_maintenance_date'
     | 'revizni_zprava_available'
     | 'remote_url'
+    | 'taskboard_project_id'
   >
 >;
 
