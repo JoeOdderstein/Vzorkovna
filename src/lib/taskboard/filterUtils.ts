@@ -4,6 +4,9 @@ import { taskHasAssignee } from './assigneeUtils';
 
 export type AssigneeFilter = 'all' | Assignee;
 
+/** `all` or a project id */
+export type ProjectFilter = 'all' | string;
+
 const PRIORITY_WEIGHT: Record<Priority, number> = {
   high: 3,
   normal: 2,
@@ -44,6 +47,11 @@ export function orderAssigneeFiltersForUser(
   }
 
   return [ALL_FILTER, ...others];
+}
+
+export function filterTasksByProject(tasks: Task[], filter: ProjectFilter): Task[] {
+  if (filter === 'all') return tasks;
+  return tasks.filter((task) => task.project_id === filter);
 }
 
 export function filterTasksByAssignee(tasks: Task[], filter: AssigneeFilter): Task[] {

@@ -617,21 +617,7 @@ export async function handleSendInvite(req, res) {
   }
 }
 
-export async function handleListAssignees(req, res) {
-  if (req.method !== 'GET') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  const token = getTokenFromRequest(req);
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  try {
-    await verifySessionToken(token);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
+export async function collectTaskboardAssigneeNames() {
   const names = new Set(DEFAULT_ASSIGNEES);
   for (const user of getAllowedUsers()) {
     const mapped = defaultBoardNameForUsername(user.username);
@@ -661,9 +647,26 @@ export async function handleListAssignees(req, res) {
     }
   }
 
-  return res.status(200).json({
-    assignees: [...names].sort((a, b) => a.localeCompare(b)),
-  });
+  return [...names].sort((a, b) => a.localeCompare(b));
+}
+
+export async function handleListAssignees(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const token = getTokenFromRequest(req);
+  if (!token) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  try {
+    await verifySessionToken(token);
+  } catch {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const assignees = await collectTaskboardAssigneeNames();
+  return res.status(200).json({ assignees });
 }
 
 export async function handleListNotifyRecipients(req, res) {

@@ -81,12 +81,30 @@ export async function seedDefaultCategoriesForProject(
   return fetchProjectCategories(projectId);
 }
 
+const categoriesByProjectId = new Map<string, CategoryOption[]>();
+
+export function peekCategoriesForProject(projectId: string): CategoryOption[] | undefined {
+  return categoriesByProjectId.get(projectId);
+}
+
+export function prefetchCategoriesForProjects(projectIds: string[]) {
+  for (const projectId of projectIds) {
+    if (!projectId || categoriesByProjectId.has(projectId)) continue;
+    void fetchCategoriesForProject(projectId).catch(() => {});
+  }
+}
+
 export async function fetchCategoriesForProject(projectId: string): Promise<CategoryOption[]> {
+  const cached = categoriesByProjectId.get(projectId);
+  if (cached) return cached;
+
   let categories = await fetchProjectCategories(projectId);
   if (categories.length === 0) {
     categories = await seedDefaultCategoriesForProject(projectId);
   }
-  return mapToOptions(categories);
+  const options = mapToOptions(categories);
+  categoriesByProjectId.set(projectId, options);
+  return options;
 }
 
 export async function refreshCategoriesForProject(

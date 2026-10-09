@@ -12,6 +12,7 @@ import {
   fetchVisibleProjects,
   filterTasksForProjects,
 } from '../../lib/taskboard/taskService';
+import { useProjectCalendarColorClass } from '../../lib/taskboard/calendarProjectColors';
 import type { Project, Task } from '../../lib/taskboard/types';
 import ProjectBoardPanel from '../../taskboard/components/ProjectBoardPanel';
 import ProjectRestrictedIcon from '../../taskboard/components/ProjectRestrictedIcon';
@@ -30,6 +31,7 @@ export default function TaskboardOverviewPage() {
   const { projectsToken, expandProjectId } = useTaskboardRefresh();
   const [searchParams] = useSearchParams();
   const { t } = useTaskboardI18n();
+  const projectColorClass = useProjectCalendarColorClass(projects);
 
   const refreshAllTasks = useCallback(() => {
     fetchAllActiveTasks()
@@ -118,17 +120,18 @@ export default function TaskboardOverviewPage() {
           {sortedProjects.map((project) => {
             const count = taskCounts[project.id] ?? 0;
             const isOpen = Boolean(expanded[project.id]);
+            const colorClass = projectColorClass(project.id);
 
             return (
               <li key={project.id}>
                 <button
                   type="button"
                   onClick={() => toggleProject(project.id)}
-                  className="group w-full flex items-center gap-4 py-4 text-left transition-colors tb-project-row"
+                  className={`group w-full flex items-center gap-4 py-4 text-left transition-colors tb-project-row ${colorClass}`}
                   aria-expanded={isOpen}
                 >
                   <span
-                    className={`tb-count-badge ${count === 0 ? 'tb-count-badge--empty' : ''}`}
+                    className={`tb-count-badge ${count === 0 ? 'tb-count-badge--empty' : ''} ${colorClass}`}
                     aria-label={`${count} active task${count === 1 ? '' : 's'}`}
                   >
                     {count}
@@ -145,9 +148,10 @@ export default function TaskboardOverviewPage() {
                 </button>
 
                 {isOpen && (
-                  <div className="pl-2 sm:pl-14 pr-2 border-t tb-project-panel">
+                  <div className={`pl-2 sm:pl-14 pr-2 border-t tb-project-panel ${colorClass}`}>
                     <ProjectBoardPanel
                       project={project}
+                      projectColorClass={colorClass}
                       initialTaskId={initialTaskForProject(project)}
                       onTasksChange={refreshAllTasks}
                     />

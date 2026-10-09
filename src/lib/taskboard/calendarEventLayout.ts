@@ -46,6 +46,32 @@ export function splitIntoWeeks(cells: CalendarCell[]): CalendarCell[][] {
   return weeks;
 }
 
+/** Monday 00:00 local time for the week containing `date`. */
+export function startOfWeekMonday(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const weekday = d.getDay();
+  const diff = weekday === 0 ? -6 : 1 - weekday;
+  d.setDate(d.getDate() + diff);
+  return d;
+}
+
+export function addCalendarDays(date: Date, days: number): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  d.setDate(d.getDate() + days);
+  return d;
+}
+
+/** Seven cells (Mon–Sun) for the week containing `anchor`. */
+export function buildWeekCells(anchor: Date): CalendarCell[] {
+  const start = startOfWeekMonday(anchor);
+  const cells: CalendarCell[] = [];
+  for (let i = 0; i < 7; i += 1) {
+    const date = addCalendarDays(start, i);
+    cells.push({ date, key: formatDateKey(date), dateKey: formatDateKey(date) });
+  }
+  return cells;
+}
+
 export function layoutEventSegments(events: CalendarEvent[], weeks: CalendarCell[][]) {
   const segmentsByWeek = weeks.map((week, weekIndex) => {
     const segments: CalendarEventSegment[] = [];

@@ -27,12 +27,14 @@ import { applyTaskUpdates, computeMoveGroupUpdates } from '../../lib/taskboard/d
 
 interface ProjectBoardPanelProps {
   project: Project;
+  projectColorClass?: string;
   initialTaskId?: string | null;
   onTasksChange?: () => void;
 }
 
 export default function ProjectBoardPanel({
   project,
+  projectColorClass,
   initialTaskId,
   onTasksChange,
 }: ProjectBoardPanelProps) {
@@ -216,6 +218,7 @@ export default function ProjectBoardPanel({
           <KanbanBoard
             categories={categories}
             tasks={filteredTasks}
+            projectColorClass={projectColorClass}
             collapsed={collapsed}
             onToggleCollapse={(id) => setCollapsed((c) => ({ ...c, [id]: !c[id] }))}
             onTaskClick={(task) => openTask(task, project.id)}

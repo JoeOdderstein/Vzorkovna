@@ -9,6 +9,7 @@ import {
   INVOICES_PATH,
   PROJECTS_PATH,
   MESSAGES_PATH,
+  CALENDAR_PATH,
   TASKBOARD_DRIVE_URL,
   TASKBOARD_PATH,
 } from '../lib/taskboard/driveConstants';
@@ -31,8 +32,13 @@ export default function Nav({ activeSection }: NavProps) {
     location.pathname.startsWith(`${PROJECTS_PATH}/installation/`);
   const isMessagesPage = location.pathname.startsWith(MESSAGES_PATH);
   const isInvoicesPage = location.pathname.startsWith(INVOICES_PATH);
+  const isCalendarPage = location.pathname.startsWith(CALENDAR_PATH);
   const isAppPage =
-    isTaskboardPage || isProjectsAppPage || isMessagesPage || isInvoicesPage;
+    isTaskboardPage ||
+    isProjectsAppPage ||
+    isMessagesPage ||
+    isInvoicesPage ||
+    isCalendarPage;
   const hideSiteNavLinks =
     isAppPage || location.pathname === '/login';
   const { authenticated, username, isAdmin, canAccessInvoices, logout } = useTaskboardAuth();
@@ -179,6 +185,14 @@ export default function Nav({ activeSection }: NavProps) {
                 >
                   {t('nav.remoteInst').toUpperCase()}
                 </Link>
+                <Link
+                  to={CALENDAR_PATH}
+                  className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                    isCalendarPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                  }`}
+                >
+                  {t('nav.calendar').toUpperCase()}
+                </Link>
                 {canAccessInvoices ? (
                   <Link
                     to={INVOICES_PATH}
@@ -274,6 +288,13 @@ export default function Nav({ activeSection }: NavProps) {
                   className={`site-mobile-nav-link${isMessagesPage ? ' site-mobile-nav-link--active' : ''}`}
                 >
                   {t('nav.remoteInst')}
+                </Link>
+                <Link
+                  to={CALENDAR_PATH}
+                  onClick={() => setMenuOpen(false)}
+                  className={`site-mobile-nav-link${isCalendarPage ? ' site-mobile-nav-link--active' : ''}`}
+                >
+                  {t('nav.calendar')}
                 </Link>
                 {canAccessInvoices ? (
                   <Link

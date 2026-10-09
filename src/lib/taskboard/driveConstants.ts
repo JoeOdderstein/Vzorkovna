@@ -10,6 +10,8 @@ export const MESSAGES_PATH = '/messages';
 
 export const INVOICES_PATH = '/invoices';
 
+export const CALENDAR_PATH = '/calendar';
+
 export function installationDetailPath(installationId: string) {
   return `${PROJECTS_PATH}/installation/${installationId}`;
 }

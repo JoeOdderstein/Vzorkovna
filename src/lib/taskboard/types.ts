@@ -94,6 +94,8 @@ export interface CalendarEvent {
 
 export type CalendarEventInsert = Pick<CalendarEvent, 'title' | 'start_date' | 'end_date'>;
 
+export type CalendarEventUpdate = CalendarEventInsert;
+
 export type UserProfileTheme = 'light' | 'dark';
 
 /** English originals in DB; `uk` shows DeepL Ukrainian translations in the UI. */

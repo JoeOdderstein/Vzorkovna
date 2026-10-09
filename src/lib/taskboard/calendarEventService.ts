@@ -1,7 +1,7 @@
 import { isLocalTaskboardMode } from './taskService';
 import { localStore } from './localStore';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
-import type { CalendarEvent, CalendarEventInsert } from './types';
+import type { CalendarEvent, CalendarEventInsert, CalendarEventUpdate } from './types';
 
 async function db() {
   await ensureSupabaseSession();
@@ -36,7 +36,7 @@ export async function fetchCalendarEvents(): Promise<CalendarEvent[]> {
 }
 
 export async function createCalendarEvent(input: CalendarEventInsert): Promise<CalendarEvent> {
-  const title = input.title.trim() || 'Prague visit';
+  const title = input.title.trim() || 'Event';
   if (input.end_date < input.start_date) {
     throw new Error('End date must be on or after the start date.');
   }
@@ -64,6 +64,34 @@ export async function createCalendarEvent(input: CalendarEventInsert): Promise<C
     throw error;
   }
 
+  return mapCalendarEvent(data as Record<string, unknown>);
+}
+
+export async function updateCalendarEvent(
+  id: string,
+  input: CalendarEventUpdate
+): Promise<CalendarEvent> {
+  const title = input.title.trim() || 'Event';
+  if (input.end_date < input.start_date) {
+    throw new Error('End date must be on or after the start date.');
+  }
+
+  if (isLocalTaskboardMode()) {
+    return localStore.updateCalendarEvent(id, { ...input, title });
+  }
+
+  const { data, error } = await (await db())
+    .from('calendar_events')
+    .update({
+      title,
+      start_date: input.start_date,
+      end_date: input.end_date,
+    })
+    .eq('id', id)
+    .select('*')
+    .single();
+
+  if (error) throw error;
   return mapCalendarEvent(data as Record<string, unknown>);
 }
 

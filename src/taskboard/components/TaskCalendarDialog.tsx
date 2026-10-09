@@ -1,15 +1,21 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, Trash2, X } from 'lucide-react';
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AddTaskDialog from './AddTaskDialog';
+import { useAddTaskFlow } from '../hooks/useAddTaskFlow';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
 import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import {
+  addCalendarDays,
   buildCalendarCells,
+  buildWeekCells,
   CALENDAR_LAYOUT,
   eventLaneHeight,
   layoutEventSegments,
   splitIntoWeeks,
+  startOfWeekMonday,
+  type CalendarCell,
   type CalendarEventSegment,
 } from '../../lib/taskboard/calendarEventLayout';
 import {
@@ -17,31 +23,58 @@ import {
   deleteCalendarEvent,
   fetchCalendarEvents,
   isCalendarEventsReady,
+  updateCalendarEvent,
 } from '../../lib/taskboard/calendarEventService';
-import { filterTasksByAssignee } from '../../lib/taskboard/filterUtils';
+import { filterTasksByAssignee, filterTasksByProject } from '../../lib/taskboard/filterUtils';
 import {
-  deadlineClasses,
+  buildProjectCalendarColorIndex,
+  projectCalendarColorClassForId,
+} from '../../lib/taskboard/calendarProjectColors';
+import {
   formatDateKey,
   formatDateRange,
-  getDeadlineStatus,
+  formatDeadline,
+  isDateKeyInRange,
 } from '../../lib/taskboard/deadlineUtils';
 import {
-  fetchAllActiveTasks,
+  fetchActiveTasksWithDeadlines,
   fetchVisibleProjects,
   filterTasksForProjects,
 } from '../../lib/taskboard/taskService';
 import type { CalendarEvent, Project, Task } from '../../lib/taskboard/types';
-import TranslatableText from './TranslatableText';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 
 interface TaskCalendarDialogProps {
   open: boolean;
-  onClose: () => void;
+  onClose?: () => void;
+  variant?: 'dialog' | 'page';
 }
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const DEFAULT_VISIT_TITLE = 'Prague visit';
 const MOBILE_CALENDAR_QUERY = '(max-width: 767px)';
+/** Month grid: cap DOM nodes when many deadlines fall on one day. */
+const MONTH_CELL_TASK_CAP = 6;
+type CalendarViewMode = 'month' | 'week';
+
+function formatWeekRangeLabel(weekCells: CalendarCell[]): string {
+  const first = weekCells[0]?.date;
+  const last = weekCells[6]?.date;
+  if (!first || !last) return '';
+
+  const sameMonth =
+    first.getMonth() === last.getMonth() && first.getFullYear() === last.getFullYear();
+  if (sameMonth) {
+    return `${first.toLocaleDateString(undefined, { month: 'long' })} ${first.getDate()} – ${last.getDate()}, ${first.getFullYear()}`;
+  }
+
+  const startStr = first.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  const endStr = last.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+  return `${startStr} – ${endStr}`;
+}
 
 function useMobileCalendarLayout() {
   const [mobile, setMobile] = useState(() =>
@@ -67,6 +100,26 @@ function segmentClassName(segment: CalendarEventSegment) {
   return classes.join(' ');
 }
 
+function visitSegmentButton(
+  segment: CalendarEventSegment,
+  key: string,
+  gridStyle: { gridColumn: string; gridRow: number },
+  onSelect: (event: CalendarEvent) => void
+) {
+  return (
+    <button
+      type="button"
+      key={key}
+      className={segmentClassName(segment)}
+      style={gridStyle}
+      onClick={() => onSelect(segment.event)}
+      title={formatDateRange(segment.event.start_date, segment.event.end_date)}
+    >
+      <span className="truncate">{segment.event.title}</span>
+    </button>
+  );
+}
+
 function formatAgendaDate(dateKey: string) {
   const [year, month, day] = dateKey.split('-').map(Number);
   return new Date(year, month - 1, day).toLocaleDateString(undefined, {
@@ -76,16 +129,39 @@ function formatAgendaDate(dateKey: string) {
   });
 }
 
-export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialogProps) {
+function visitsOnDate(events: CalendarEvent[], dateKey: string) {
+  return events.filter((event) => isDateKeyInRange(dateKey, event.start_date, event.end_date));
+}
+
+export default function TaskCalendarDialog({
+  open,
+  onClose,
+  variant = 'dialog',
+}: TaskCalendarDialogProps) {
+  const isPage = variant === 'page';
+  const isActive = isPage || open;
   const mobileCalendar = useMobileCalendarLayout();
   const { username, isAdmin } = useTaskboardAuth();
-  const { assigneeFilter } = useTaskboardFilter();
+  const { assigneeFilter, projectFilter, setTasksForCounts, setFilterProjects } =
+    useTaskboardFilter();
   const { projectsToken } = useTaskboardRefresh();
   const { openTask } = useTaskboardSelection();
   const { t } = useTaskboardI18n();
 
+  const onTaskCreated = useCallback(
+    (task: Task) => {
+      openTask(task, task.project_id);
+    },
+    [openTask]
+  );
+  const { addTaskOpen, setAddTaskOpen, handleCreateTask } = useAddTaskFlow({
+    onCreated: onTaskCreated,
+  });
+  const defaultAddTaskProjectId = projectFilter !== 'all' ? projectFilter : undefined;
+
   const [viewDate, setViewDate] = useState(() => new Date());
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [viewMode, setViewMode] = useState<CalendarViewMode>('month');
+  const [visibleTasksUnfiltered, setVisibleTasksUnfiltered] = useState<Task[]>([]);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(false);
@@ -93,62 +169,91 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
   const [eventsReady, setEventsReady] = useState(true);
 
   const [addFormOpen, setAddFormOpen] = useState(false);
-  const [title, setTitle] = useState(DEFAULT_VISIT_TITLE);
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null);
+  const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const eventsReadyChecked = useRef(false);
+  const hasLoadedTasksOnce = useRef(false);
+
+  const tasks = useMemo(() => {
+    const byAssignee = filterTasksByAssignee(visibleTasksUnfiltered, assigneeFilter);
+    return filterTasksByProject(byAssignee, projectFilter);
+  }, [visibleTasksUnfiltered, assigneeFilter, projectFilter]);
 
   const loadCalendarData = useCallback(async () => {
     setError('');
-    setLoading(true);
+    if (!hasLoadedTasksOnce.current) {
+      setLoading(true);
+    }
 
     try {
-      const [projectList, allTasks, visitEvents, ready] = await Promise.all([
+      const [projectList, deadlineTasks, visitEvents] = await Promise.all([
         fetchVisibleProjects(username, isAdmin),
-        fetchAllActiveTasks(),
+        fetchActiveTasksWithDeadlines(),
         fetchCalendarEvents(),
-        isCalendarEventsReady(),
       ]);
 
       setProjects(projectList);
-      const visible = filterTasksForProjects(allTasks, projectList);
-      setTasks(filterTasksByAssignee(visible, assigneeFilter));
+      setFilterProjects(projectList);
+      const visible = filterTasksForProjects(deadlineTasks, projectList);
+      setVisibleTasksUnfiltered(visible);
+      setTasksForCounts(visible);
       setEvents(visitEvents);
-      setEventsReady(ready);
+      hasLoadedTasksOnce.current = true;
     } catch {
       setError('Could not load calendar.');
     } finally {
       setLoading(false);
     }
-  }, [username, isAdmin, assigneeFilter]);
+  }, [username, isAdmin, setTasksForCounts, setFilterProjects]);
 
   useEffect(() => {
-    if (!open) return;
-    setViewDate(new Date());
-    setAddFormOpen(false);
-    setTitle(DEFAULT_VISIT_TITLE);
-    setStartDate('');
-    setEndDate('');
-    setFormError('');
+    if (!isActive) return;
+    if (!isPage) {
+      setViewDate(new Date());
+      setAddFormOpen(false);
+      setTitle('');
+      setStartDate('');
+      setEndDate('');
+      setFormError('');
+    }
     loadCalendarData();
-  }, [open, projectsToken, loadCalendarData]);
+  }, [isActive, isPage, projectsToken, loadCalendarData]);
 
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    if (!isActive || eventsReadyChecked.current) return;
+    eventsReadyChecked.current = true;
+    void isCalendarEventsReady().then(setEventsReady);
+  }, [isActive]);
+
+  useEffect(() => {
+    if (!open || isPage) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose?.();
     window.addEventListener('keydown', onKey);
     document.body.style.overflow = 'hidden';
     return () => {
       window.removeEventListener('keydown', onKey);
       document.body.style.overflow = '';
     };
-  }, [open, onClose]);
+  }, [open, isPage, onClose]);
 
   const projectNames = useMemo(
     () => Object.fromEntries(projects.map((project) => [project.id, project.name])),
     [projects]
+  );
+
+  const projectColorIndex = useMemo(
+    () => buildProjectCalendarColorIndex(projects),
+    [projects]
+  );
+
+  const taskProjectColorClass = useCallback(
+    (projectId: string) => projectCalendarColorClassForId(projectId, projectColorIndex),
+    [projectColorIndex]
   );
 
   const tasksByDate = useMemo(() => {
@@ -168,14 +273,42 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
   const year = viewDate.getFullYear();
   const month = viewDate.getMonth();
   const monthLabel = viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
-  const cells = useMemo(() => buildCalendarCells(year, month), [year, month]);
-  const weeks = useMemo(() => splitIntoWeeks(cells), [cells]);
-  const { segmentsByWeek, maxLanesByWeek } = useMemo(
-    () => layoutEventSegments(events, weeks),
-    [events, weeks]
+  const monthWeeks = useMemo(
+    () => splitIntoWeeks(buildCalendarCells(year, month)),
+    [year, month]
   );
+  const weekCells = useMemo(() => buildWeekCells(viewDate), [viewDate]);
+  const displayWeeks = viewMode === 'week' ? [weekCells] : monthWeeks;
+  const { segmentsByWeek, maxLanesByWeek } = useMemo(
+    () => layoutEventSegments(events, displayWeeks),
+    [events, displayWeeks]
+  );
+  const periodLabel = viewMode === 'month' ? monthLabel : formatWeekRangeLabel(weekCells);
+  const weekStartKey = weekCells[0]?.dateKey;
+  const weekEndKey = weekCells[6]?.dateKey;
+
+  const goToPreviousPeriod = () => {
+    if (viewMode === 'month') {
+      setViewDate(new Date(year, month - 1, 1));
+      return;
+    }
+    setViewDate(addCalendarDays(startOfWeekMonday(viewDate), -7));
+  };
+
+  const goToNextPeriod = () => {
+    if (viewMode === 'month') {
+      setViewDate(new Date(year, month + 1, 1));
+      return;
+    }
+    setViewDate(addCalendarDays(startOfWeekMonday(viewDate), 7));
+  };
   const todayKey = formatDateKey(new Date());
   const laneHeight = CALENDAR_LAYOUT.desktop.laneHeight;
+  const weekVisitLaneCount =
+    viewMode === 'week' && !mobileCalendar ? (maxLanesByWeek[0] ?? 0) : 0;
+  const weekVisitLaneAreaHeight = eventLaneHeight(weekVisitLaneCount);
+  const weekVisitSegments =
+    viewMode === 'week' && !mobileCalendar ? (segmentsByWeek[0] ?? []) : [];
   const monthTaskEntries = useMemo(() => {
     const entries: [string, Task[]][] = [];
     for (const [dateKey, dayTasks] of tasksByDate) {
@@ -188,18 +321,64 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
     return entries;
   }, [tasksByDate, year, month]);
 
+  const weekTaskEntries = useMemo(() => {
+    const entries: [string, Task[]][] = [];
+    for (const cell of weekCells) {
+      if (!cell.dateKey) continue;
+      const dayTasks = tasksByDate.get(cell.dateKey);
+      if (dayTasks?.length) entries.push([cell.dateKey, dayTasks]);
+    }
+    return entries;
+  }, [weekCells, tasksByDate]);
+
+  const eventsInView = useMemo(() => {
+    if (viewMode === 'month') return events;
+    if (!weekStartKey || !weekEndKey) return events;
+    return events.filter(
+      (event) => event.end_date >= weekStartKey && event.start_date <= weekEndKey
+    );
+  }, [events, viewMode, weekStartKey, weekEndKey]);
+
+  const isViewEmpty = useMemo(() => {
+    if (viewMode === 'month') {
+      return monthTaskEntries.length === 0 && events.length === 0;
+    }
+    return weekTaskEntries.length === 0 && eventsInView.length === 0;
+  }, [viewMode, monthTaskEntries, events.length, weekTaskEntries, eventsInView.length]);
+
+  const mobileAgendaEntries = viewMode === 'week' ? weekTaskEntries : monthTaskEntries;
+
   const handleTaskClick = (task: Task) => {
     openTask(task, task.project_id);
-    onClose();
+    if (!isPage) onClose?.();
+  };
+
+  const closeEventForm = () => {
+    setAddFormOpen(false);
+    setEditingEvent(null);
+    setTitle('');
+    setStartDate('');
+    setEndDate('');
+    setFormError('');
   };
 
   const openAddForm = () => {
     const today = formatDateKey(new Date());
-    setTitle(DEFAULT_VISIT_TITLE);
+    setEditingEvent(null);
+    setTitle(t('calendar.defaultEventTitle'));
     setStartDate(today);
     setEndDate(today);
     setFormError('');
     setAddFormOpen(true);
+  };
+
+  const openEditEvent = (event: CalendarEvent) => {
+    setAddFormOpen(false);
+    setEditingEvent(event);
+    setTitle(event.title);
+    setStartDate(event.start_date);
+    setEndDate(event.end_date);
+    setFormError('');
   };
 
   const handleAddEvent = async (e: FormEvent) => {
@@ -217,106 +396,194 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
     setFormError('');
     try {
       const created = await createCalendarEvent({
-        title: title.trim() || DEFAULT_VISIT_TITLE,
+        title: title.trim() || t('calendar.defaultEventTitle'),
         start_date: startDate,
         end_date: endDate,
       });
       setEvents((prev) => [...prev, created].sort((a, b) => a.start_date.localeCompare(b.start_date)));
-      setAddFormOpen(false);
-      setTitle(DEFAULT_VISIT_TITLE);
-      setStartDate('');
-      setEndDate('');
+      closeEventForm();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Could not save visit.');
+      setFormError(err instanceof Error ? err.message : 'Could not save event.');
     } finally {
       setSaving(false);
     }
   };
 
-  const handleDeleteEvent = async (event: CalendarEvent) => {
-    if (!window.confirm(`Remove "${event.title}" (${formatDateRange(event.start_date, event.end_date)})?`)) {
+  const handleUpdateEvent = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!editingEvent) return;
+    if (!startDate || !endDate) {
+      setFormError('Choose a start and end date.');
+      return;
+    }
+    if (endDate < startDate) {
+      setFormError('End date must be on or after the start date.');
       return;
     }
 
-    setDeletingId(event.id);
+    setSaving(true);
+    setFormError('');
     try {
-      await deleteCalendarEvent(event.id);
-      setEvents((prev) => prev.filter((item) => item.id !== event.id));
+      const updated = await updateCalendarEvent(editingEvent.id, {
+        title: title.trim() || t('calendar.defaultEventTitle'),
+        start_date: startDate,
+        end_date: endDate,
+      });
+      setEvents((prev) =>
+        prev
+          .map((item) => (item.id === updated.id ? updated : item))
+          .sort((a, b) => a.start_date.localeCompare(b.start_date))
+      );
+      closeEventForm();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Could not save event.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteEditingEvent = async () => {
+    if (!editingEvent) return;
+    const dates = formatDateRange(editingEvent.start_date, editingEvent.end_date);
+    if (
+      !window.confirm(
+        t('calendar.deleteEventConfirm', { title: editingEvent.title, dates })
+      )
+    ) {
+      return;
+    }
+
+    setDeletingId(editingEvent.id);
+    try {
+      await deleteCalendarEvent(editingEvent.id);
+      setEvents((prev) => prev.filter((item) => item.id !== editingEvent.id));
+      closeEventForm();
     } catch {
-      setError('Could not remove visit.');
+      setError('Could not remove event.');
     } finally {
       setDeletingId(null);
     }
   };
 
-  if (!open) return null;
+  const eventFormOpen = addFormOpen || editingEvent !== null;
+  const isEditingEvent = editingEvent !== null;
 
-  return (
-    <div className="taskboard fixed inset-0 z-[80] flex items-center justify-center px-4 sm:px-6">
-      <div className="absolute inset-0 tb-overlay" onClick={onClose} />
-      <div
-        className={`relative w-full max-w-5xl tb-calendar-panel max-h-[90vh] flex flex-col${
-          mobileCalendar ? ' tb-calendar-panel--mobile' : ''
-        }`}
-        onClick={(e) => e.stopPropagation()}
-      >
+  if (!isActive) return null;
+
+  const panel = (
+    <div
+      className={`relative w-full tb-calendar-panel flex flex-col${
+        viewMode === 'week' && !mobileCalendar ? ' max-w-none' : ' max-w-5xl'
+      }${isPage ? '' : ' max-h-[90vh]'}${
+        mobileCalendar ? ' tb-calendar-panel--mobile' : ''
+      }${viewMode === 'week' ? ' tb-calendar-panel--week-view' : ''}`}
+      onClick={isPage ? undefined : (e) => e.stopPropagation()}
+    >
+      {!isPage ? (
         <div className="px-6 py-4 border-b tb-calendar-border flex items-center justify-between shrink-0">
-          <h2 className="tb-heading">Calendar</h2>
+          <h2 className="tb-heading">{t('header.calendar')}</h2>
           <button
             type="button"
             onClick={onClose}
             className="text-[#80868b] hover:text-[#202124] transition-colors"
-            aria-label="Close"
+            aria-label={t('common.close')}
           >
             <X size={20} />
           </button>
         </div>
+      ) : null}
 
         <div className="px-6 py-5 overflow-y-auto flex-1">
           <div className="flex flex-wrap items-center justify-between gap-4 mb-5">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <div
+                className="tb-calendar-view-toggle"
+                role="group"
+                aria-label={t('header.calendar')}
+              >
+                <button
+                  type="button"
+                  className={`tb-calendar-view-toggle__btn${
+                    viewMode === 'month' ? ' tb-calendar-view-toggle__btn--active' : ''
+                  }`}
+                  aria-pressed={viewMode === 'month'}
+                  onClick={() => setViewMode('month')}
+                >
+                  {t('calendar.viewMonth')}
+                </button>
+                <button
+                  type="button"
+                  className={`tb-calendar-view-toggle__btn${
+                    viewMode === 'week' ? ' tb-calendar-view-toggle__btn--active' : ''
+                  }`}
+                  aria-pressed={viewMode === 'week'}
+                  onClick={() => setViewMode('week')}
+                >
+                  {t('calendar.viewWeek')}
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={goToPreviousPeriod}
+                  className="tb-calendar-nav"
+                  aria-label={
+                    viewMode === 'month' ? t('calendar.prevMonth') : t('calendar.prevWeek')
+                  }
+                >
+                  <ChevronLeft size={18} />
+                </button>
+                <p className="tb-heading text-base min-w-[10rem] text-center">{periodLabel}</p>
+                <button
+                  type="button"
+                  onClick={goToNextPeriod}
+                  className="tb-calendar-nav"
+                  aria-label={viewMode === 'month' ? t('calendar.nextMonth') : t('calendar.nextWeek')}
+                >
+                  <ChevronRight size={18} />
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => setViewDate(new Date(year, month - 1, 1))}
-                className="tb-calendar-nav"
-                aria-label="Previous month"
+                onClick={() => setViewDate(new Date())}
+                className="tb-btn-secondary text-xs uppercase tracking-wide"
               >
-                <ChevronLeft size={18} />
-              </button>
-              <p className="tb-heading text-base min-w-[10rem] text-center">{monthLabel}</p>
-              <button
-                type="button"
-                onClick={() => setViewDate(new Date(year, month + 1, 1))}
-                className="tb-calendar-nav"
-                aria-label="Next month"
-              >
-                <ChevronRight size={18} />
+                {t('calendar.today')}
               </button>
             </div>
-            <button
-              type="button"
-              onClick={openAddForm}
-              className="tb-btn-secondary"
-              disabled={!eventsReady}
-            >
-              + Add event
-            </button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setAddTaskOpen(true)}
+                className="tb-btn-primary whitespace-nowrap"
+              >
+                {t('header.addTask')}
+              </button>
+              <button
+                type="button"
+                onClick={openAddForm}
+                className="tb-btn-secondary whitespace-nowrap"
+                disabled={!eventsReady}
+              >
+                + Add event
+              </button>
+            </div>
           </div>
 
           {!eventsReady && (
             <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-4">
-              Visit events are not set up yet. Run{' '}
-              <code className="text-xs">supabase/migrations/008_calendar_events.sql</code> in Supabase
-              SQL Editor.
+              {t('calendar.eventsNotReady')}
             </p>
           )}
 
-          {addFormOpen && (
+          {eventFormOpen && (
             <form
-              onSubmit={handleAddEvent}
+              onSubmit={isEditingEvent ? handleUpdateEvent : handleAddEvent}
               className="mb-5 p-4 rounded-lg border tb-calendar-border tb-calendar-form space-y-4"
             >
-              <p className="tb-field-label">Add Prague visit</p>
+              <p className="tb-field-label">
+                {isEditingEvent ? t('calendar.editEvent') : t('calendar.addEventForm')}
+              </p>
               <div className="grid gap-4 sm:grid-cols-3">
                 <label className="block space-y-1.5">
                   <span className="tb-field-label">Title</span>
@@ -324,7 +591,7 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                     type="text"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    placeholder={DEFAULT_VISIT_TITLE}
+                    placeholder={t('calendar.defaultEventTitle')}
                     className="field-input w-full"
                   />
                 </label>
@@ -352,14 +619,24 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
               </div>
               <div className="flex flex-wrap items-center gap-3">
                 <button type="submit" disabled={saving} className="tb-btn-primary disabled:opacity-50">
-                  {saving ? 'Saving…' : 'Save visit'}
+                  {saving
+                    ? t('common.saving')
+                    : isEditingEvent
+                      ? t('calendar.saveChanges')
+                      : t('calendar.saveEvent')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setAddFormOpen(false)}
-                  className="tb-link px-2 py-1"
-                >
-                  Cancel
+                {isEditingEvent && (
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteEditingEvent()}
+                    disabled={saving || deletingId === editingEvent?.id}
+                    className="tb-btn-secondary text-red-600 border-red-200 hover:bg-red-50 disabled:opacity-50"
+                  >
+                    {t('calendar.deleteEvent')}
+                  </button>
+                )}
+                <button type="button" onClick={closeEventForm} className="tb-link px-2 py-1">
+                  {t('common.cancel')}
                 </button>
               </div>
               {formError && <p className="text-sm text-red-600">{formError}</p>}
@@ -371,6 +648,114 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
 
           {!loading && !error && (
             <>
+              {viewMode === 'week' && !mobileCalendar ? (
+                <div className="tb-calendar-week-layout">
+                  <div className="tb-calendar-week-columns">
+                    {weekCells.map(({ date, dateKey, key }, colIndex) => {
+                      if (!date || !dateKey) return null;
+
+                      const dayTasks = tasksByDate.get(dateKey) ?? [];
+                      const isToday = dateKey === todayKey;
+                      const weekdayLabel = date.toLocaleDateString(undefined, { weekday: 'long' });
+                      const hasVisitOnDay = weekVisitSegments.some(
+                        (segment) =>
+                          colIndex >= segment.startCol &&
+                          colIndex <= segment.startCol + segment.span - 1
+                      );
+
+                      return (
+                        <section
+                          key={key}
+                          className={`tb-calendar-week-day${
+                            isToday ? ' tb-calendar-week-day--today' : ''
+                          }`}
+                          aria-label={formatAgendaDate(dateKey)}
+                        >
+                          <header className="tb-calendar-week-day-head">
+                            <p className="tb-calendar-week-day-name">{weekdayLabel}</p>
+                            <p className="tb-calendar-week-day-date">{date.getDate()}</p>
+                            <p className="tb-calendar-week-day-month">
+                              {date.toLocaleDateString(undefined, { month: 'short' })}
+                            </p>
+                          </header>
+                          <div
+                            className="tb-calendar-week-visit-spacer"
+                            style={{ height: `${weekVisitLaneAreaHeight}rem` }}
+                            aria-hidden
+                          />
+                          <div className="tb-calendar-week-day-body">
+                            {dayTasks.length === 0 && !hasVisitOnDay ? (
+                              <p className="text-xs tb-muted py-2">{t('calendar.weekDayEmpty')}</p>
+                            ) : dayTasks.length === 0 ? null : (
+                              <ul className="space-y-2">
+                                {dayTasks.map((task) => {
+                                  const projectLabel =
+                                    projectNames[task.project_id] ?? t('common.project');
+                                  const assigneeLabel =
+                                    task.assignees?.length > 0
+                                      ? task.assignees.join(', ')
+                                      : null;
+
+                                  return (
+                                    <li key={task.id}>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleTaskClick(task)}
+                                        className={`tb-calendar-week-task ${taskProjectColorClass(task.project_id)}`}
+                                      >
+                                        <span className="tb-calendar-week-task-title">
+                                          {task.task_name || 'Untitled task'}
+                                        </span>
+                                        <span className="tb-calendar-week-task-meta">
+                                          {projectLabel}
+                                        </span>
+                                        {assigneeLabel && (
+                                          <span className="tb-calendar-week-task-meta">
+                                            {t('task.assignedTo')}: {assigneeLabel}
+                                          </span>
+                                        )}
+                                        {task.deadline && (
+                                          <span className="tb-calendar-week-task-meta">
+                                            {t('task.deadline')}: {formatDeadline(task.deadline)}
+                                          </span>
+                                        )}
+                                      </button>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            )}
+                          </div>
+                        </section>
+                      );
+                    })}
+                  </div>
+                  {weekVisitLaneCount > 0 && (
+                    <div
+                      className="tb-calendar-week-event-layer"
+                      style={{
+                        height: `${weekVisitLaneAreaHeight}rem`,
+                        gridTemplateRows: `repeat(${weekVisitLaneCount}, ${laneHeight}rem)`,
+                      }}
+                    >
+                      {weekVisitSegments.map((segment) =>
+                        visitSegmentButton(
+                          segment,
+                          `week-visit-${segment.event.id}-${segment.startCol}`,
+                          {
+                            gridColumn: `${segment.startCol + 1} / span ${segment.span}`,
+                            gridRow: segment.lane + 1,
+                          },
+                          openEditEvent
+                        )
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+              {!(viewMode === 'week' && mobileCalendar) && (
+                <>
               <div className="grid grid-cols-7 gap-px mb-1">
                 {WEEKDAYS.map((label) => (
                   <div key={label} className="tb-calendar-weekday">
@@ -380,7 +765,7 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
               </div>
 
               <div className="space-y-px tb-calendar-grid rounded-lg overflow-hidden">
-                {weeks.map((week, weekIndex) => {
+                {displayWeeks.map((week, weekIndex) => {
                   const maxLanes = maxLanesByWeek[weekIndex] ?? 0;
                   const laneAreaHeight = mobileCalendar ? 0 : eventLaneHeight(maxLanes);
                   const segments = segmentsByWeek[weekIndex] ?? [];
@@ -406,6 +791,12 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
 
                           const dayTasks = tasksByDate.get(dateKey) ?? [];
                           const isToday = dateKey === todayKey;
+                          const taskCap =
+                            viewMode === 'month' && !mobileCalendar
+                              ? MONTH_CELL_TASK_CAP
+                              : dayTasks.length;
+                          const shownTasks = dayTasks.slice(0, taskCap);
+                          const hiddenTaskCount = dayTasks.length - shownTasks.length;
 
                           return (
                             <div
@@ -419,40 +810,56 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                                 aria-hidden
                               />
                               {mobileCalendar ? (
-                                dayTasks.length > 0 && (
-                                  <span
-                                    className="tb-calendar-mobile-indicator"
-                                    aria-label={`${dayTasks.length} deadline${dayTasks.length === 1 ? '' : 's'}`}
-                                  >
-                                    {dayTasks.length}
-                                  </span>
-                                )
+                                <>
+                                  {dayTasks.length > 0 && (
+                                    <span
+                                      className="tb-calendar-mobile-indicator"
+                                      aria-label={`${dayTasks.length} deadline${dayTasks.length === 1 ? '' : 's'}`}
+                                    >
+                                      {dayTasks.length}
+                                    </span>
+                                  )}
+                                  {visitsOnDate(events, dateKey).map((visit) => (
+                                    <button
+                                      key={visit.id}
+                                      type="button"
+                                      onClick={() => openEditEvent(visit)}
+                                      className="tb-calendar-week-visit text-[0.625rem] w-full mt-1 px-1 py-0.5 truncate"
+                                    >
+                                      {visit.title}
+                                    </button>
+                                  ))}
+                                </>
                               ) : (
                                 <ul className="space-y-1">
-                                  {dayTasks.map((task) => {
-                                    const status = getDeadlineStatus(task.deadline, task.completed);
+                                  {shownTasks.map((task) => {
+                                    const projectLabel =
+                                      projectNames[task.project_id] ?? t('common.project');
                                     return (
                                       <li key={task.id}>
                                         <button
                                           type="button"
                                           onClick={() => handleTaskClick(task)}
-                                          className={`tb-calendar-task ${deadlineClasses[status]}`}
-                                          title={`${task.task_name} · ${projectNames[task.project_id] ?? 'Project'}`}
+                                          className={`tb-calendar-task ${taskProjectColorClass(task.project_id)}`}
+                                          title={`${task.task_name} · ${projectLabel}`}
                                         >
                                           <span className="block truncate">
                                             {task.task_name || 'Untitled task'}
                                           </span>
                                           <span className="block truncate tb-calendar-task-sub opacity-80">
-                                            <TranslatableText
-                                              text={
-                                                projectNames[task.project_id] ?? t('common.project')
-                                              }
-                                            />
+                                            {projectLabel}
                                           </span>
                                         </button>
                                       </li>
                                     );
                                   })}
+                                  {hiddenTaskCount > 0 && (
+                                    <li className="text-[0.625rem] tb-muted px-0.5">
+                                      {t('calendar.moreDeadlines', {
+                                        count: String(hiddenTaskCount),
+                                      })}
+                                    </li>
+                                  )}
                                 </ul>
                               )}
                             </div>
@@ -468,107 +875,157 @@ export default function TaskCalendarDialog({ open, onClose }: TaskCalendarDialog
                             gridTemplateRows: `repeat(${maxLanes}, ${laneHeight}rem)`,
                           }}
                         >
-                          {segments.map((segment) => (
-                            <div
-                              key={`${segment.event.id}-${weekIndex}-${segment.startCol}`}
-                              className={segmentClassName(segment)}
-                              style={{
+                          {segments.map((segment) =>
+                            visitSegmentButton(
+                              segment,
+                              `${segment.event.id}-${weekIndex}-${segment.startCol}`,
+                              {
                                 gridColumn: `${segment.startCol + 1} / span ${segment.span}`,
                                 gridRow: segment.lane + 1,
-                              }}
-                              title={formatDateRange(segment.event.start_date, segment.event.end_date)}
-                            >
-                              <span className="truncate">{segment.event.title}</span>
-                            </div>
-                          ))}
+                              },
+                              openEditEvent
+                            )
+                          )}
                         </div>
                       )}
                     </div>
                   );
                 })}
               </div>
+                </>
+              )}
 
-              {mobileCalendar && monthTaskEntries.length > 0 && (
-                <div className="tb-calendar-mobile-agenda mt-5">
-                  <p className="tb-field-label mb-3">Deadlines this month</p>
+              {mobileCalendar && mobileAgendaEntries.length > 0 && (
+                <div
+                  className={`tb-calendar-mobile-agenda mt-5${
+                    viewMode === 'week' ? ' tb-calendar-mobile-agenda--week' : ''
+                  }`}
+                >
+                  <p className="tb-field-label mb-3">
+                    {viewMode === 'week'
+                      ? t('calendar.deadlinesThisWeek')
+                      : t('calendar.deadlinesThisMonth')}
+                  </p>
                   <ul className="space-y-4">
-                    {monthTaskEntries.map(([dateKey, dayTasks]) => (
+                    {mobileAgendaEntries.map(([dateKey, dayTasks]) => {
+                      const dayVisits = visitsOnDate(events, dateKey);
+                      return (
                       <li key={dateKey}>
                         <p className="tb-calendar-agenda-date">{formatAgendaDate(dateKey)}</p>
+                        {dayVisits.length > 0 && (
+                          <ul className="space-y-1.5 mt-2 mb-2">
+                            {dayVisits.map((visit) => (
+                              <li key={visit.id}>
+                                <button
+                                  type="button"
+                                  onClick={() => openEditEvent(visit)}
+                                  className="tb-calendar-week-visit text-sm w-full text-left"
+                                >
+                                  {visit.title}
+                                </button>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
                         <ul className="space-y-2 mt-1.5">
                           {dayTasks.map((task) => {
-                            const status = getDeadlineStatus(task.deadline, task.completed);
+                            const projectLabel =
+                              projectNames[task.project_id] ?? t('common.project');
+                            const assigneeLabel =
+                              task.assignees?.length > 0 ? task.assignees.join(', ') : null;
+                            const useWeekStyle = viewMode === 'week';
+                            const colorClass = taskProjectColorClass(task.project_id);
+
                             return (
                               <li key={task.id}>
                                 <button
                                   type="button"
                                   onClick={() => handleTaskClick(task)}
-                                  className={`tb-calendar-agenda-task ${deadlineClasses[status]}`}
+                                  className={
+                                    useWeekStyle
+                                      ? `tb-calendar-week-task w-full ${colorClass}`
+                                      : `tb-calendar-agenda-task ${colorClass}`
+                                  }
                                 >
-                                  <span className="block font-medium">
+                                  <span
+                                    className={
+                                      useWeekStyle
+                                        ? 'tb-calendar-week-task-title'
+                                        : 'block font-medium'
+                                    }
+                                  >
                                     {task.task_name || 'Untitled task'}
                                   </span>
-                                  <span className="block tb-calendar-agenda-task-sub opacity-80">
-                                    <TranslatableText
-                                      text={
-                                        projectNames[task.project_id] ?? t('common.project')
-                                      }
-                                    />
+                                  <span
+                                    className={
+                                      useWeekStyle
+                                        ? 'tb-calendar-week-task-meta'
+                                        : 'block tb-calendar-agenda-task-sub opacity-80'
+                                    }
+                                  >
+                                    {projectLabel}
                                   </span>
+                                  {useWeekStyle && assigneeLabel && (
+                                    <span className="tb-calendar-week-task-meta">
+                                      {t('task.assignedTo')}: {assigneeLabel}
+                                    </span>
+                                  )}
                                 </button>
                               </li>
                             );
                           })}
                         </ul>
                       </li>
-                    ))}
+                    );
+                    })}
                   </ul>
                 </div>
               )}
 
-              {tasksByDate.size === 0 && events.length === 0 && (
-                <p className="text-sm tb-muted mt-4">No deadlines or visits yet.</p>
+                </>
               )}
 
-              {events.length > 0 && (
-                <div className="mt-6">
-                  <p className="tb-field-label mb-3">Prague visits</p>
-                  <ul className="space-y-2">
-                    {events.map((event) => (
-                      <li
-                        key={event.id}
-                        className="flex items-center justify-between gap-3 py-2 border-b tb-calendar-border last:border-0"
-                      >
-                        <div>
-                          <p className="text-sm tb-text">{event.title}</p>
-                          <p className="text-xs tb-muted">
-                            {formatDateRange(event.start_date, event.end_date)}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteEvent(event)}
-                          disabled={deletingId === event.id}
-                          className="p-2 text-[#80868b] hover:text-red-600 transition-colors disabled:opacity-50"
-                          aria-label={`Remove ${event.title}`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+              {isViewEmpty && (
+                <p className="text-sm tb-muted mt-4">{t('calendar.emptySchedule')}</p>
               )}
+
             </>
           )}
         </div>
 
+      {!isPage ? (
         <div className="px-6 py-4 border-t tb-calendar-border flex justify-end shrink-0">
           <button type="button" onClick={onClose} className="tb-link px-3 py-2">
-            Close
+            {t('common.close')}
           </button>
         </div>
-      </div>
+      ) : null}
+    </div>
+  );
+
+  const addTaskDialog = (
+    <AddTaskDialog
+      open={addTaskOpen}
+      onClose={() => setAddTaskOpen(false)}
+      onCreate={handleCreateTask}
+      defaultProjectId={defaultAddTaskProjectId}
+    />
+  );
+
+  if (isPage) {
+    return (
+      <>
+        {panel}
+        {addTaskDialog}
+      </>
+    );
+  }
+
+  return (
+    <div className="taskboard fixed inset-0 z-[80] flex items-center justify-center px-4 sm:px-6">
+      <div className="absolute inset-0 tb-overlay" onClick={onClose} />
+      {panel}
+      {addTaskDialog}
     </div>
   );
 }

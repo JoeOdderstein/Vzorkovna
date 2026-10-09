@@ -162,3 +162,41 @@ export async function updateInvoiceStatus(
   if (error) throw error;
   return mapInvoice(data as Record<string, unknown>);
 }
+
+export async function deleteInvoice(invoiceId: string, actorUsername: string): Promise<void> {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Deletes require Supabase.');
+  }
+
+  const actor = actorUsername.trim().toLowerCase();
+  if (!actor) throw new Error('You must be logged in to delete an invoice.');
+
+  const supabase = await db();
+
+  const { data: existing, error: fetchError } = await supabase
+    .from('invoices')
+    .select('id, storage_path, uploaded_by')
+    .eq('id', invoiceId)
+    .maybeSingle();
+
+  if (fetchError) throw fetchError;
+  if (!existing) throw new Error('Invoice not found.');
+  if (String(existing.uploaded_by).toLowerCase() !== actor) {
+    throw new Error('You can only delete invoices you uploaded.');
+  }
+
+  const storagePath = String(existing.storage_path ?? '');
+
+  const { error: deleteError } = await supabase.from('invoices').delete().eq('id', invoiceId);
+
+  if (deleteError) throw deleteError;
+
+  if (storagePath) {
+    const { error: storageError } = await supabase.storage
+      .from('task-attachments')
+      .remove([storagePath]);
+    if (storageError) {
+      console.warn('Invoice row deleted but PDF removal failed:', storageError);
+    }
+  }
+}

@@ -11,6 +11,8 @@ interface TaskCardProps {
   isSubtask?: boolean;
   onClick: () => void;
   onComplete?: (taskId: string) => void;
+  /** Same palette as calendar (`tb-cal-project-N`). */
+  projectColorClass?: string;
   /** Use a div for the title so parent drag sensors are not blocked by nested buttons. */
   titleAsDiv?: boolean;
   expandControl?: {
@@ -24,6 +26,7 @@ export default function TaskCard({
   isSubtask = false,
   onClick,
   onComplete,
+  projectColorClass,
   titleAsDiv = false,
   expandControl,
 }: TaskCardProps) {
@@ -32,11 +35,14 @@ export default function TaskCard({
   const deadlineStatus = getDeadlineStatus(task.deadline, task.completed);
   const titleClassName =
     'min-w-0 flex-1 text-left hover:opacity-80 transition-opacity cursor-pointer';
+  const cardColorClass = projectColorClass
+    ? projectColorClass
+    : `border-l-2 ${priorityBorderClasses[task.priority]}`;
 
   return (
     <div
       data-task-card
-      className={`w-full tb-card border-l-2 ${priorityBorderClasses[task.priority]} px-3 py-3`}
+      className={`w-full tb-card ${cardColorClass} px-3 py-3`}
     >
       <div className="flex items-start gap-2">
         {expandControl && (

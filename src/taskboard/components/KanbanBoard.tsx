@@ -85,6 +85,7 @@ function getPromoteCandidate(
 interface KanbanBoardProps {
   categories: CategoryOption[];
   tasks: Task[];
+  projectColorClass?: string;
   collapsed: Record<string, boolean>;
   onToggleCollapse: (parentId: string) => void;
   onTaskClick: (task: Task) => void;
@@ -116,10 +117,12 @@ function NestDropTarget({
 
 function DraggableSubtask({
   task,
+  projectColorClass,
   onTaskClick,
   onCompleteTask,
 }: {
   task: Task;
+  projectColorClass?: string;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
 }) {
@@ -142,6 +145,7 @@ function DraggableSubtask({
       <TaskCard
         task={task}
         isSubtask
+        projectColorClass={projectColorClass}
         onClick={() => onTaskClick(task)}
         onComplete={onCompleteTask}
         titleAsDiv
@@ -154,6 +158,7 @@ function SortableGroup({
   group,
   collapsed,
   nestReadyId,
+  projectColorClass,
   onToggleCollapse,
   onTaskClick,
   onCompleteTask,
@@ -161,6 +166,7 @@ function SortableGroup({
   group: TaskGroup;
   collapsed: boolean;
   nestReadyId: string | null;
+  projectColorClass?: string;
   onToggleCollapse: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
@@ -186,6 +192,7 @@ function SortableGroup({
         <NestDropTarget showNestHint={nestReadyId === group.parent.id}>
           <TaskCard
             task={group.parent}
+            projectColorClass={projectColorClass}
             onClick={() => onTaskClick(group.parent)}
             onComplete={onCompleteTask}
             titleAsDiv
@@ -206,6 +213,7 @@ function SortableGroup({
             <DraggableSubtask
               key={sub.id}
               task={sub}
+              projectColorClass={projectColorClass}
               onTaskClick={onTaskClick}
               onCompleteTask={onCompleteTask}
             />
@@ -226,6 +234,7 @@ function Column({
   isDraggingSubtask,
   isDragOver,
   isDragging,
+  projectColorClass,
   onToggleCollapse,
   onTaskClick,
   onCompleteTask,
@@ -242,6 +251,7 @@ function Column({
   isDraggingSubtask: boolean;
   isDragOver: boolean;
   isDragging: boolean;
+  projectColorClass?: string;
   onToggleCollapse: (id: string) => void;
   onTaskClick: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
@@ -292,6 +302,7 @@ function Column({
               group={group}
               collapsed={collapsed[group.parent.id] ?? true}
               nestReadyId={nestReadyId}
+              projectColorClass={projectColorClass}
               onToggleCollapse={onToggleCollapse}
               onTaskClick={onTaskClick}
               onCompleteTask={onCompleteTask}
@@ -399,6 +410,7 @@ function AddCategoryColumn({
 export default function KanbanBoard({
   categories,
   tasks,
+  projectColorClass,
   collapsed,
   onToggleCollapse,
   onTaskClick,
@@ -675,6 +687,7 @@ export default function KanbanBoard({
               isDraggingSubtask={isDraggingSubtask}
               isDragOver={overColumnId === id}
               isDragging={isDragging}
+              projectColorClass={projectColorClass}
               onToggleCollapse={onToggleCollapse}
               onTaskClick={onTaskClick}
               onCompleteTask={onCompleteTask}
@@ -694,6 +707,7 @@ export default function KanbanBoard({
             <TaskCard
               task={activeTask}
               isSubtask={Boolean(activeTask.parent_task_id)}
+              projectColorClass={projectColorClass}
               onClick={() => {}}
             />
           </div>

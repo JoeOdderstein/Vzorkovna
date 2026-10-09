@@ -6,6 +6,7 @@ import { useAssigneeNames } from '../../hooks/useAssigneeNames';
 import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
 import {
   buildAssigneeFilters,
+  filterTasksByProject,
   orderAssigneeFiltersForUser,
   type AssigneeFilter,
 } from '../../lib/taskboard/filterUtils';
@@ -21,17 +22,22 @@ function countTasksForFilter(tasks: Task[], id: AssigneeFilter) {
 export default function AssigneeFilterBar() {
   const { username } = useTaskboardAuth();
   const { profile } = useUserProfile();
-  const { assigneeFilter, setAssigneeFilter, tasksForCounts } = useTaskboardFilter();
+  const { assigneeFilter, setAssigneeFilter, tasksForCounts, projectFilter } = useTaskboardFilter();
   const assigneeNames = useAssigneeNames();
   const { t } = useTaskboardI18n();
+
+  const tasksForAssigneeCounts = useMemo(
+    () => filterTasksByProject(tasksForCounts, projectFilter),
+    [tasksForCounts, projectFilter]
+  );
 
   const counts = useMemo(() => {
     const map: Record<AssigneeFilter, number> = { all: 0 } as Record<AssigneeFilter, number>;
     for (const { id } of buildAssigneeFilters(assigneeNames)) {
-      map[id] = countTasksForFilter(tasksForCounts, id);
+      map[id] = countTasksForFilter(tasksForAssigneeCounts, id);
     }
     return map;
-  }, [tasksForCounts, assigneeNames]);
+  }, [tasksForAssigneeCounts, assigneeNames]);
 
   const currentAssignee =
     profile?.board_name ?? (username ? defaultBoardNameForUsername(username) : null);

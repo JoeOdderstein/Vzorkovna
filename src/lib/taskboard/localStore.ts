@@ -517,13 +517,32 @@ export const localStore = {
   createCalendarEvent: (input: CalendarEventInsert): CalendarEvent => {
     const event: CalendarEvent = {
       id: newId(),
-      title: input.title.trim() || 'Prague visit',
+      title: input.title.trim() || 'Event',
       start_date: input.start_date,
       end_date: input.end_date,
       created_at: now(),
     };
     saveCalendarEvents([...loadCalendarEvents(), event]);
     return event;
+  },
+
+  updateCalendarEvent: (
+    id: string,
+    input: CalendarEventInsert
+  ): CalendarEvent => {
+    const events = loadCalendarEvents();
+    const index = events.findIndex((event) => event.id === id);
+    if (index === -1) throw new Error('Event not found.');
+    const updated: CalendarEvent = {
+      ...events[index],
+      title: input.title.trim() || 'Event',
+      start_date: input.start_date,
+      end_date: input.end_date,
+    };
+    const next = [...events];
+    next[index] = updated;
+    saveCalendarEvents(next);
+    return updated;
   },
 
   deleteCalendarEvent: (id: string): void => {

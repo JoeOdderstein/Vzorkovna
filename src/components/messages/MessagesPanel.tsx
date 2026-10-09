@@ -1,52 +1,110 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { CheckSquare, ExternalLink } from 'lucide-react';
-import CommentAuthorBlock from '../CommentAuthorBlock';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useMessagesCompose } from '../../context/MessagesComposeContext';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useUserProfile } from '../../context/UserProfileContext';
-import { useAssigneeNames } from '../../hooks/useAssigneeNames';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
-import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
-import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
-import { fetchCategoriesForProject } from '../../lib/taskboard/categoryService';
-import { DEFAULT_CATEGORIES } from '../../lib/taskboard/categoryUtils';
-import type { Assignee, TaskCategory } from '../../lib/taskboard/constants';
-import { formatCommentTimestamp } from '../../lib/taskboard/commentFormat';
+import { fetchAssigneeNames, fetchMembers } from '../../lib/taskboard/memberService';
 import {
-  createTeamMessage,
-  fetchTeamMessages,
+  fetchTeamMessagesOlderThan,
+  fetchTeamMessagesRecent,
+  fetchTeamMessagesWindow,
   isTeamMessagesReady,
+  mergeTeamMessagesById,
   subscribeToTeamMessages,
+  TEAM_MESSAGES_PAGE_SIZE,
 } from '../../lib/messages/teamMessageService';
 import type { TeamMessage } from '../../lib/messages/types';
-import { fetchVisibleProjects } from '../../lib/taskboard/taskService';
-import type { CategoryOption, Project } from '../../lib/taskboard/types';
-import CategorySelect from '../../taskboard/components/CategorySelect';
-import { translateCategoryLabel } from '../../lib/taskboard/i18n/messages';
+import { withRetry } from '../../lib/taskboard/loadUtils';
+import { ensureSupabaseSession } from '../../lib/supabase';
+import { isSupabaseConfigured } from '../../lib/taskboard/config';
+import { fetchProjects, fetchVisibleProjects } from '../../lib/taskboard/taskService';
+import type { Project } from '../../lib/taskboard/types';
+import {
+  buildAssigneeOptionsFromMembers,
+  buildAssigneeOptionsFromNames,
+  type TaskboardAssigneeOption,
+} from './MessageActionPointFields';
+import MessageComposeForm from './MessageComposeForm';
+import MessageRow from './MessageRow';
 
 export default function MessagesPanel() {
-  const { username, isAdmin } = useTaskboardAuth();
+  const { username, isAdmin, sessionReady } = useTaskboardAuth();
   const { profile } = useUserProfile();
-  const assigneeNames = useAssigneeNames();
   const { t, locale } = useTaskboardI18n();
+  const { drawerOpen: composeDrawerOpen, setComposeWillOpenHandler } = useMessagesCompose();
+  const prevComposeDrawerOpenRef = useRef<boolean | null>(null);
 
   const [messages, setMessages] = useState<TeamMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(true);
   const [error, setError] = useState('');
+  const [hasMoreOlder, setHasMoreOlder] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
 
-  const [body, setBody] = useState('');
-  const [addAction, setAddAction] = useState(false);
-  const [actionTitle, setActionTitle] = useState('');
+  const [projectFilter, setProjectFilter] = useState<'all' | string>('all');
   const [projects, setProjects] = useState<Project[]>([]);
-  const [projectId, setProjectId] = useState('');
-  const [category, setCategory] = useState<TaskCategory>('quotations');
-  const [categories, setCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES);
-  const [assignees, setAssignees] = useState<Assignee[]>([]);
-  const [submitting, setSubmitting] = useState(false);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [assigneeOptions, setAssigneeOptions] = useState<TaskboardAssigneeOption[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
+  const [teamReady, setTeamReady] = useState(true);
 
-  const feedEndRef = useRef<HTMLDivElement>(null);
+  const feedScrollRef = useRef<HTMLElement>(null);
+  const messagesRef = useRef<TeamMessage[]>([]);
+  const stickToBottomRef = useRef(true);
+  /** After refresh / filter change, stay pinned until the user scrolls away from the bottom. */
+  const pinFeedToBottomRef = useRef(true);
+  const loadingOlderScrollRef = useRef(false);
+  const prevScrollHeightRef = useRef(0);
+  const prevFilteredCountRef = useRef(0);
+  /** Ignore scroll events while the feed resizes (compose drawer open/close). */
+  const ignoreFeedScrollPinResetRef = useRef(false);
+  /** Keep feed scrollTop stable while the compose drawer changes layout. */
+  const preserveFeedScrollRef = useRef(false);
+  /** Distance from bottom — stable when the feed container height changes (compose drawer). */
+  const savedFeedDistanceFromBottomRef = useRef(0);
+
+  const captureFeedScroll = useCallback(() => {
+    const el = feedScrollRef.current;
+    if (!el) return;
+    savedFeedDistanceFromBottomRef.current = Math.max(
+      0,
+      el.scrollHeight - el.scrollTop - el.clientHeight
+    );
+    preserveFeedScrollRef.current = true;
+  }, []);
+
+  const restoreFeedScroll = useCallback(() => {
+    const el = feedScrollRef.current;
+    if (!el) return;
+    const maxScrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+    const nextTop = maxScrollTop - savedFeedDistanceFromBottomRef.current;
+    el.scrollTop = Math.max(0, Math.min(nextTop, maxScrollTop));
+  }, []);
+
+  const restoreFeedScrollAfterLayout = useCallback(() => {
+    restoreFeedScroll();
+    requestAnimationFrame(() => {
+      restoreFeedScroll();
+      requestAnimationFrame(restoreFeedScroll);
+    });
+  }, [restoreFeedScroll]);
+
+  const scrollFeedToBottom = useCallback(() => {
+    const el = feedScrollRef.current;
+    if (!el) return;
+    el.scrollTop = Math.max(0, el.scrollHeight - el.clientHeight);
+  }, []);
+
+  const stickFeedToBottomAfterLayout = useCallback(() => {
+    scrollFeedToBottom();
+    requestAnimationFrame(() => {
+      scrollFeedToBottom();
+      requestAnimationFrame(scrollFeedToBottom);
+    });
+  }, [scrollFeedToBottom]);
+
+  messagesRef.current = messages;
 
   const displayName = useMemo(() => {
     if (profile?.board_name?.trim()) return profile.board_name.trim();
@@ -54,24 +112,68 @@ export default function MessagesPanel() {
     return '';
   }, [profile?.board_name, username]);
 
-  const localizedCategories = useMemo(
-    () =>
-      categories.map((item) => ({
-        ...item,
-        label: translateCategoryLabel(locale, item.id, item.label),
-      })),
-    [categories, locale]
-  );
+  const loadInitial = useCallback(async () => {
+    const { messages: rows, hasMoreOlder: more } = await fetchTeamMessagesRecent();
+    setMessages(rows);
+    setHasMoreOlder(more);
+    setError('');
+    stickToBottomRef.current = true;
+    pinFeedToBottomRef.current = true;
+  }, []);
 
   const reload = useCallback(async () => {
     try {
-      const rows = await fetchTeamMessages();
-      setMessages(rows);
+      const count = Math.max(TEAM_MESSAGES_PAGE_SIZE, messagesRef.current.length + 1);
+      const { messages: rows, hasMoreOlder: more } = await fetchTeamMessagesWindow(count);
+      setMessages((prev) => mergeTeamMessagesById(prev, rows));
+      setHasMoreOlder(more);
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : t('messages.loadError'));
     }
   }, [t]);
+
+  const loadOlder = useCallback(async () => {
+    const oldest = messagesRef.current[0];
+    if (!oldest || loadingOlder) return;
+
+    const el = feedScrollRef.current;
+    if (el) {
+      prevScrollHeightRef.current = el.scrollHeight;
+      loadingOlderScrollRef.current = true;
+    }
+    stickToBottomRef.current = false;
+    pinFeedToBottomRef.current = false;
+    setLoadingOlder(true);
+    setError('');
+
+    try {
+      const { messages: older, hasMoreOlder: more } = await fetchTeamMessagesOlderThan(oldest);
+      if (older.length === 0) {
+        setHasMoreOlder(false);
+        return;
+      }
+      setMessages((prev) => {
+        const seen = new Set(prev.map((m) => m.id));
+        const merged = [...older.filter((m) => !seen.has(m.id)), ...prev];
+        return merged;
+      });
+      setHasMoreOlder(more);
+    } catch (err) {
+      loadingOlderScrollRef.current = false;
+      setError(err instanceof Error ? err.message : t('messages.loadError'));
+    } finally {
+      setLoadingOlder(false);
+    }
+  }, [loadingOlder, t]);
+
+  const onMessageMutated = useCallback(() => {
+    void reload();
+  }, [reload]);
+
+  const onMessageDeleted = useCallback((messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -84,7 +186,7 @@ export default function MessagesPanel() {
           setLoading(false);
           return;
         }
-        return reload();
+        return loadInitial();
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -92,97 +194,227 @@ export default function MessagesPanel() {
     return () => {
       cancelled = true;
     };
+  }, [loadInitial]);
+
+  const reloadDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const scheduleReload = useCallback(() => {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+      return;
+    }
+    if (reloadDebounceRef.current) clearTimeout(reloadDebounceRef.current);
+    reloadDebounceRef.current = setTimeout(() => {
+      reloadDebounceRef.current = null;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
+        return;
+      }
+      void reload();
+    }, 1200);
   }, [reload]);
 
   useEffect(() => {
     if (!ready) return;
-    return subscribeToTeamMessages(() => {
-      void reload();
-    });
-  }, [ready, reload]);
+    const unsub = subscribeToTeamMessages(scheduleReload);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        void reload();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      unsub();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [ready, scheduleReload, reload]);
 
-  useEffect(() => {
-    if (!username) return;
-    void fetchVisibleProjects(username, isAdmin)
-      .then((list) => {
-        setProjects(list);
-        setProjectId((current) =>
-          current && list.some((p) => p.id === current) ? current : list[0]?.id ?? ''
-        );
-      })
-      .catch(() => setProjects([]));
+  const loadTaskboardContext = useCallback(async () => {
+    if (!username) {
+      return { projects: [] as Project[], assigneeOptions: [] as TaskboardAssigneeOption[] };
+    }
+    setLoadingProjects(true);
+    setLoadingTeam(true);
+
+    let list: Project[] = [];
+    let options: TaskboardAssigneeOption[] = [];
+
+    try {
+      if (isSupabaseConfigured()) {
+        await ensureSupabaseSession();
+      }
+      list = await withRetry(() =>
+        isAdmin ? fetchProjects() : fetchVisibleProjects(username, isAdmin)
+      );
+    } catch (err) {
+      setProjects([]);
+      list = [];
+      console.error('Messages: could not load projects', err);
+    } finally {
+      setLoadingProjects(false);
+    }
+
+    if (list.length > 0) {
+      setProjects(list);
+    }
+
+    try {
+      if (isAdmin) {
+        const membersResult = await fetchMembers();
+        setTeamReady(membersResult.membersReady);
+        options = buildAssigneeOptionsFromMembers(membersResult.members);
+      } else {
+        setTeamReady(true);
+        const names = await fetchAssigneeNames();
+        options = buildAssigneeOptionsFromNames(names);
+      }
+      if (options.length === 0) {
+        const names = await fetchAssigneeNames();
+        options = buildAssigneeOptionsFromNames(names);
+      }
+      setAssigneeOptions(options);
+    } catch {
+      try {
+        const names = await fetchAssigneeNames();
+        options = buildAssigneeOptionsFromNames(names);
+        setAssigneeOptions(options);
+        setTeamReady(true);
+      } catch {
+        setAssigneeOptions([]);
+        options = [];
+      }
+    } finally {
+      setLoadingTeam(false);
+    }
+
+    return { projects: list, assigneeOptions: options };
   }, [username, isAdmin]);
 
   useEffect(() => {
-    if (!projectId) return;
-    void fetchCategoriesForProject(projectId)
-      .then((list) => {
-        setCategories(list);
-        setCategory((current) =>
-          list.some((item) => item.id === current) ? current : list[0]?.id ?? 'quotations'
-        );
-      })
-      .catch(() => setCategories(DEFAULT_CATEGORIES));
-  }, [projectId]);
+    if (!ready || !username || !sessionReady) return;
+    void loadTaskboardContext();
+  }, [ready, username, sessionReady, loadTaskboardContext]);
+
+  const filteredMessages = useMemo(() => {
+    if (projectFilter === 'all') return messages;
+    return messages.filter((message) => message.project_id === projectFilter);
+  }, [messages, projectFilter]);
 
   useEffect(() => {
-    if (messages.length === 0) return;
-    feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    stickToBottomRef.current = true;
+    pinFeedToBottomRef.current = true;
+  }, [projectFilter]);
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    const trimmed = body.trim();
-    if (!trimmed || !username) return;
+  useEffect(() => {
+    const onComposeWillOpen = () => {
+      ignoreFeedScrollPinResetRef.current = true;
+      captureFeedScroll();
+    };
+    setComposeWillOpenHandler(onComposeWillOpen);
+    return () => setComposeWillOpenHandler(null);
+  }, [captureFeedScroll, setComposeWillOpenHandler]);
 
-    if (addAction) {
-      if (!actionTitle.trim()) {
-        setError(t('messages.actionTitleRequired'));
-        return;
-      }
-      if (!projectId) {
-        setError(t('messages.projectRequired'));
-        return;
-      }
-      if (assignees.length === 0) {
-        setError(t('messages.assigneeRequired'));
-        return;
-      }
+  const onFeedScroll = useCallback(() => {
+    if (ignoreFeedScrollPinResetRef.current) return;
+    const el = feedScrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const nearBottom = distanceFromBottom < 48;
+    stickToBottomRef.current = nearBottom;
+    if (!nearBottom) {
+      pinFeedToBottomRef.current = false;
+    }
+  }, []);
+
+  useLayoutEffect(() => {
+    if (messagesRef.current.length === 0) return;
+
+    if (prevComposeDrawerOpenRef.current === null) {
+      prevComposeDrawerOpenRef.current = composeDrawerOpen;
+      return;
+    }
+    if (prevComposeDrawerOpenRef.current === composeDrawerOpen) {
+      return;
+    }
+    prevComposeDrawerOpenRef.current = composeDrawerOpen;
+
+    ignoreFeedScrollPinResetRef.current = true;
+    restoreFeedScrollAfterLayout();
+
+    const timers = [0, 50, 150, 280, 400, 550, 700].map((ms) =>
+      window.setTimeout(() => restoreFeedScroll(), ms)
+    );
+
+    const endTimer = window.setTimeout(() => {
+      preserveFeedScrollRef.current = false;
+      ignoreFeedScrollPinResetRef.current = false;
+    }, 750);
+
+    return () => {
+      for (const id of timers) window.clearTimeout(id);
+      window.clearTimeout(endTimer);
+      preserveFeedScrollRef.current = false;
+      ignoreFeedScrollPinResetRef.current = false;
+    };
+  }, [composeDrawerOpen, restoreFeedScroll, restoreFeedScrollAfterLayout]);
+
+  useLayoutEffect(() => {
+    const el = feedScrollRef.current;
+    if (!el || filteredMessages.length === 0) return;
+
+    if (loadingOlderScrollRef.current) {
+      const delta = el.scrollHeight - prevScrollHeightRef.current;
+      el.scrollTop += delta;
+      loadingOlderScrollRef.current = false;
+      prevFilteredCountRef.current = filteredMessages.length;
+      return;
     }
 
-    setSubmitting(true);
-    setError('');
-    try {
-      await createTeamMessage({
-        body: trimmed,
-        author: { username, displayName },
-        actionPoint: addAction
-          ? {
-              taskName: actionTitle.trim(),
-              projectId,
-              category,
-              assignees,
-            }
-          : null,
-      });
-      setBody('');
-      setActionTitle('');
-      setAssignees([]);
-      setAddAction(false);
-      await reload();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : t('messages.postError'));
-    } finally {
-      setSubmitting(false);
+    if (preserveFeedScrollRef.current) {
+      restoreFeedScroll();
+    } else if (pinFeedToBottomRef.current || stickToBottomRef.current) {
+      stickFeedToBottomAfterLayout();
     }
-  };
+    prevFilteredCountRef.current = filteredMessages.length;
+  }, [
+    filteredMessages.length,
+    messages.length,
+    loading,
+    stickFeedToBottomAfterLayout,
+    restoreFeedScroll,
+  ]);
 
-  const onComposerKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && !addAction) {
-      e.preventDefault();
-      if (!submitting && body.trim()) void handleSubmit(e as unknown as FormEvent);
+  useEffect(() => {
+    const el = feedScrollRef.current;
+    if (!el || filteredMessages.length === 0) return;
+
+    const onResize = () => {
+      if (loadingOlderScrollRef.current) return;
+      if (preserveFeedScrollRef.current) {
+        restoreFeedScroll();
+        return;
+      }
+      if (pinFeedToBottomRef.current || stickToBottomRef.current) {
+        scrollFeedToBottom();
+      }
+    };
+
+    const observer = new ResizeObserver(onResize);
+    observer.observe(el);
+    const list = el.querySelector('ul');
+    if (list) observer.observe(list);
+    const end = el.querySelector('[data-messages-feed-end]');
+    if (end instanceof HTMLElement) observer.observe(end);
+
+    return () => observer.disconnect();
+  }, [filteredMessages.length, scrollFeedToBottom, composeDrawerOpen, restoreFeedScroll]);
+
+  const messageCountsByProject = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const message of messages) {
+      if (!message.project_id) continue;
+      counts.set(message.project_id, (counts.get(message.project_id) ?? 0) + 1);
     }
-  };
+    return counts;
+  }, [messages]);
 
   if (!ready) {
     return (
@@ -196,187 +428,124 @@ export default function MessagesPanel() {
     );
   }
 
-  return (
-    <div className="max-w-3xl mx-auto">
-      <header className="mb-8">
-        <span className="tb-label block mb-2">{t('nav.remoteInst')}</span>
-        <p className="text-sm tb-muted">{t('messages.pageDescription')}</p>
-      </header>
+  const composeForm = username ? (
+    <MessageComposeForm
+      username={username}
+      displayName={displayName}
+      isAdmin={isAdmin}
+      projects={projects}
+      loadingProjects={loadingProjects}
+      assigneeOptions={assigneeOptions}
+      loadingTeam={loadingTeam}
+      teamReady={teamReady}
+      onPosted={async (created) => {
+            stickToBottomRef.current = true;
+            pinFeedToBottomRef.current = true;
+            setProjectFilter((prev) =>
+          prev === 'all' || prev === created.project_id ? prev : 'all'
+        );
+        setMessages((prev) => mergeTeamMessagesById(prev, [created]));
+        await reload();
+      }}
+      onProjectsReplace={setProjects}
+      onAssigneeOptionsReplace={setAssigneeOptions}
+      reloadTaskboardContext={loadTaskboardContext}
+    />
+  ) : null;
 
-      <section className="tb-remote-inst-card p-4 md:p-6 mb-6 max-h-[min(52vh,520px)] overflow-y-auto">
+  return (
+    <div className="flex flex-col flex-1 min-h-0 w-full gap-3">
+      {projects.length > 0 ? (
+        <div
+          className="tb-header-scroll-row tb-header-scroll-row--filters shrink-0"
+          role="group"
+          aria-label={t('messages.filterByProject')}
+        >
+          <button
+            type="button"
+            onClick={() => setProjectFilter('all')}
+            className={`tb-filter-btn relative ${projectFilter === 'all' ? 'tb-filter-btn--active' : ''}`}
+          >
+            {t('filter.all')}
+            {messages.length > 0 && (
+              <span className="tb-filter-count">{messages.length}</span>
+            )}
+          </button>
+          {projects.map((project) => {
+            const count = messageCountsByProject.get(project.id) ?? 0;
+            const active = projectFilter === project.id;
+            return (
+              <button
+                key={project.id}
+                type="button"
+                onClick={() => setProjectFilter(project.id)}
+                className={`tb-filter-btn relative ${active ? 'tb-filter-btn--active' : ''}`}
+                title={project.name}
+              >
+                <span className="max-w-[12rem] truncate">{project.name}</span>
+                {count > 0 && <span className="tb-filter-count">{count}</span>}
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <section
+        ref={feedScrollRef}
+        onScroll={onFeedScroll}
+        className="tb-remote-inst-card p-4 md:p-6 flex-1 min-h-0 overflow-y-auto min-h-[14rem] max-h-[min(62vh,720px)]"
+      >
         {loading && messages.length === 0 ? (
           <p className="text-sm tb-muted">{t('messages.loading')}</p>
         ) : null}
         {!loading && messages.length === 0 ? (
           <p className="text-sm tb-muted">{t('messages.empty')}</p>
         ) : null}
+        {!loading && messages.length > 0 && filteredMessages.length === 0 ? (
+          <p className="text-sm tb-muted">{t('messages.noMessagesForProject')}</p>
+        ) : null}
+        {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
+        {hasMoreOlder ? (
+          <div className="mb-4 flex justify-center">
+            <button
+              type="button"
+              className="tb-btn-secondary text-sm disabled:opacity-50"
+              disabled={loadingOlder}
+              onClick={() => void loadOlder()}
+            >
+              {loadingOlder ? t('messages.loadingOlder') : t('messages.loadOlder')}
+            </button>
+          </div>
+        ) : null}
         <ul className="space-y-4">
-          {messages.map((message) => (
-            <MessageRow key={message.id} message={message} />
+          {filteredMessages.map((message) => (
+            <MessageRow
+              key={message.id}
+              message={message}
+              locale={locale}
+              currentUsername={username}
+              projects={projects}
+              isAdmin={isAdmin}
+              onMutated={onMessageMutated}
+              onDeleted={onMessageDeleted}
+            />
           ))}
         </ul>
-        <div ref={feedEndRef} />
+        <div data-messages-feed-end className="h-px w-full shrink-0" aria-hidden />
       </section>
 
-      <form onSubmit={handleSubmit} className="tb-remote-inst-card p-4 md:p-6 space-y-4">
-        <label className="block">
-          <span className="tb-field-label mb-2 block">{t('messages.composeLabel')}</span>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onKeyDown={onComposerKeyDown}
-            rows={4}
-            className="field-input w-full resize-y min-h-[6rem]"
-            placeholder={t('messages.composePlaceholder')}
-            disabled={submitting}
-          />
-          <span className="text-xs tb-muted mt-1 block">{t('messages.composeHint')}</span>
-        </label>
-
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={addAction}
-            onChange={(e) => setAddAction(e.target.checked)}
-            className="rounded border-[var(--tb-border)]"
-            disabled={submitting}
-          />
-          <span className="text-sm font-medium">{t('messages.addActionPoint')}</span>
-        </label>
-
-        {addAction ? (
-          <div className="space-y-4 pl-0 sm:pl-6 border-l-2 border-[var(--tb-accent)]/30 ml-1">
-            <label className="block">
-              <span className="tb-field-label mb-2 block">{t('messages.actionTitle')}</span>
-              <input
-                type="text"
-                value={actionTitle}
-                onChange={(e) => setActionTitle(e.target.value)}
-                className="field-input w-full"
-                placeholder={t('messages.actionTitlePlaceholder')}
-                disabled={submitting}
-              />
-            </label>
-
-            <div>
-              <span className="tb-field-label mb-2 block">{t('common.project')}</span>
-              {projects.length === 0 ? (
-                <p className="text-sm tb-muted">{t('messages.noProjects')}</p>
-              ) : (
-                <select
-                  value={projectId}
-                  onChange={(e) => setProjectId(e.target.value)}
-                  className="field-input w-full"
-                  disabled={submitting}
-                >
-                  {projects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div>
-              <span className="tb-field-label mb-2 block">{t('task.category')}</span>
-              <CategorySelect
-                id="messages-action-category"
-                categories={localizedCategories}
-                value={category}
-                onChange={setCategory}
-                className="field-input w-full"
-              />
-            </div>
-
-            <div>
-              <span className="tb-field-label mb-2 block">{t('task.assignedTo')}</span>
-              <div className="flex flex-wrap gap-2">
-                {assigneeNames.map((name) => {
-                  const selected = assignees.includes(name);
-                  return (
-                    <button
-                      key={name}
-                      type="button"
-                      onClick={() => setAssignees((prev) => toggleAssignee(prev, name))}
-                      className={`px-3 py-1.5 text-sm rounded-full border transition-colors ${
-                        selected ? 'tb-pill-selected font-medium' : 'tb-pill'
-                      }`}
-                      disabled={submitting}
-                    >
-                      {name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {error ? <p className="text-sm text-red-600">{error}</p> : null}
-
-        <div className="flex justify-end">
-          <button type="submit" className="tb-btn-primary" disabled={submitting || !body.trim()}>
-            {submitting ? t('messages.posting') : t('messages.post')}
-          </button>
+      {composeForm ? (
+        <div
+          className={
+            composeDrawerOpen
+              ? 'h-0 min-h-0 shrink-0 overflow-hidden p-0 m-0'
+              : 'shrink-0 min-h-0 pb-2'
+          }
+          aria-hidden={composeDrawerOpen}
+        >
+          {composeForm}
         </div>
-      </form>
+      ) : null}
     </div>
-  );
-}
-
-function MessageRow({ message }: { message: TeamMessage }) {
-  const { t } = useTaskboardI18n();
-  const authorLabel = message.author_display_name || message.author_username;
-  const task = message.linked_task;
-  const taskHref =
-    task?.project?.slug != null
-      ? `/taskboard?open=${encodeURIComponent(task.project.slug)}&task=${encodeURIComponent(task.id)}`
-      : task
-        ? `/taskboard?task=${encodeURIComponent(task.id)}`
-        : null;
-
-  return (
-    <li>
-      <CommentAuthorBlock username={message.author_username}>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-1">
-          <span className="text-sm font-semibold">{authorLabel}</span>
-          <time className="text-xs tb-muted" dateTime={message.created_at}>
-            {formatCommentTimestamp(message.created_at)}
-          </time>
-        </div>
-        <p className="text-sm whitespace-pre-wrap break-words">{message.body}</p>
-
-        {task && taskHref ? (
-          <div className="mt-3 rounded-lg border border-[var(--tb-border)] bg-[var(--tb-surface-muted)]/50 px-3 py-2.5">
-            <div className="flex items-start gap-2">
-              <CheckSquare size={18} className="shrink-0 mt-0.5 text-[var(--tb-accent)]" aria-hidden />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs tb-muted uppercase tracking-wide mb-0.5">
-                  {t('messages.actionPointCreated')}
-                </p>
-                <p className="text-sm font-medium">{task.task_name}</p>
-                <p className="text-xs tb-muted mt-1">
-                  {task.project?.name ? `${task.project.name}` : null}
-                  {task.assignees.length > 0 ? (
-                    <>
-                      {task.project?.name ? ' · ' : null}
-                      {formatAssignees(task.assignees)}
-                    </>
-                  ) : null}
-                </p>
-                <Link
-                  to={taskHref}
-                  className="inline-flex items-center gap-1 text-sm text-[var(--tb-accent)] hover:underline mt-2"
-                >
-                  {t('messages.openOnTaskboard')}
-                  <ExternalLink size={14} aria-hidden />
-                </Link>
-              </div>
-            </div>
-          </div>
-        ) : null}
-      </CommentAuthorBlock>
-    </li>
   );
 }

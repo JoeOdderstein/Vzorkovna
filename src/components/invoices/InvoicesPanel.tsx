@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FileText, Upload } from 'lucide-react';
+import { FileText, Trash2, Upload } from 'lucide-react';
 import UploadInvoiceDialog from './UploadInvoiceDialog';
 import InstallationPdfViewer from '../installations/InstallationPdfViewer';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
+  deleteInvoice,
   getInvoicePdfUrl,
   listInvoices,
   updateInvoiceStatus,
@@ -38,6 +39,7 @@ export default function InvoicesPanel() {
   const [loading, setLoading] = useState(true);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [viewer, setViewer] = useState<{ url: string; title: string } | null>(null);
   const [displayNames, setDisplayNames] = useState<Record<string, string>>({});
@@ -85,6 +87,29 @@ export default function InvoicesPanel() {
       setError(t('invoices.openError'));
     } finally {
       setOpeningId(null);
+    }
+  };
+
+  const canDeleteInvoice = useCallback(
+    (invoice: InvoiceRecord) =>
+      Boolean(username && invoice.uploaded_by.trim().toLowerCase() === username.trim().toLowerCase()),
+    [username],
+  );
+
+  const handleDelete = async (invoice: InvoiceRecord) => {
+    if (!username || !canDeleteInvoice(invoice)) return;
+    if (!window.confirm(t('invoices.deleteConfirm'))) return;
+
+    setDeletingId(invoice.id);
+    setError('');
+    try {
+      await deleteInvoice(invoice.id, username);
+      setInvoices((prev) => prev.filter((row) => row.id !== invoice.id));
+      if (viewer?.title === invoice.title) setViewer(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('invoices.deleteFailed'));
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -162,8 +187,9 @@ export default function InvoicesPanel() {
           </div>
           <ul className="space-y-2">
             {invoices.map((invoice) => {
-              const busy = savingId === invoice.id;
+              const busy = savingId === invoice.id || deletingId === invoice.id;
               const opening = openingId === invoice.id;
+              const showDelete = canDeleteInvoice(invoice);
               const ownerName = labelForUser(invoice.uploaded_by);
               const showMeta =
                 (invoice.forwarded_to_finance && invoice.forwarded_to_finance_by) ||
@@ -191,18 +217,34 @@ export default function InvoicesPanel() {
                       <span className="text-[10px] uppercase tracking-wider tb-muted md:hidden mb-1 block">
                         {t('invoices.colName')}
                       </span>
-                      <p className="text-sm tb-text font-medium truncate">{ownerName}</p>
-                      <button
-                        type="button"
-                        className="mt-1 text-xs tb-muted hover:text-[var(--tb-accent)] text-left truncate max-w-full block"
-                        disabled={opening}
-                        onClick={() => void openInvoice(invoice)}
-                      >
-                        {invoice.title}
-                        {opening ? ` (${t('invoices.opening')})` : ''}
-                        {' · '}
-                        {formatWhen(invoice.created_at)}
-                      </button>
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm tb-text font-medium truncate">{ownerName}</p>
+                          <button
+                            type="button"
+                            className="mt-1 text-xs tb-muted hover:text-[var(--tb-accent)] text-left truncate max-w-full block"
+                            disabled={opening}
+                            onClick={() => void openInvoice(invoice)}
+                          >
+                            {invoice.title}
+                            {opening ? ` (${t('invoices.opening')})` : ''}
+                            {' · '}
+                            {formatWhen(invoice.created_at)}
+                          </button>
+                        </div>
+                        {showDelete ? (
+                          <button
+                            type="button"
+                            className="shrink-0 p-2 rounded-md border border-[var(--tb-border)] text-[var(--tb-text-muted)] hover:text-red-600 hover:border-red-300 transition-colors disabled:opacity-50"
+                            disabled={busy}
+                            aria-label={t('invoices.delete')}
+                            title={t('invoices.delete')}
+                            onClick={() => void handleDelete(invoice)}
+                          >
+                            <Trash2 size={16} aria-hidden />
+                          </button>
+                        ) : null}
+                      </div>
                       <span className="text-xs tb-muted block mt-1 md:hidden">
                         {t('invoices.openPdfHint')}
                       </span>

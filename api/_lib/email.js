@@ -599,6 +599,59 @@ export async function sendInvoiceForwardedEmail({
   if (error) throw error;
 }
 
+function buildTeamMessageHtml({ recipientName, authorName, messageTitle, messagesUrl }) {
+  const safeRecipient = escapeHtml(recipientName);
+  const safeAuthor = escapeHtml(authorName);
+  const safeTitle = escapeHtml(messageTitle);
+  const safeUrl = messagesUrl ? escapeHref(messagesUrl) : '';
+
+  const openButton = messagesUrl
+    ? `<a href="${safeUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;margin:16px 0 0;">
+          Open messages
+        </a>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+  <body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;margin:0;padding:24px;background:#f6f6f6;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#666;">Headlight Rabbits — team messages</p>
+      <h1 style="margin:0 0 16px;font-size:22px;">New team message</h1>
+      <p style="margin:0 0 16px;">Hi ${safeRecipient}, <strong>${safeAuthor}</strong> posted a new message:</p>
+      <p style="margin:0 0 16px;font-size:18px;font-weight:600;">${safeTitle}</p>
+      ${openButton}
+      ${messagesUrl ? `<p style="margin:16px 0 0;font-size:12px;color:#888;word-break:break-all;">${safeUrl}</p>` : ''}
+    </div>
+  </body>
+</html>`;
+}
+
+export async function sendTeamMessageEmail({
+  to,
+  recipientName,
+  authorName,
+  messageTitle,
+  messagesUrl,
+}) {
+  const resend = getResend();
+  const from = process.env.EMAIL_FROM;
+
+  if (!resend || !from) {
+    throw new Error('Email is not configured');
+  }
+
+  const subject = `New message: ${messageTitle}`;
+  const html = buildTeamMessageHtml({
+    recipientName,
+    authorName,
+    messageTitle,
+    messagesUrl,
+  });
+
+  const { error } = await resend.emails.send({ from, to, subject, html });
+  if (error) throw error;
+}
+
 export async function sendInviteEmail({
   to,
   boardName,

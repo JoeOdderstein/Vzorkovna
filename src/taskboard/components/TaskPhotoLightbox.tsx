@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
 import { useTaskboardTheme } from '../../context/TaskboardThemeContext';
 
 interface TaskPhotoLightboxProps {
@@ -11,6 +11,8 @@ interface TaskPhotoLightboxProps {
   onNext?: () => void;
   hasPrevious?: boolean;
   hasNext?: boolean;
+  onDownload?: () => void | Promise<void>;
+  downloadLabel?: string;
 }
 
 export default function TaskPhotoLightbox({
@@ -21,6 +23,8 @@ export default function TaskPhotoLightbox({
   onNext,
   hasPrevious = false,
   hasNext = false,
+  onDownload,
+  downloadLabel = 'Download',
 }: TaskPhotoLightboxProps) {
   const { theme } = useTaskboardTheme();
 
@@ -80,6 +84,17 @@ export default function TaskPhotoLightbox({
           )}
         </div>
         <div className="pointer-events-auto flex items-center gap-2 shrink-0">
+          {onDownload ? (
+            <button
+              type="button"
+              onClick={() => void onDownload()}
+              className="tb-photo-lightbox-btn"
+              aria-label={downloadLabel}
+              title={downloadLabel}
+            >
+              <Download size={22} />
+            </button>
+          ) : null}
           {hasPrevious && onPrevious && (
             <button
               type="button"

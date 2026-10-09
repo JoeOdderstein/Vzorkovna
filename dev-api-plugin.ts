@@ -87,8 +87,11 @@ export function taskboardDevApi(): Plugin {
             } as never,
             createDevApiResponse(res) as never,
           );
-        } catch {
-          sendJson(res, 500, { error: 'Server error' });
+        } catch (err) {
+          console.error('Dev API middleware error:', err);
+          sendJson(res, 500, {
+            error: err instanceof Error ? err.message : 'Server error',
+          });
         }
       });
     },

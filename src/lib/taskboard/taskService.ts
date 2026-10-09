@@ -265,6 +265,23 @@ export async function fetchAllActiveTasks() {
   return mapTasks(data ?? []);
 }
 
+/** Active tasks that have a deadline — lighter load for the calendar. */
+export async function fetchActiveTasksWithDeadlines() {
+  if (isLocalTaskboardMode()) {
+    return localStore.getAllActiveTasks().filter((task) => Boolean(task.deadline));
+  }
+
+  const { data, error } = await (await db())
+    .from('tasks')
+    .select('*')
+    .eq('completed', false)
+    .not('deadline', 'is', null)
+    .order('sort_order', { ascending: true });
+
+  if (error) throw error;
+  return mapTasks(data ?? []);
+}
+
 export async function fetchArchivedTasks(search = '') {
   if (isLocalTaskboardMode()) return localStore.getArchivedTasks(search);
 
