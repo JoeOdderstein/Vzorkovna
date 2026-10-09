@@ -557,8 +557,10 @@ function MessageComposeForm({
 
       <p className="text-xs tb-muted -mt-2">{t('messages.suggestComposeHint')}</p>
 
-      <label className="block">
-        <span className="tb-field-label mb-2 block">{t('task.description')}</span>
+      <div className="block">
+        <span id="message-compose-body-label" className="tb-field-label mb-2 block">
+          {t('task.description')}
+        </span>
         <MessageRichTextEditor
           username={username}
           value={body}
@@ -566,9 +568,9 @@ function MessageComposeForm({
           placeholder={t('messages.composePlaceholder')}
           disabled={submitting}
           maxHeightClassName="max-h-[min(16rem,32vh)] md:max-h-[min(14rem,28vh)]"
-          aria-label={t('task.description')}
+          aria-labelledby="message-compose-body-label"
         />
-      </label>
+      </div>
 
       <MessageComposeAttachments
         username={username}

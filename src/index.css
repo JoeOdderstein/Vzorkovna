@@ -1920,6 +1920,35 @@ body {
   cursor: not-allowed;
 }
 
+.message-rich-text-format-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--tb-text-secondary, var(--tb-muted));
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.message-rich-text-format-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--tb-accent) 10%, transparent);
+  color: var(--tb-text);
+}
+
+.message-rich-text-format-btn--active {
+  background: color-mix(in srgb, var(--tb-accent) 16%, transparent);
+  color: var(--tb-accent);
+}
+
+.message-rich-text-format-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .message-rich-text-editor img.message-inline-image,
 .message-rich-text-editor .message-image-block img {
   display: inline-block;
@@ -1959,6 +1988,11 @@ body {
   position: relative;
   line-height: 1.5;
   word-break: break-word;
+  font-weight: 400;
+}
+
+.message-rich-text-editor :where(b, strong) {
+  font-weight: 700;
 }
 
 .message-rich-text-editor .message-image-block--selected {
