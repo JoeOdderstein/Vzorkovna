@@ -510,38 +510,128 @@ export async function updateTeamMessage(
     return enriched;
   }
 
-  const { data, error } = await (await db())
-    .from('team_messages')
-    .update({
+  if (isSupabaseConfigured()) {
+    const viaApi = await updateTeamMessageViaApi(messageId, {
       title,
       body,
-      project_id: input.projectId,
+      projectId: input.projectId,
       category: input.category,
-      feed_summary: null,
-    })
-    .eq('id', messageId)
-    .select('*')
-    .single();
-
-  if (error) {
-    if (/42501|permission|policy/i.test(error.message)) {
-      throw new Error('You can only edit your own messages.');
+    });
+    if (viaApi !== 'unavailable') {
+      if (!authorUsernamesMatch(viaApi.author_username, actorUsername)) {
+        throw new Error('You can only edit your own messages.');
+      }
+      return viaApi;
     }
-    if (/title|project_id|category|column/i.test(error.message)) {
-      throw new Error(
-        'Messages need title and project fields. Run supabase/migrations/029_team_message_title_project.sql in Supabase.'
-      );
-    }
-    throw error;
   }
 
-  if (!data) throw new Error('Message not found.');
+  const basePayload = {
+    title,
+    body,
+    project_id: input.projectId,
+    category: input.category,
+  };
+
+  let { data, error } = await (await db())
+    .from('team_messages')
+    .update({ ...basePayload, feed_summary: null })
+    .eq('id', messageId)
+    .select('*')
+    .maybeSingle();
+
+  if (error && /feed_summary|column/i.test(error.message)) {
+    ({ data, error } = await (await db())
+      .from('team_messages')
+      .update(basePayload)
+      .eq('id', messageId)
+      .select('*')
+      .maybeSingle());
+  }
+
+  if (error) {
+    throw formatTeamMessageUpdateError(error);
+  }
+
+  if (!data) {
+    throw formatTeamMessageUpdateError({ message: 'PGRST116', code: 'PGRST116' });
+  }
+
   const row = mapRow(data as Record<string, unknown>);
   if (!authorUsernamesMatch(row.author_username, actorUsername)) {
     throw new Error('You can only edit your own messages.');
   }
   const [enriched] = await enrichMessages([row]);
   return enriched;
+}
+
+async function updateTeamMessageViaApi(
+  messageId: string,
+  input: UpdateTeamMessageInput
+): Promise<TeamMessage | 'unavailable'> {
+  let res: Response;
+  try {
+    res = await fetch('/api/messages/update', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messageId,
+        title: input.title,
+        body: input.body,
+        projectId: input.projectId,
+        category: input.category,
+      }),
+    });
+  } catch {
+    return 'unavailable';
+  }
+
+  if (res.status === 503 || res.status === 404) {
+    return 'unavailable';
+  }
+
+  const payload = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    message?: Record<string, unknown>;
+  };
+
+  if (!res.ok) {
+    throw new Error(
+      typeof payload.error === 'string' ? payload.error : 'Could not save message.'
+    );
+  }
+
+  if (!payload.message) {
+    throw new Error('Could not save message.');
+  }
+
+  const row = mapRow(payload.message);
+  const [enriched] = await enrichMessages([row]);
+  return enriched;
+}
+
+function formatTeamMessageUpdateError(error: { message?: string; code?: string }): Error {
+  const message = error.message ?? '';
+  if (/42501|permission|policy/i.test(message)) {
+    return new Error('You can only edit your own messages.');
+  }
+  if (/PGRST116|0 rows/i.test(message)) {
+    return new Error(
+      'Message could not be saved. Run supabase/migrations/030_team_messages_author_edit.sql and 031_team_messages_delete_case_insensitive.sql in Supabase if you have not already.'
+    );
+  }
+  if (/title|project_id|category|column/i.test(message)) {
+    return new Error(
+      'Messages need title and project fields. Run supabase/migrations/029_team_message_title_project.sql in Supabase.'
+    );
+  }
+  if (/feed_summary|column/i.test(message)) {
+    return new Error(
+      'Run supabase/migrations/032_team_message_feed_summary.sql in Supabase, then try again.'
+    );
+  }
+  if (message.trim()) return new Error(message);
+  return new Error('Could not save message.');
 }
 
 async function deleteTeamMessageViaApi(messageId: string): Promise<'ok' | 'unavailable'> {
