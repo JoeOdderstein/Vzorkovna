@@ -423,6 +423,15 @@ export default function MessagesPanel() {
     return counts;
   }, [messages]);
 
+  const projectsByMessageCount = useMemo(() => {
+    return [...projects].sort((a, b) => {
+      const countA = messageCountsByProject.get(a.id) ?? 0;
+      const countB = messageCountsByProject.get(b.id) ?? 0;
+      if (countB !== countA) return countB - countA;
+      return a.name.localeCompare(b.name);
+    });
+  }, [projects, messageCountsByProject]);
+
   if (!ready) {
     return (
       <section className="tb-remote-inst-card p-6 md:p-8">
@@ -478,7 +487,7 @@ export default function MessagesPanel() {
               <span className="tb-filter-count">{messages.length}</span>
             )}
           </button>
-          {projects.map((project) => {
+          {projectsByMessageCount.map((project) => {
             const count = messageCountsByProject.get(project.id) ?? 0;
             const active = projectFilter === project.id;
             return (
