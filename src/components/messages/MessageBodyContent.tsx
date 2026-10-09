@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { MESSAGE_FILE_LINK_CLASS } from '../../lib/messages/messageAttachmentHtml';
@@ -8,6 +8,12 @@ import {
   messageImageFileNameFromPath,
   messageImageStoragePathFromElement,
 } from '../../lib/messages/messageImageService';
+import {
+  countMessageBodyWords,
+  MESSAGE_FEED_WORD_LIMIT,
+  truncateMessageHtmlToWordLimit,
+  truncatePlainTextToWords,
+} from '../../lib/messages/messageBodyWordLimit';
 import {
   htmlMessageHasContent,
   isLikelyHtmlMessageBody,
@@ -37,6 +43,26 @@ function collectMessageImages(container: HTMLElement): MessageImageSlide[] {
   return slides;
 }
 
+function MessageBodyExpandToggle({
+  expanded,
+  onToggle,
+}: {
+  expanded: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useTaskboardI18n();
+  return (
+    <button
+      type="button"
+      className="mt-2 text-sm font-medium text-[var(--tb-accent)] hover:opacity-85 underline-offset-2 hover:underline"
+      onClick={onToggle}
+      aria-expanded={expanded}
+    >
+      {expanded ? t('messages.showLessMessage') : t('messages.showFullMessage')}
+    </button>
+  );
+}
+
 function MessageBodyContent({ body, className = 'text-sm break-words' }: MessageBodyContentProps) {
   const { t } = useTaskboardI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -44,6 +70,14 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
   const [html, setHtml] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [slides, setSlides] = useState<MessageImageSlide[]>([]);
+  const [expanded, setExpanded] = useState(false);
+
+  const wordCount = useMemo(() => countMessageBodyWords(body), [body]);
+  const isLongMessage = wordCount > MESSAGE_FEED_WORD_LIMIT;
+
+  useEffect(() => {
+    setExpanded(false);
+  }, [body]);
 
   useEffect(() => {
     if (!isLikelyHtmlMessageBody(body)) {
@@ -77,9 +111,15 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
     setLightboxIndex(null);
   }, []);
 
+  const displayHtml = useMemo(() => {
+    if (!html) return null;
+    if (expanded || !isLongMessage) return html;
+    return truncateMessageHtmlToWordLimit(html, MESSAGE_FEED_WORD_LIMIT);
+  }, [html, expanded, isLongMessage]);
+
   useEffect(() => {
     const root = containerRef.current;
-    if (!root || !html) return;
+    if (!root || !displayHtml) return;
 
     const onRootClick = (event: Event) => {
       const target = event.target;
@@ -127,18 +167,21 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
       root.removeEventListener('click', onRootClick);
       root.removeEventListener('keydown', onKeyDown);
     };
-  }, [html, openLightbox, t]);
+  }, [displayHtml, openLightbox, t]);
 
   const activeSlide = lightboxIndex != null ? slides[lightboxIndex] : null;
 
-  if (html) {
+  if (html && displayHtml) {
     return (
       <>
         <div
           ref={containerRef}
           className={`message-rich-text ${className}`}
-          dangerouslySetInnerHTML={{ __html: html }}
+          dangerouslySetInnerHTML={{ __html: displayHtml }}
         />
+        {isLongMessage ? (
+          <MessageBodyExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
+        ) : null}
         {activeSlide ? (
           <TaskPhotoLightbox
             imageUrl={activeSlide.url}
@@ -168,7 +211,19 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
     return <p className={`text-sm tb-muted ${className}`}>…</p>;
   }
 
-  return <p className={`whitespace-pre-wrap ${className}`}>{body}</p>;
+  const plainDisplay =
+    isLongMessage && !expanded
+      ? truncatePlainTextToWords(body, MESSAGE_FEED_WORD_LIMIT)
+      : body;
+
+  return (
+    <>
+      <p className={`whitespace-pre-wrap ${className}`}>{plainDisplay}</p>
+      {isLongMessage ? (
+        <MessageBodyExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
+      ) : null}
+    </>
+  );
 }
 
 export default memo(MessageBodyContent);
