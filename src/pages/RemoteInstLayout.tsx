@@ -50,7 +50,9 @@ function RemoteInstShell() {
       <Nav activeSection="login" />
       <div
         className={`taskboard flex flex-col ${
-          isMessagesPage ? 'min-h-screen pt-20 pb-6' : 'min-h-screen pt-24 pb-16'
+          isMessagesPage
+            ? 'h-dvh max-h-dvh min-h-0 overflow-hidden pt-20 pb-6'
+            : 'min-h-screen pt-24 pb-16'
         }`}
         data-theme={theme}
       >

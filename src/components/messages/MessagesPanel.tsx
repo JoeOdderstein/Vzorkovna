@@ -493,7 +493,7 @@ export default function MessagesPanel() {
       <section
         ref={feedScrollRef}
         onScroll={onFeedScroll}
-        className="tb-remote-inst-card p-4 md:p-6 flex-1 min-h-0 overflow-y-auto min-h-[14rem] max-h-[min(62vh,720px)]"
+        className="tb-remote-inst-card tb-messages-feed p-4 md:p-6 flex-1 min-h-0 overflow-y-auto"
       >
         {loading && messages.length === 0 ? (
           <p className="text-sm tb-muted">{t('messages.loading')}</p>
