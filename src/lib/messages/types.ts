@@ -25,6 +25,8 @@ export interface TeamMessage {
   linked_task_id: string | null;
   linked_task_ids?: string[];
   created_at: string;
+  /** AI recap for chat feed (collapsed view); max ~50 words. */
+  feed_summary?: string | null;
   project?: TeamMessageProject | null;
   linked_task?: TeamMessageLinkedTask | null;
   linked_tasks?: TeamMessageLinkedTask[];

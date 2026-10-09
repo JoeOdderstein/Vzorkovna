@@ -18,6 +18,7 @@ import { translateCategoryLabel } from '../../lib/taskboard/i18n/messages';
 import CategorySelect from '../../taskboard/components/CategorySelect';
 import MessageBodyContent from './MessageBodyContent';
 import MessageRichTextEditor from './MessageRichTextEditor';
+import { fetchMessageFeedSummary } from '../../lib/messages/messageFeedSummary';
 import {
   htmlMessageHasContent,
   normalizeOutgoingMessageBody,
@@ -147,6 +148,7 @@ function MessageRow({
       );
       setEditing(false);
       onMutated();
+      void fetchMessageFeedSummary(message.id, { force: true }).catch(() => {});
     } catch (err) {
       setActionError(err instanceof Error ? err.message : t('messages.editError'));
     } finally {
@@ -267,14 +269,34 @@ function MessageRow({
           </div>
         ) : (
           <>
-            <h3 className="text-base font-semibold mb-1">{displayTitle}</h3>
-            {message.project?.name || categoryLabel ? (
-              <p className="text-xs tb-muted mb-2">
-                {message.project?.name ?? t('common.project')}
-                {categoryLabel ? ` · ${categoryLabel}` : null}
-              </p>
-            ) : null}
-            <MessageBodyContent body={message.body} />
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <h3 className="text-base font-semibold min-w-0 flex-1 leading-snug">
+                {displayTitle}
+              </h3>
+              {message.project?.name || categoryLabel ? (
+                <p
+                  className="text-xs tb-muted shrink-0 max-w-[min(100%,14rem)] text-right leading-snug"
+                  title={
+                    message.project?.name || categoryLabel
+                      ? `${message.project?.name ?? t('common.project')}${
+                          categoryLabel ? ` · ${categoryLabel}` : ''
+                        }`
+                      : undefined
+                  }
+                >
+                  <span className="block truncate">
+                    {message.project?.name ?? t('common.project')}
+                    {categoryLabel ? ` · ${categoryLabel}` : null}
+                  </span>
+                </p>
+              ) : null}
+            </div>
+            <MessageBodyContent
+              messageId={message.id}
+              title={displayTitle}
+              body={message.body}
+              feedSummary={message.feed_summary}
+            />
           </>
         )}
 

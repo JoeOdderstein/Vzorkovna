@@ -16,6 +16,7 @@ import messagesDelete from './handlers/messages-delete.js';
 import messagesNotifyPost from './handlers/messages-notify-post.js';
 import messagesParseActionPoints from './handlers/messages-parse-action-points.js';
 import messagesSuggestProject from './handlers/messages-suggest-project.js';
+import messagesFeedSummary from './handlers/messages-feed-summary.js';
 import tasksNotifyAssignment from './handlers/tasks-notify-assignment.js';
 import tasksNotifyComment from './handlers/tasks-notify-comment.js';
 import translate from './handlers/translate.js';
@@ -41,6 +42,7 @@ const ROUTES = {
   'messages/notify-post': messagesNotifyPost,
   'messages/parse-action-points': messagesParseActionPoints,
   'messages/suggest-project': messagesSuggestProject,
+  'messages/feed-summary': messagesFeedSummary,
   translate: translate,
 };
 

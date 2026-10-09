@@ -1,3 +1,4 @@
+import { buildLocalFeedSummary } from './messageFeedSummary';
 import {
   htmlMessageHasContent,
   messageBodyToPlainText,
@@ -51,6 +52,10 @@ function mapRow(row: Record<string, unknown>): TeamMessage {
     linked_task_id: linked_task_ids[0] ?? null,
     linked_task_ids,
     created_at: String(row.created_at ?? ''),
+    feed_summary:
+      typeof row.feed_summary === 'string' && row.feed_summary.trim()
+        ? String(row.feed_summary).trim()
+        : null,
     project: null,
     linked_task: null,
     linked_tasks: [],
@@ -408,6 +413,7 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
       id: crypto.randomUUID(),
       title,
       body,
+      feed_summary: buildLocalFeedSummary(body) || null,
       project_id: input.projectId,
       category: input.category,
       author_username: input.author.username,
@@ -494,6 +500,7 @@ export async function updateTeamMessage(
       ...all[index],
       title,
       body,
+      feed_summary: buildLocalFeedSummary(body) || null,
       project_id: input.projectId,
       category: input.category,
     };
@@ -510,6 +517,7 @@ export async function updateTeamMessage(
       body,
       project_id: input.projectId,
       category: input.category,
+      feed_summary: null,
     })
     .eq('id', messageId)
     .select('*')

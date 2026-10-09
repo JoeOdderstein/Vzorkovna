@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { MESSAGE_FILE_LINK_CLASS } from '../../lib/messages/messageAttachmentHtml';
@@ -9,11 +9,10 @@ import {
   messageImageStoragePathFromElement,
 } from '../../lib/messages/messageImageService';
 import {
-  countMessageBodyWords,
-  MESSAGE_FEED_WORD_LIMIT,
-  truncateMessageHtmlToWordLimit,
-  truncatePlainTextToWords,
-} from '../../lib/messages/messageBodyWordLimit';
+  buildLocalFeedSummary,
+  fetchMessageFeedSummary,
+} from '../../lib/messages/messageFeedSummary';
+import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
 import {
   htmlMessageHasContent,
   isLikelyHtmlMessageBody,
@@ -21,8 +20,12 @@ import {
 } from '../../lib/messages/messageRichText';
 
 interface MessageBodyContentProps {
+  messageId: string;
+  title: string;
   body: string;
+  feedSummary?: string | null;
   className?: string;
+  onFeedSummaryChange?: (summary: string) => void;
 }
 
 type MessageImageSlide = {
@@ -58,12 +61,19 @@ function MessageBodyExpandToggle({
       onClick={onToggle}
       aria-expanded={expanded}
     >
-      {expanded ? t('messages.showLessMessage') : t('messages.showFullMessage')}
+      {expanded ? t('messages.closeMessage') : t('messages.openMessage')}
     </button>
   );
 }
 
-function MessageBodyContent({ body, className = 'text-sm break-words' }: MessageBodyContentProps) {
+function MessageBodyContent({
+  messageId,
+  title,
+  body,
+  feedSummary,
+  className = 'text-sm break-words',
+  onFeedSummaryChange,
+}: MessageBodyContentProps) {
   const { t } = useTaskboardI18n();
   const containerRef = useRef<HTMLDivElement>(null);
   const resolvedForBodyRef = useRef<string | null>(null);
@@ -71,20 +81,81 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [slides, setSlides] = useState<MessageImageSlide[]>([]);
   const [expanded, setExpanded] = useState(false);
+  const [summary, setSummary] = useState<string | null>(feedSummary?.trim() || null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [summaryError, setSummaryError] = useState('');
+  const summaryRequestRef = useRef(0);
 
-  const wordCount = useMemo(() => countMessageBodyWords(body), [body]);
-  const isLongMessage = wordCount > MESSAGE_FEED_WORD_LIMIT;
+  const loadSummary = useCallback(
+    (force = false) => {
+      if (expanded) return;
+
+      const requestId = ++summaryRequestRef.current;
+      setSummaryLoading(true);
+      setSummaryError('');
+
+      if (isLocalTaskboardMode()) {
+        const local = buildLocalFeedSummary(body);
+        setSummary(local || null);
+        setSummaryLoading(false);
+        if (local) onFeedSummaryChange?.(local);
+        return;
+      }
+
+      if (feedSummary?.trim() && !force) {
+        setSummary(feedSummary.trim());
+        setSummaryLoading(false);
+        return;
+      }
+
+      void fetchMessageFeedSummary(messageId, { force })
+        .then((text) => {
+          if (requestId !== summaryRequestRef.current) return;
+          const trimmed = text.trim();
+          setSummary(trimmed || null);
+          if (trimmed) onFeedSummaryChange?.(trimmed);
+        })
+        .catch((err) => {
+          if (requestId !== summaryRequestRef.current) return;
+          setSummary(null);
+          setSummaryError(
+            err instanceof Error ? err.message : t('messages.feedSummaryError')
+          );
+        })
+        .finally(() => {
+          if (requestId === summaryRequestRef.current) {
+            setSummaryLoading(false);
+          }
+        });
+    },
+    [body, expanded, feedSummary, messageId, onFeedSummaryChange, t]
+  );
 
   useEffect(() => {
     setExpanded(false);
-  }, [body]);
+    setSummary(feedSummary?.trim() || null);
+    setSummaryError('');
+  }, [body, feedSummary, messageId]);
 
   useEffect(() => {
+    if (expanded) return;
+    if (feedSummary?.trim()) return;
+    loadSummary(false);
+  }, [body, expanded, feedSummary, loadSummary, messageId]);
+
+  useEffect(() => {
+    if (!expanded) {
+      resolvedForBodyRef.current = null;
+      setHtml(null);
+      return;
+    }
+
     if (!isLikelyHtmlMessageBody(body)) {
       resolvedForBodyRef.current = null;
       setHtml(null);
       return;
     }
+
     let cancelled = false;
     if (resolvedForBodyRef.current !== body) {
       setHtml(null);
@@ -99,7 +170,7 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
     return () => {
       cancelled = true;
     };
-  }, [body]);
+  }, [body, expanded]);
 
   const openLightbox = useCallback((index: number, list: MessageImageSlide[]) => {
     if (index < 0 || index >= list.length) return;
@@ -111,15 +182,9 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
     setLightboxIndex(null);
   }, []);
 
-  const displayHtml = useMemo(() => {
-    if (!html) return null;
-    if (expanded || !isLongMessage) return html;
-    return truncateMessageHtmlToWordLimit(html, MESSAGE_FEED_WORD_LIMIT);
-  }, [html, expanded, isLongMessage]);
-
   useEffect(() => {
     const root = containerRef.current;
-    if (!root || !displayHtml) return;
+    if (!root || !html || !expanded) return;
 
     const onRootClick = (event: Event) => {
       const target = event.target;
@@ -167,21 +232,50 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
       root.removeEventListener('click', onRootClick);
       root.removeEventListener('keydown', onKeyDown);
     };
-  }, [displayHtml, openLightbox, t]);
+  }, [expanded, html, openLightbox, t]);
 
   const activeSlide = lightboxIndex != null ? slides[lightboxIndex] : null;
 
-  if (html && displayHtml) {
+  if (!expanded) {
+    return (
+      <>
+        {summaryLoading ? (
+          <p className={`text-sm tb-muted ${className}`}>{t('messages.feedSummaryLoading')}</p>
+        ) : summary ? (
+          <p className={`text-sm leading-relaxed ${className}`}>
+            <span className="font-semibold text-[var(--tb-text-secondary)]">
+              {t('messages.feedSummaryLabel')}
+            </span>{' '}
+            {summary}
+          </p>
+        ) : summaryError ? (
+          <div className="space-y-2">
+            <p className={`text-sm text-red-600 ${className}`}>{summaryError}</p>
+            <button
+              type="button"
+              className="text-sm font-medium text-[var(--tb-accent)] hover:underline"
+              onClick={() => loadSummary(true)}
+            >
+              {t('messages.feedSummaryRetry')}
+            </button>
+          </div>
+        ) : (
+          <p className={`text-sm tb-muted ${className}`}>{t('messages.feedSummaryUnavailable')}</p>
+        )}
+        <MessageBodyExpandToggle expanded={false} onToggle={() => setExpanded(true)} />
+      </>
+    );
+  }
+
+  if (html) {
     return (
       <>
         <div
           ref={containerRef}
           className={`message-rich-text ${className}`}
-          dangerouslySetInnerHTML={{ __html: displayHtml }}
+          dangerouslySetInnerHTML={{ __html: html }}
         />
-        {isLongMessage ? (
-          <MessageBodyExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
-        ) : null}
+        <MessageBodyExpandToggle expanded onToggle={() => setExpanded(false)} />
         {activeSlide ? (
           <TaskPhotoLightbox
             imageUrl={activeSlide.url}
@@ -208,20 +302,18 @@ function MessageBodyContent({ body, className = 'text-sm break-words' }: Message
   }
 
   if (isLikelyHtmlMessageBody(body) && html === null) {
-    return <p className={`text-sm tb-muted ${className}`}>…</p>;
+    return (
+      <>
+        <p className={`text-sm tb-muted ${className}`}>…</p>
+        <MessageBodyExpandToggle expanded onToggle={() => setExpanded(false)} />
+      </>
+    );
   }
-
-  const plainDisplay =
-    isLongMessage && !expanded
-      ? truncatePlainTextToWords(body, MESSAGE_FEED_WORD_LIMIT)
-      : body;
 
   return (
     <>
-      <p className={`whitespace-pre-wrap ${className}`}>{plainDisplay}</p>
-      {isLongMessage ? (
-        <MessageBodyExpandToggle expanded={expanded} onToggle={() => setExpanded((v) => !v)} />
-      ) : null}
+      <p className={`whitespace-pre-wrap ${className}`}>{body}</p>
+      <MessageBodyExpandToggle expanded onToggle={() => setExpanded(false)} />
     </>
   );
 }

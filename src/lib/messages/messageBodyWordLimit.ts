@@ -1,11 +1,22 @@
 import { messageBodyToPlainText } from './messageRichText';
 
+/** @deprecated Feed uses AI summary instead of word truncation. */
 export const MESSAGE_FEED_WORD_LIMIT = 150;
+
+export const MESSAGE_FEED_SUMMARY_WORD_LIMIT = 50;
 
 export function countMessageBodyWords(body: string): number {
   const plain = messageBodyToPlainText(body);
   if (!plain) return 0;
   return plain.split(/\s+/).filter(Boolean).length;
+}
+
+export function clampSummaryWords(text: string, maxWords: number): string {
+  const trimmed = text.trim();
+  if (!trimmed || maxWords <= 0) return '';
+  const words = trimmed.split(/\s+/).filter(Boolean);
+  if (words.length <= maxWords) return trimmed;
+  return `${words.slice(0, maxWords).join(' ')}…`;
 }
 
 export function truncatePlainTextToWords(text: string, maxWords: number): string {

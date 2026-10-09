@@ -28,6 +28,7 @@ import { appendMessageAttachmentsHtml } from '../../lib/messages/messageAttachme
 import type { ActionPointDraft, MessageComposeAttachment, TeamMessage } from '../../lib/messages/types';
 import MessageComposeAttachments from './MessageComposeAttachments';
 import MessageComposeNotificationRecipients from './MessageComposeNotificationRecipients';
+import { fetchMessageFeedSummary } from '../../lib/messages/messageFeedSummary';
 import { notifyTeamMessagePosted } from '../../lib/messages/notifyTeamMessage';
 import type { CategoryOption, Project } from '../../lib/taskboard/types';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
@@ -525,6 +526,7 @@ function MessageComposeForm({
         } catch (notifyErr) {
           console.warn('Message posted but email notify failed:', notifyErr);
         }
+        void fetchMessageFeedSummary(created.id).catch(() => {});
       }
       await onPosted(created);
     } catch (err) {
