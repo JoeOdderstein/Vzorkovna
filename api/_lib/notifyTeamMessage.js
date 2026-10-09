@@ -1,5 +1,6 @@
 import { defaultBoardNameForUsername } from './boardNameDefaults.js';
 import { sendTeamMessageEmail } from './email.js';
+import { buildMessageBodyHtmlForEmail } from './messageBodyForEmail.js';
 import { getTokenFromRequest, verifySessionToken } from './auth.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 
@@ -66,7 +67,7 @@ export async function handleNotifyTeamMessage(req, res) {
 
   const { data: message, error: messageError } = await supabase
     .from('team_messages')
-    .select('id, title, author_username, author_display_name')
+    .select('id, title, body, author_username, author_display_name')
     .eq('id', messageId)
     .maybeSingle();
 
@@ -78,6 +79,11 @@ export async function handleNotifyTeamMessage(req, res) {
     String(message.author_display_name ?? '').trim() ||
     defaultBoardNameForUsername(message.author_username) ||
     message.author_username;
+
+  const messageBodyHtml = await buildMessageBodyHtmlForEmail(
+    supabase,
+    String(message.body ?? '')
+  );
 
   const excluded = new Set(excludedUsernames);
   const messagesUrl = siteBaseUrl() ? `${siteBaseUrl()}/messages` : '';
@@ -109,6 +115,7 @@ export async function handleNotifyTeamMessage(req, res) {
         recipientName,
         authorName,
         messageTitle: String(message.title ?? 'Team message'),
+        messageBodyHtml,
         messagesUrl,
       });
       sent += 1;

@@ -599,16 +599,26 @@ export async function sendInvoiceForwardedEmail({
   if (error) throw error;
 }
 
-function buildTeamMessageHtml({ recipientName, authorName, messageTitle, messagesUrl }) {
+function buildTeamMessageHtml({
+  recipientName,
+  authorName,
+  messageTitle,
+  messageBodyHtml,
+  messagesUrl,
+}) {
   const safeRecipient = escapeHtml(recipientName);
   const safeAuthor = escapeHtml(authorName);
   const safeTitle = escapeHtml(messageTitle);
   const safeUrl = messagesUrl ? escapeHref(messagesUrl) : '';
+  const bodyBlock =
+    typeof messageBodyHtml === 'string' && messageBodyHtml.trim()
+      ? `<div style="margin:16px 0 0;padding:16px 0 0;border-top:1px solid #eee;">${messageBodyHtml}</div>`
+      : '';
 
-  const openButton = messagesUrl
-    ? `<a href="${safeUrl}" style="display:inline-block;background:#111;color:#fff;text-decoration:none;padding:10px 18px;border-radius:6px;font-weight:600;margin:16px 0 0;">
-          Open messages
-        </a>`
+  const replyLink = messagesUrl
+    ? `<p style="margin:20px 0 0;">
+          <a href="${safeUrl}" style="color:#111;font-weight:600;text-decoration:underline;">Reply on taskboard</a>
+        </p>`
     : '';
 
   return `<!DOCTYPE html>
@@ -616,11 +626,10 @@ function buildTeamMessageHtml({ recipientName, authorName, messageTitle, message
   <body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;margin:0;padding:24px;background:#f6f6f6;">
     <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;">
       <p style="margin:0 0 8px;font-size:14px;color:#666;">Headlight Rabbits — team messages</p>
-      <h1 style="margin:0 0 16px;font-size:22px;">New team message</h1>
-      <p style="margin:0 0 16px;">Hi ${safeRecipient}, <strong>${safeAuthor}</strong> posted a new message:</p>
-      <p style="margin:0 0 16px;font-size:18px;font-weight:600;">${safeTitle}</p>
-      ${openButton}
-      ${messagesUrl ? `<p style="margin:16px 0 0;font-size:12px;color:#888;word-break:break-all;">${safeUrl}</p>` : ''}
+      <p style="margin:0 0 12px;">Hi ${safeRecipient}, <strong>${safeAuthor}</strong> posted a message on the taskboard.</p>
+      <h1 style="margin:0 0 8px;font-size:20px;font-weight:600;">${safeTitle}</h1>
+      ${bodyBlock}
+      ${replyLink}
     </div>
   </body>
 </html>`;
@@ -631,6 +640,7 @@ export async function sendTeamMessageEmail({
   recipientName,
   authorName,
   messageTitle,
+  messageBodyHtml,
   messagesUrl,
 }) {
   const resend = getResend();
@@ -645,6 +655,7 @@ export async function sendTeamMessageEmail({
     recipientName,
     authorName,
     messageTitle,
+    messageBodyHtml,
     messagesUrl,
   });
 
