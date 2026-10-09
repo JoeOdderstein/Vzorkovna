@@ -8,6 +8,7 @@ import { useAssigneeNames } from '../../hooks/useAssigneeNames';
 import type { CategoryOption } from '../../lib/taskboard/types';
 import CategorySelect from './CategorySelect';
 import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
+import { notifyTaskAttachment } from '../../lib/taskboard/notifyAssignment';
 import {
   getAttachmentUrl,
   updateTask,
@@ -209,6 +210,7 @@ export default function TaskDrawer({
       const { path, name } = await uploadAttachment(file, task.id);
       await save({ attachment_path: path, attachment_name: name });
       setForm((f) => ({ ...f, attachment_path: path, attachment_name: name }));
+      notifyTaskAttachment(task.id);
     } catch {
       setUploadError('Upload failed.');
     }

@@ -3,9 +3,35 @@ const EMAIL_PHOTO_TTL_SEC = 60 * 60 * 24 * 7;
 
 export const MAX_EMAIL_PHOTOS = 4;
 
-function isImageStoragePath(path) {
+export function isImageStoragePath(path) {
   const base = String(path ?? '').split('?')[0];
   return /\.(jpg|jpeg|png|webp|gif|avif)$/i.test(base);
+}
+
+/**
+ * Signed download link for non-image task attachments (PDF, etc.) in notification emails.
+ */
+export async function getTaskFileAttachmentForEmail(supabase, attachmentPath, attachmentName) {
+  const path = String(attachmentPath ?? '').trim();
+  if (!supabase || !path || isImageStoragePath(path)) {
+    return null;
+  }
+
+  const { data, error } = await supabase.storage
+    .from('task-attachments')
+    .createSignedUrl(path, EMAIL_PHOTO_TTL_SEC);
+
+  if (error) {
+    console.error(`Email file attachment signed URL failed for ${path}:`, error.message);
+    return null;
+  }
+
+  if (!data?.signedUrl) return null;
+
+  const fileName =
+    String(attachmentName ?? '').trim() || path.split('/').pop() || 'attachment';
+
+  return { url: data.signedUrl, fileName };
 }
 
 /**

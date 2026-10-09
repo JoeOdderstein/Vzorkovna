@@ -120,6 +120,21 @@ function buildEmailPhotoThumbnailsHtml({ photoUrls, totalPhotoCount, taskUrl }) 
     </div>`;
 }
 
+function buildEmailFileAttachmentHtml(fileAttachment) {
+  if (!fileAttachment?.url) return '';
+
+  const safeUrl = escapeHref(fileAttachment.url);
+  const safeName = escapeHtml(fileAttachment.fileName || 'Attachment');
+
+  return `<div style="margin:0 0 16px;">
+      <p style="margin:0 0 8px;font-size:14px;color:#666;">Attachment</p>
+      <p style="margin:0;">
+        <a href="${safeUrl}" style="color:#111;font-weight:600;text-decoration:underline;">${safeName}</a>
+      </p>
+      <p style="margin:8px 0 0;font-size:12px;color:#888;">Download link expires in 7 days.</p>
+    </div>`;
+}
+
 function buildAssignmentHtml({
   assigneeName,
   assignedBy,
@@ -130,6 +145,8 @@ function buildAssignmentHtml({
   taskUrl,
   photoUrls,
   totalPhotoCount,
+  fileAttachment = null,
+  attachmentOnly = false,
 }) {
   const deadlineLine = deadline
     ? `<p style="margin:0 0 16px;color:#444;">Deadline: <strong>${formatDeadline(deadline)}</strong></p>`
@@ -179,11 +196,18 @@ function buildAssignmentHtml({
   <body style="font-family:system-ui,-apple-system,sans-serif;line-height:1.5;color:#111;margin:0;padding:24px;background:#f6f6f6;">
     <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e5e5e5;border-radius:10px;padding:24px;">
       <p style="margin:0 0 8px;font-size:14px;color:#666;">Headlight Rabbits taskboard</p>
-      <h1 style="margin:0 0 16px;font-size:22px;">You were assigned to a task</h1>
-      <p style="margin:0 0 16px;">Hi ${safeAssigneeName}, <strong>${safeAssignedBy}</strong> assigned you to:</p>
+      <h1 style="margin:0 0 16px;font-size:22px;">${
+        attachmentOnly ? 'New attachment on your task' : 'You were assigned to a task'
+      }</h1>
+      <p style="margin:0 0 16px;">Hi ${safeAssigneeName}, ${
+        attachmentOnly
+          ? `<strong>${safeAssignedBy}</strong> added a file to a task assigned to you:`
+          : `<strong>${safeAssignedBy}</strong> assigned you to:`
+      }</p>
       <p style="margin:0 0 8px;font-size:18px;font-weight:600;">${safeTaskName}</p>
       <p style="margin:0 0 16px;color:#444;">Project: <strong>${safeProjectName}</strong></p>
       ${descriptionBlock}
+      ${buildEmailFileAttachmentHtml(fileAttachment)}
       ${buildEmailPhotoThumbnailsHtml({ photoUrls, totalPhotoCount, taskUrl })}
       ${deadlineLine}
       ${buttons}
@@ -204,6 +228,8 @@ export async function sendAssignmentEmail({
   taskUrl,
   photoUrls = [],
   totalPhotoCount = 0,
+  fileAttachment = null,
+  attachmentOnly = false,
 }) {
   const resend = getResend();
   const from = process.env.EMAIL_FROM;
@@ -212,7 +238,9 @@ export async function sendAssignmentEmail({
     throw new Error('Email is not configured');
   }
 
-  const subject = `Assigned: ${taskName} (${projectName})`;
+  const subject = attachmentOnly
+    ? `Attachment: ${taskName} (${projectName})`
+    : `Assigned: ${taskName} (${projectName})`;
   const html = buildAssignmentHtml({
     assigneeName,
     assignedBy,
@@ -223,6 +251,8 @@ export async function sendAssignmentEmail({
     taskUrl,
     photoUrls,
     totalPhotoCount,
+    fileAttachment,
+    attachmentOnly,
   });
 
   const { error } = await resend.emails.send({

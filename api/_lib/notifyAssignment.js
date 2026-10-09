@@ -2,7 +2,10 @@ import { normalizeAssignees } from './assigneeUsername.js';
 import { sendAssignmentEmail } from './email.js';
 import { getTokenFromRequest, verifySessionToken } from './auth.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
-import { getTaskPhotoSignedUrlsForEmail } from './taskPhotosForEmail.js';
+import {
+  getTaskFileAttachmentForEmail,
+  getTaskPhotoSignedUrlsForEmail,
+} from './taskPhotosForEmail.js';
 
 function readRequestBody(req) {
   if (req.body == null) return {};
@@ -37,6 +40,7 @@ export async function handleNotifyAssignment(req, res) {
   const body = readRequestBody(req);
   const taskId = typeof body.taskId === 'string' ? body.taskId : '';
   const previousAssignees = normalizeAssignees(body.previousAssignees);
+  const notifyAttachment = body.notifyAttachment === true;
 
   if (!taskId) {
     return res.status(400).json({ error: 'taskId is required' });
@@ -53,7 +57,7 @@ export async function handleNotifyAssignment(req, res) {
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('id, task_name, description, assignees, deadline, project_id')
+    .select('id, task_name, description, assignees, deadline, project_id, attachment_path, attachment_name')
     .eq('id', taskId)
     .maybeSingle();
 
@@ -103,21 +107,43 @@ export async function handleNotifyAssignment(req, res) {
   const { urls: photoUrls, totalCount: totalPhotoCount } =
     await getTaskPhotoSignedUrlsForEmail(supabase, taskId);
 
+  const fileAttachment = await getTaskFileAttachmentForEmail(
+    supabase,
+    task.attachment_path,
+    task.attachment_name
+  );
+
   let notified = 0;
   const failures = [];
   const skipped = [];
 
-  if (newAssignees.length === 0) {
+  const assigneesToNotify = notifyAttachment ? currentAssignees : newAssignees;
+
+  if (notifyAttachment && !fileAttachment) {
     return res.status(200).json({
       ok: true,
       notified: 0,
-      skipped: [{ assignee: null, reason: 'no_new_assignees' }],
+      skipped: [{ assignee: null, reason: 'no_file_attachment' }],
+      currentAssignees,
+    });
+  }
+
+  if (assigneesToNotify.length === 0) {
+    return res.status(200).json({
+      ok: true,
+      notified: 0,
+      skipped: [
+        {
+          assignee: null,
+          reason: notifyAttachment ? 'no_assignees' : 'no_new_assignees',
+        },
+      ],
       currentAssignees,
       previousAssignees,
     });
   }
 
-  for (const assignee of newAssignees) {
+  for (const assignee of assigneesToNotify) {
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .select('email, notify_on_assign, board_name, username')
@@ -158,6 +184,8 @@ export async function handleNotifyAssignment(req, res) {
         taskUrl,
         photoUrls,
         totalPhotoCount,
+        fileAttachment,
+        attachmentOnly: notifyAttachment,
       });
       notified += 1;
     } catch (err) {
