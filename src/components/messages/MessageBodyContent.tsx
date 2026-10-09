@@ -10,7 +10,12 @@ import {
 import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { MESSAGE_FILE_LINK_CLASS } from '../../lib/messages/messageAttachmentHtml';
-import { downloadMessageFile } from '../../lib/messages/messageFileService';
+import {
+  downloadMessageFile,
+  getMessageFileUrl,
+  isMessagePdfFileName,
+} from '../../lib/messages/messageFileService';
+import MessagePdfPreviewDialog from './MessagePdfPreviewDialog';
 import {
   downloadMessageImage,
   messageImageFileNameFromPath,
@@ -98,6 +103,7 @@ function MessageBodyContent({
   const [html, setHtml] = useState<string | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const [slides, setSlides] = useState<MessageImageSlide[]>([]);
+  const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string; storagePath: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [summary, setSummary] = useState<string | null>(feedSummary?.trim() || null);
   const [summaryLoading, setSummaryLoading] = useState(false);
@@ -179,6 +185,7 @@ function MessageBodyContent({
   useEffect(() => {
     setExpanded(false);
     expandScrollPinRef.current = null;
+    setPdfPreview(null);
     setSummary(feedSummary?.trim() || null);
     setSummaryError('');
   }, [body, feedSummary, messageId]);
@@ -247,6 +254,10 @@ function MessageBodyContent({
     setLightboxIndex(null);
   }, []);
 
+  const closePdfPreview = useCallback(() => {
+    setPdfPreview(null);
+  }, []);
+
   useEffect(() => {
     const root = containerRef.current;
     if (!root || !html || !expanded) return;
@@ -260,7 +271,14 @@ function MessageBodyContent({
         const name = fileLink.getAttribute('data-file-name')?.trim() || 'file';
         if (path) {
           event.preventDefault();
-          void downloadMessageFile(path, name).catch(() => {});
+          event.stopPropagation();
+          if (isMessagePdfFileName(name)) {
+            void getMessageFileUrl(path)
+              .then((url) => setPdfPreview({ url, fileName: name, storagePath: path }))
+              .catch(() => {});
+          } else {
+            void downloadMessageFile(path, name).catch(() => {});
+          }
         }
         return;
       }
@@ -274,6 +292,14 @@ function MessageBodyContent({
       const index = list.findIndex((slide) => slide.url === src);
       openLightbox(index >= 0 ? index : 0, list.length > 0 ? list : [{ url: src, fileName: 'message-image.png' }]);
     };
+
+    for (const anchor of root.querySelectorAll(`a.${MESSAGE_FILE_LINK_CLASS}`)) {
+      if (!(anchor instanceof HTMLAnchorElement)) continue;
+      const name = anchor.getAttribute('data-file-name')?.trim() || '';
+      if (isMessagePdfFileName(name)) {
+        anchor.setAttribute('aria-label', t('messages.fileOpenPreview'));
+      }
+    }
 
     const images = root.querySelectorAll('img');
     for (const img of images) {
@@ -300,6 +326,14 @@ function MessageBodyContent({
   }, [expanded, html, openLightbox, t]);
 
   const activeSlide = lightboxIndex != null ? slides[lightboxIndex] : null;
+  const pdfPreviewNode = pdfPreview ? (
+    <MessagePdfPreviewDialog
+      fileUrl={pdfPreview.url}
+      fileName={pdfPreview.fileName}
+      onClose={closePdfPreview}
+      onDownload={() => downloadMessageFile(pdfPreview.storagePath, pdfPreview.fileName)}
+    />
+  ) : null;
 
   if (!expanded) {
     return (
@@ -368,6 +402,7 @@ function MessageBodyContent({
             }
           />
         ) : null}
+        {pdfPreviewNode}
       </>
     );
   }
