@@ -1,4 +1,4 @@
-import { memo, useEffect, useMemo, useState } from 'react';
+import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckSquare, ExternalLink } from 'lucide-react';
 import CommentAuthorBlock from '../CommentAuthorBlock';
@@ -70,6 +70,7 @@ function MessageRow({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const titleScrollAnchorRef = useRef<HTMLHeadingElement>(null);
 
   const authorLabel = message.author_display_name || message.author_username;
   const linkedTasks =
@@ -270,7 +271,10 @@ function MessageRow({
         ) : (
           <>
             <div className="flex items-start justify-between gap-3 mb-2">
-              <h3 className="text-base font-semibold min-w-0 flex-1 leading-snug">
+              <h3
+                ref={titleScrollAnchorRef}
+                className="text-base font-semibold min-w-0 flex-1 leading-snug"
+              >
                 {displayTitle}
               </h3>
               {message.project?.name || categoryLabel ? (
@@ -296,6 +300,7 @@ function MessageRow({
               title={displayTitle}
               body={message.body}
               feedSummary={message.feed_summary}
+              scrollAnchorRef={titleScrollAnchorRef}
             />
           </>
         )}

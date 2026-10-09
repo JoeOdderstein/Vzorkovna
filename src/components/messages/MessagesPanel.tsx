@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMessagesCompose } from '../../context/MessagesComposeContext';
+import { isFeedAutoScrollSuppressed } from '../../lib/messages/messageFeedScrollAnchor';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useUserProfile } from '../../context/UserProfileContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
@@ -370,7 +371,10 @@ export default function MessagesPanel() {
 
     if (preserveFeedScrollRef.current) {
       restoreFeedScroll();
-    } else if (pinFeedToBottomRef.current || stickToBottomRef.current) {
+    } else if (
+      !isFeedAutoScrollSuppressed() &&
+      (pinFeedToBottomRef.current || stickToBottomRef.current)
+    ) {
       stickFeedToBottomAfterLayout();
     }
     prevFilteredCountRef.current = filteredMessages.length;
@@ -392,7 +396,10 @@ export default function MessagesPanel() {
         restoreFeedScroll();
         return;
       }
-      if (pinFeedToBottomRef.current || stickToBottomRef.current) {
+      if (
+        !isFeedAutoScrollSuppressed() &&
+        (pinFeedToBottomRef.current || stickToBottomRef.current)
+      ) {
         scrollFeedToBottom();
       }
     };

@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type RefObject,
+} from 'react';
 import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { MESSAGE_FILE_LINK_CLASS } from '../../lib/messages/messageAttachmentHtml';
@@ -18,6 +26,13 @@ import {
   isLikelyHtmlMessageBody,
   resolveMessageBodyHtml,
 } from '../../lib/messages/messageRichText';
+import {
+  applyFeedScrollAnchorPin,
+  captureFeedScrollAnchorPin,
+  scheduleFeedScrollAnchorPin,
+  suppressFeedAutoScroll,
+  type FeedScrollAnchorPin,
+} from '../../lib/messages/messageFeedScrollAnchor';
 
 interface MessageBodyContentProps {
   messageId: string;
@@ -26,6 +41,8 @@ interface MessageBodyContentProps {
   feedSummary?: string | null;
   className?: string;
   onFeedSummaryChange?: (summary: string) => void;
+  /** Message title (or row) — kept fixed on screen when expanding at the bottom of the feed. */
+  scrollAnchorRef?: RefObject<HTMLElement | null>;
 }
 
 type MessageImageSlide = {
@@ -73,6 +90,7 @@ function MessageBodyContent({
   feedSummary,
   className = 'text-sm break-words',
   onFeedSummaryChange,
+  scrollAnchorRef,
 }: MessageBodyContentProps) {
   const { t } = useTaskboardI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -85,6 +103,33 @@ function MessageBodyContent({
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
   const summaryRequestRef = useRef(0);
+  const expandScrollPinRef = useRef<FeedScrollAnchorPin | null>(null);
+
+  const setExpandedWithScrollAnchor = useCallback(
+    (next: boolean) => {
+      if (next) {
+        const anchor = scrollAnchorRef?.current;
+        if (anchor) {
+          const pin = captureFeedScrollAnchorPin(anchor);
+          if (pin) {
+            expandScrollPinRef.current = pin;
+            suppressFeedAutoScroll();
+          }
+        }
+      } else {
+        expandScrollPinRef.current = null;
+        suppressFeedAutoScroll(600);
+      }
+      setExpanded(next);
+    },
+    [scrollAnchorRef]
+  );
+
+  useLayoutEffect(() => {
+    const pin = expandScrollPinRef.current;
+    if (!expanded || !pin) return;
+    scheduleFeedScrollAnchorPin(pin);
+  }, [expanded, html, body, summaryLoading]);
 
   const loadSummary = useCallback(
     (force = false) => {
@@ -133,9 +178,29 @@ function MessageBodyContent({
 
   useEffect(() => {
     setExpanded(false);
+    expandScrollPinRef.current = null;
     setSummary(feedSummary?.trim() || null);
     setSummaryError('');
   }, [body, feedSummary, messageId]);
+
+  useEffect(() => {
+    const pin = expandScrollPinRef.current;
+    if (!expanded || !pin) return;
+
+    const nodes: HTMLElement[] = [pin.anchorEl];
+    const row = pin.anchorEl.closest('li');
+    if (row instanceof HTMLElement) nodes.push(row);
+    if (containerRef.current) nodes.push(containerRef.current);
+
+    const onResize = () => {
+      suppressFeedAutoScroll();
+      applyFeedScrollAnchorPin(pin);
+    };
+
+    const observer = new ResizeObserver(onResize);
+    for (const node of nodes) observer.observe(node);
+    return () => observer.disconnect();
+  }, [expanded, html]);
 
   useEffect(() => {
     if (expanded) return;
@@ -262,7 +327,10 @@ function MessageBodyContent({
         ) : (
           <p className={`text-sm tb-muted ${className}`}>{t('messages.feedSummaryUnavailable')}</p>
         )}
-        <MessageBodyExpandToggle expanded={false} onToggle={() => setExpanded(true)} />
+        <MessageBodyExpandToggle
+          expanded={false}
+          onToggle={() => setExpandedWithScrollAnchor(true)}
+        />
       </>
     );
   }
@@ -275,7 +343,10 @@ function MessageBodyContent({
           className={`message-rich-text ${className}`}
           dangerouslySetInnerHTML={{ __html: html }}
         />
-        <MessageBodyExpandToggle expanded onToggle={() => setExpanded(false)} />
+        <MessageBodyExpandToggle
+          expanded
+          onToggle={() => setExpandedWithScrollAnchor(false)}
+        />
         {activeSlide ? (
           <TaskPhotoLightbox
             imageUrl={activeSlide.url}
@@ -305,7 +376,10 @@ function MessageBodyContent({
     return (
       <>
         <p className={`text-sm tb-muted ${className}`}>…</p>
-        <MessageBodyExpandToggle expanded onToggle={() => setExpanded(false)} />
+        <MessageBodyExpandToggle
+          expanded
+          onToggle={() => setExpandedWithScrollAnchor(false)}
+        />
       </>
     );
   }
@@ -313,7 +387,10 @@ function MessageBodyContent({
   return (
     <>
       <p className={`whitespace-pre-wrap ${className}`}>{body}</p>
-      <MessageBodyExpandToggle expanded onToggle={() => setExpanded(false)} />
+      <MessageBodyExpandToggle
+        expanded
+        onToggle={() => setExpandedWithScrollAnchor(false)}
+      />
     </>
   );
 }
