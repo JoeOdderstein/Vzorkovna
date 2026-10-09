@@ -17,7 +17,7 @@ export default function TranslatableText({
   multiline = false,
   variant = 'inline',
 }: TranslatableTextProps) {
-  const { locale: preferredLocale, t } = useTaskboardI18n();
+  const { t, translateUserContent } = useTaskboardI18n();
 
   const [display, setDisplay] = useState(text);
   const [showOriginal, setShowOriginal] = useState(false);
@@ -30,7 +30,7 @@ export default function TranslatableText({
   }, [text]);
 
   useEffect(() => {
-    if (preferredLocale !== 'uk') {
+    if (!translateUserContent) {
       setDisplay(text);
       setWasTranslated(false);
       setError('');
@@ -72,9 +72,9 @@ export default function TranslatableText({
     return () => {
       cancelled = true;
     };
-  }, [text, preferredLocale, showOriginal]);
+  }, [text, translateUserContent, showOriginal]);
 
-  if (preferredLocale !== 'uk') {
+  if (!translateUserContent) {
     return (
       <span className={`${multiline ? 'whitespace-pre-wrap break-words' : ''} ${className}`.trim()}>
         {text}
@@ -90,7 +90,7 @@ export default function TranslatableText({
   return (
     <span className="block">
       <span className={bodyClass.trim()}>
-        {loading && preferredLocale === 'uk' && !showOriginal ? text : display}
+        {loading && translateUserContent && !showOriginal ? text : display}
       </span>
       {loading && !showOriginal && (
         <span className="block text-[10px] tb-muted mt-0.5">{t('translate.translating')}</span>

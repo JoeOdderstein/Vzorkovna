@@ -34,8 +34,10 @@ function readCachedLocale(username: string | null): UserProfilePreferredLocale {
 export function useTaskboardI18n() {
   const { username } = useTaskboardAuth();
   const profileCtx = useContext(UserProfileContext);
-  const locale: UserProfilePreferredLocale =
-    profileCtx?.profile?.preferred_locale ?? readCachedLocale(username);
+  const profileLocale = profileCtx?.profile?.preferred_locale;
+  const locale: UserProfilePreferredLocale = profileLocale ?? readCachedLocale(username);
+  /** DeepL for user-written titles/descriptions/comments — only when profile is Ukrainian. */
+  const translateUserContent = profileLocale === 'uk';
 
   const t = useCallback(
     (key: MessageKey, vars?: Record<string, string>) => {
@@ -49,5 +51,5 @@ export function useTaskboardI18n() {
     document.documentElement.lang = locale === 'uk' ? 'uk' : 'en';
   }, [locale]);
 
-  return { t, locale };
+  return { t, locale, translateUserContent };
 }

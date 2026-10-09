@@ -1,4 +1,5 @@
 import { getTokenFromRequest, verifySessionToken } from './auth.js';
+import { getSupabaseAdmin } from './supabaseAdmin.js';
 
 const MAX_TEXT_LENGTH = 5000;
 
@@ -84,16 +85,11 @@ export async function handleTranslate(req, res) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
+  let claims;
   try {
-    await verifySessionToken(token);
+    claims = await verifySessionToken(token);
   } catch {
     return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  if (!process.env.DEEPL_API_KEY?.trim()) {
-    return res.status(503).json({
-      error: 'Translation is not configured. Add DEEPL_API_KEY on the server.',
-    });
   }
 
   const body = readRequestBody(req);
@@ -105,6 +101,40 @@ export async function handleTranslate(req, res) {
   }
   if (text.length > MAX_TEXT_LENGTH) {
     return res.status(400).json({ error: `text must be at most ${MAX_TEXT_LENGTH} characters` });
+  }
+
+  const passthrough = () =>
+    res.status(200).json({
+      text: text.trim(),
+      target_lang: target,
+      detected_source_lang: 'en',
+      translated: false,
+    });
+
+  const username = typeof claims.username === 'string' ? claims.username.trim() : '';
+  if (target !== 'uk' || !username) {
+    return passthrough();
+  }
+
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('preferred_locale')
+      .eq('username', username)
+      .maybeSingle();
+    if (profile?.preferred_locale !== 'uk') {
+      return passthrough();
+    }
+  } catch (err) {
+    console.error('Translate profile check failed:', err);
+    return passthrough();
+  }
+
+  if (!process.env.DEEPL_API_KEY?.trim()) {
+    return res.status(503).json({
+      error: 'Translation is not configured. Add DEEPL_API_KEY on the server.',
+    });
   }
 
   try {

@@ -23,7 +23,6 @@ import { useTaskPhotos } from '../../hooks/useTaskPhotos';
 import { fetchOrCreateUserProfile } from '../../lib/taskboard/userProfileService';
 import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
 import TaskCommentsSection from './TaskCommentsSection';
-import TranslatableText from './TranslatableText';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
   translateCategoryLabel,
@@ -272,11 +271,6 @@ export default function TaskDrawer({
               onBlur={() => form.task_name !== task.task_name && save({ task_name: form.task_name ?? '' })}
               className="field-input"
             />
-            <TranslatableText
-              text={form.task_name ?? ''}
-              variant="hint"
-              className="mt-1.5"
-            />
           </Field>
 
           <Field label={t('task.description')}>
@@ -287,12 +281,6 @@ export default function TaskDrawer({
               onBlur={() => form.description !== task.description && save({ description: form.description ?? '' })}
               rows={4}
               className="field-input resize-y min-h-[100px]"
-            />
-            <TranslatableText
-              text={form.description ?? ''}
-              variant="hint"
-              multiline
-              className="mt-1.5"
             />
             <TaskDescriptionPhotos
               photos={photos}
