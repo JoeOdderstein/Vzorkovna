@@ -124,21 +124,18 @@ export default function MessageComposeNotificationRecipients({
                       type="button"
                       role="option"
                       aria-selected={notify}
-                      className="w-full flex items-start gap-2.5 px-3 py-2 text-sm text-left hover:bg-[var(--tb-surface)]"
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left hover:bg-[var(--tb-surface)]"
                       onClick={() => toggleNotify(person.username)}
                     >
                       <input
                         type="checkbox"
                         readOnly
                         checked={notify}
-                        className="mt-0.5 rounded border-[var(--tb-border)] pointer-events-none"
+                        className="rounded border-[var(--tb-border)] pointer-events-none shrink-0"
                         tabIndex={-1}
                         aria-hidden
                       />
-                      <span className="min-w-0">
-                        <span className="block truncate">{person.board_name}</span>
-                        <span className="block text-xs tb-muted truncate">{person.email}</span>
-                      </span>
+                      <span className="min-w-0 truncate">{person.board_name}</span>
                     </button>
                   </li>
                 );

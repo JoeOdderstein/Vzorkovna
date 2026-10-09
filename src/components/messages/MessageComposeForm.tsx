@@ -49,6 +49,13 @@ import {
 const SUGGEST_DEBOUNCE_MS = 900;
 const DRAFT_SAVE_DEBOUNCE_MS = 650;
 
+function withAuthorExcludedFromNotify(excluded: string[], authorUsername: string): string[] {
+  const authorKey = authorUsername.trim().toLowerCase();
+  if (!authorKey) return excluded;
+  if (excluded.some((u) => u.trim().toLowerCase() === authorKey)) return excluded;
+  return [...excluded, authorKey];
+}
+
 function createBlankActionDraft(
   projectId: string,
   category: TaskCategory
@@ -154,7 +161,10 @@ function MessageComposeForm({
       setActionDrafts(drafts);
       setAttachments(Array.isArray(stored.attachments) ? stored.attachments : []);
       setExcludedNotifyUsernames(
-        Array.isArray(stored.excludedNotifyUsernames) ? stored.excludedNotifyUsernames : []
+        withAuthorExcludedFromNotify(
+          Array.isArray(stored.excludedNotifyUsernames) ? stored.excludedNotifyUsernames : [],
+          username
+        )
       );
       setActionDraftsFromAi(false);
       const shouldExpand =
@@ -170,6 +180,11 @@ function MessageComposeForm({
     }
     draftReadyRef.current = true;
   }, [username, setTitle, setDrawerOpen]);
+
+  useEffect(() => {
+    if (!username.trim()) return;
+    setExcludedNotifyUsernames((prev) => withAuthorExcludedFromNotify(prev, username));
+  }, [username]);
 
   useEffect(() => {
     if (!draftReadyRef.current || !username) return;

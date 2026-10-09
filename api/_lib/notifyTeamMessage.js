@@ -80,6 +80,8 @@ export async function handleNotifyTeamMessage(req, res) {
     defaultBoardNameForUsername(message.author_username) ||
     message.author_username;
 
+  const authorUsername = normalizeUsername(message.author_username);
+
   const messageBodyHtml = await buildMessageBodyHtmlForEmail(
     supabase,
     String(message.body ?? '')
@@ -104,7 +106,7 @@ export async function handleNotifyTeamMessage(req, res) {
   for (const row of profiles ?? []) {
     const username = normalizeUsername(row.username);
     const email = String(row.email ?? '').trim();
-    if (!username || !email || excluded.has(username)) continue;
+    if (!username || !email || excluded.has(username) || username === authorUsername) continue;
 
     const recipientName =
       String(row.board_name ?? '').trim() || defaultBoardNameForUsername(username) || username;
