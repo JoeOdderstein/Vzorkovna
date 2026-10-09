@@ -29,7 +29,8 @@ import type { ActionPointDraft, MessageComposeAttachment, TeamMessage } from '..
 import MessageComposeAttachments from './MessageComposeAttachments';
 import MessageComposeNotificationRecipients from './MessageComposeNotificationRecipients';
 import { fetchMessageFeedSummary } from '../../lib/messages/messageFeedSummary';
-import { notifyTeamMessagePosted } from '../../lib/messages/notifyTeamMessage';
+import { notifyTeamMessagePostedWithRetry } from '../../lib/messages/notifyTeamMessage';
+import { fetchNotifyRecipients } from '../../lib/installations/notifyBugReport';
 import type { CategoryOption, Project } from '../../lib/taskboard/types';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import MessageComposeSuggestChips from './MessageComposeSuggestChips';
@@ -488,6 +489,8 @@ function MessageComposeForm({
       }
     }
 
+    const excludedForNotify = excludedNotifyUsernames.map((u) => u.trim().toLowerCase()).filter(Boolean);
+
     setSubmitting(true);
     setError('');
     try {
@@ -507,6 +510,51 @@ function MessageComposeForm({
               }))
             : undefined,
       });
+
+      let notifyWarning = '';
+      if (!isLocalTaskboardMode()) {
+        try {
+          const excludedSet = new Set(excludedForNotify);
+          let recipients: Awaited<ReturnType<typeof fetchNotifyRecipients>> = [];
+          try {
+            recipients = await fetchNotifyRecipients();
+          } catch {
+            recipients = [];
+          }
+
+          const includedUsernames = recipients
+            .filter((person) => !excludedSet.has(person.username.trim().toLowerCase()))
+            .map((person) => person.username);
+
+          const shouldNotifyAnyone = recipients.some((person) =>
+            !excludedSet.has(person.username.trim().toLowerCase())
+          );
+
+          const notifyResult = await notifyTeamMessagePostedWithRetry({
+            messageId: created.id,
+            excludedUsernames: excludedForNotify,
+            includedUsernames: includedUsernames.length > 0 ? includedUsernames : undefined,
+          });
+
+          if (import.meta.env.DEV) {
+            console.info('[messages] notify-post result', notifyResult);
+          }
+
+          if (notifyResult.warning === 'no_recipients_matched' || notifyResult.sent === 0) {
+            if (shouldNotifyAnyone) {
+              notifyWarning = t('messages.notifyNoneSent');
+            }
+          } else if (notifyResult.failed > 0) {
+            notifyWarning = t('messages.notifyPostFailed');
+          }
+        } catch (notifyErr) {
+          console.warn('Message posted but email notify failed:', notifyErr);
+          notifyWarning =
+            notifyErr instanceof Error ? notifyErr.message : t('messages.notifyPostFailed');
+        }
+        void fetchMessageFeedSummary(created.id).catch(() => {});
+      }
+
       clearTitle();
       setBody('');
       setActionDrafts([]);
@@ -517,18 +565,12 @@ function MessageComposeForm({
       lastAppliedSuggestTitleRef.current = '';
       closeCompose();
       clearMessageComposeDraft(username);
-      if (!isLocalTaskboardMode()) {
-        try {
-          await notifyTeamMessagePosted({
-            messageId: created.id,
-            excludedUsernames: excludedNotifyUsernames,
-          });
-        } catch (notifyErr) {
-          console.warn('Message posted but email notify failed:', notifyErr);
-        }
-        void fetchMessageFeedSummary(created.id).catch(() => {});
-      }
       await onPosted(created);
+      if (notifyWarning) {
+        window.setTimeout(() => {
+          window.alert(notifyWarning);
+        }, 0);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : t('messages.postError'));
     } finally {

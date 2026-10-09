@@ -51,6 +51,11 @@ export async function handleNotifyTeamMessage(req, res) {
   const excludedUsernames = Array.isArray(body.excludedUsernames)
     ? body.excludedUsernames.map(normalizeUsername).filter(Boolean)
     : [];
+  const includedRaw = Array.isArray(body.includedUsernames)
+    ? body.includedUsernames.map(normalizeUsername).filter(Boolean)
+    : null;
+  /** Empty array means “use excluded list only” (avoids notifying nobody by mistake). */
+  const includedUsernames = includedRaw?.length ? includedRaw : null;
 
   if (!messageId) {
     return res.status(400).json({ error: 'messageId is required' });
@@ -88,6 +93,8 @@ export async function handleNotifyTeamMessage(req, res) {
   );
 
   const excluded = new Set(excludedUsernames);
+  const included =
+    includedUsernames != null ? new Set(includedUsernames) : null;
   const messagesUrl = siteBaseUrl() ? `${siteBaseUrl()}/messages` : '';
 
   const { data: profiles, error: profileError } = await supabase
@@ -102,11 +109,24 @@ export async function handleNotifyTeamMessage(req, res) {
 
   let sent = 0;
   const failures = [];
+  const skipped = [];
 
   for (const row of profiles ?? []) {
     const username = normalizeUsername(row.username);
     const email = String(row.email ?? '').trim();
-    if (!username || !email || excluded.has(username) || username === authorUsername) continue;
+    if (!username || !email) {
+      if (username) skipped.push({ username, reason: 'no_email' });
+      continue;
+    }
+    if (included) {
+      if (!included.has(username)) {
+        skipped.push({ username, reason: 'not_included' });
+        continue;
+      }
+    } else if (excluded.has(username)) {
+      skipped.push({ username, reason: 'excluded' });
+      continue;
+    }
 
     const recipientName =
       String(row.board_name ?? '').trim() || defaultBoardNameForUsername(username) || username;
@@ -127,5 +147,23 @@ export async function handleNotifyTeamMessage(req, res) {
     }
   }
 
-  return res.status(200).json({ sent, failed: failures.length });
+  if (sent === 0 && failures.length === 0) {
+    const intended =
+      included?.size ??
+      (profiles ?? []).filter((row) => {
+        const u = normalizeUsername(row.username);
+        return u && !excluded.has(u) && String(row.email ?? '').trim();
+      }).length;
+
+    if (intended > 0) {
+      return res.status(200).json({
+        sent,
+        failed: failures.length,
+        skipped,
+        warning: 'no_recipients_matched',
+      });
+    }
+  }
+
+  return res.status(200).json({ sent, failed: failures.length, skipped });
 }
