@@ -2,7 +2,10 @@ import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Upload, X } from 'lucide-react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
-import { DEFAULT_INVOICE_NOTIFY_USERNAME } from '../../lib/invoices/constants';
+import {
+  DEFAULT_INVOICE_NOTIFY_USERNAME,
+  type InvoiceDocumentKind,
+} from '../../lib/invoices/constants';
 import { notifyInvoiceUpload } from '../../lib/invoices/notifyInvoiceUpload';
 import { uploadInvoicePdf, type InvoiceRecord } from '../../lib/invoices/invoiceService';
 import {
@@ -12,12 +15,14 @@ import {
 
 interface UploadInvoiceDialogProps {
   open: boolean;
+  documentKind: InvoiceDocumentKind;
   onClose: () => void;
   onUploaded: (invoice: InvoiceRecord) => void;
 }
 
 export default function UploadInvoiceDialog({
   open,
+  documentKind,
   onClose,
   onUploaded,
 }: UploadInvoiceDialogProps) {
@@ -98,7 +103,7 @@ export default function UploadInvoiceDialog({
     setNotifyWarning('');
 
     try {
-      const created = await uploadInvoicePdf(file, username);
+      const created = await uploadInvoicePdf(file, username, documentKind);
 
       const notifyUsernames = [...new Set(selectedUsernames.map((u) => u.trim().toLowerCase()))].filter(
         Boolean,
@@ -134,7 +139,7 @@ export default function UploadInvoiceDialog({
       >
         <div className="flex items-start justify-between gap-3 mb-4">
           <h2 id="upload-invoice-title" className="tb-heading text-lg">
-            {t('invoices.uploadDialogTitle')}
+            {t(`invoices.uploadDialogTitle.${documentKind}`)}
           </h2>
           <button
             type="button"

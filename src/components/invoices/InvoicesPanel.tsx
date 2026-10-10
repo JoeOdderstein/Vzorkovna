@@ -5,6 +5,10 @@ import InstallationPdfViewer from '../installations/InstallationPdfViewer';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
+  INVOICE_DOCUMENT_KINDS,
+  type InvoiceDocumentKind,
+} from '../../lib/invoices/constants';
+import {
   deleteInvoice,
   getInvoicePdfUrl,
   listInvoices,
@@ -31,9 +35,14 @@ function formatWhen(iso: string | null) {
   });
 }
 
+function kindMessageKey(prefix: string, kind: InvoiceDocumentKind): string {
+  return `invoices.${prefix}.${kind}`;
+}
+
 export default function InvoicesPanel() {
   const { username } = useTaskboardAuth();
   const { t } = useTaskboardI18n();
+  const [documentKind, setDocumentKind] = useState<InvoiceDocumentKind>('invoice');
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([]);
   const [loading, setLoading] = useState(true);
@@ -75,6 +84,20 @@ export default function InvoicesPanel() {
       return displayNames[user] ?? user;
     },
     [displayNames],
+  );
+
+  const countsByKind = useMemo(() => {
+    const counts = new Map<InvoiceDocumentKind, number>();
+    for (const kind of INVOICE_DOCUMENT_KINDS) counts.set(kind, 0);
+    for (const row of invoices) {
+      counts.set(row.document_kind, (counts.get(row.document_kind) ?? 0) + 1);
+    }
+    return counts;
+  }, [invoices]);
+
+  const filteredInvoices = useMemo(
+    () => invoices.filter((row) => row.document_kind === documentKind),
+    [invoices, documentKind],
   );
 
   const openInvoice = async (invoice: InvoiceRecord) => {
@@ -146,10 +169,33 @@ export default function InvoicesPanel() {
   };
 
   return (
-    <section className="tb-remote-inst-card p-6 md:p-8">
+    <div className="flex flex-col gap-3">
+      <div
+        className="tb-header-scroll-row tb-header-scroll-row--filters shrink-0"
+        role="group"
+        aria-label={t('invoices.filterByKind')}
+      >
+        {INVOICE_DOCUMENT_KINDS.map((kind) => {
+          const count = countsByKind.get(kind) ?? 0;
+          const active = documentKind === kind;
+          return (
+            <button
+              key={kind}
+              type="button"
+              onClick={() => setDocumentKind(kind)}
+              className={`tb-filter-btn relative ${active ? 'tb-filter-btn--active' : ''}`}
+            >
+              {t(kindMessageKey('kind', kind))}
+              {count > 0 ? <span className="tb-filter-count">{count}</span> : null}
+            </button>
+          );
+        })}
+      </div>
+
+      <section className="tb-remote-inst-card p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h2 className="tb-heading text-lg">{t('invoices.listHeading')}</h2>
+          <h2 className="tb-heading text-lg">{t(kindMessageKey('listHeading', documentKind))}</h2>
           <p className="text-sm tb-muted mt-1">{t('invoices.uploadHint')}</p>
         </div>
         <div>
@@ -160,7 +206,7 @@ export default function InvoicesPanel() {
             onClick={() => setUploadDialogOpen(true)}
           >
             <Upload size={16} aria-hidden />
-            {t('invoices.upload')}
+            {t(kindMessageKey('upload', documentKind))}
           </button>
         </div>
       </div>
@@ -169,11 +215,11 @@ export default function InvoicesPanel() {
 
       {loading ? <p className="text-sm tb-muted">{t('common.loading')}</p> : null}
 
-      {!loading && invoices.length === 0 ? (
-        <p className="text-sm tb-muted">{t('invoices.empty')}</p>
+      {!loading && filteredInvoices.length === 0 ? (
+        <p className="text-sm tb-muted">{t(kindMessageKey('empty', documentKind))}</p>
       ) : null}
 
-      {!loading && invoices.length > 0 ? (
+      {!loading && filteredInvoices.length > 0 ? (
         <div className="overflow-x-auto">
           <div
             className={`hidden ${DESKTOP_GRID} px-3 pb-2 mb-2 text-[10px] uppercase tracking-wider tb-muted border-b border-[var(--tb-border)]`}
@@ -186,7 +232,7 @@ export default function InvoicesPanel() {
             <span className="text-center px-1 leading-snug">{t('invoices.colPayment')}</span>
           </div>
           <ul className="space-y-2">
-            {invoices.map((invoice) => {
+            {filteredInvoices.map((invoice) => {
               const busy = savingId === invoice.id || deletingId === invoice.id;
               const opening = openingId === invoice.id;
               const showDelete = canDeleteInvoice(invoice);
@@ -342,9 +388,11 @@ export default function InvoicesPanel() {
 
       <UploadInvoiceDialog
         open={uploadDialogOpen}
+        documentKind={documentKind}
         onClose={() => setUploadDialogOpen(false)}
         onUploaded={(created) => setInvoices((prev) => [created, ...prev])}
       />
-    </section>
+      </section>
+    </div>
   );
 }

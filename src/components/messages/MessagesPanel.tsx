@@ -26,6 +26,10 @@ import {
   buildAssigneeOptionsFromNames,
   type TaskboardAssigneeOption,
 } from './MessageActionPointFields';
+import {
+  fetchTeamMessageReadIds,
+  setTeamMessageRead,
+} from '../../lib/messages/messageReadService';
 import MessageComposeForm from './MessageComposeForm';
 import MessageRow from './MessageRow';
 
@@ -44,6 +48,8 @@ export default function MessagesPanel() {
   const [loadingOlder, setLoadingOlder] = useState(false);
 
   const [projectFilter, setProjectFilter] = useState<'all' | string>('all');
+  const [readFilter, setReadFilter] = useState<'all' | 'unread'>('unread');
+  const [readMessageIds, setReadMessageIds] = useState<Set<string>>(() => new Set());
   const [projects, setProjects] = useState<Project[]>([]);
   const [loadingProjects, setLoadingProjects] = useState(false);
   const [assigneeOptions, setAssigneeOptions] = useState<TaskboardAssigneeOption[]>([]);
@@ -174,7 +180,55 @@ export default function MessagesPanel() {
 
   const onMessageDeleted = useCallback((messageId: string) => {
     setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    setReadMessageIds((prev) => {
+      if (!prev.has(messageId)) return prev;
+      const next = new Set(prev);
+      next.delete(messageId);
+      return next;
+    });
   }, []);
+
+  useEffect(() => {
+    if (!ready || !username) {
+      setReadMessageIds(new Set());
+      return;
+    }
+    let cancelled = false;
+    void fetchTeamMessageReadIds(username)
+      .then((ids) => {
+        if (!cancelled) setReadMessageIds(ids);
+      })
+      .catch(() => {
+        if (!cancelled) setReadMessageIds(new Set());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, username]);
+
+  const handleReadChange = useCallback(
+    async (messageId: string, read: boolean) => {
+      if (!username) return;
+      setReadMessageIds((prev) => {
+        const next = new Set(prev);
+        if (read) next.add(messageId);
+        else next.delete(messageId);
+        return next;
+      });
+      try {
+        await setTeamMessageRead(messageId, username, read);
+      } catch (err) {
+        setReadMessageIds((prev) => {
+          const next = new Set(prev);
+          if (read) next.delete(messageId);
+          else next.add(messageId);
+          return next;
+        });
+        setError(err instanceof Error ? err.message : t('messages.readToggleError'));
+      }
+    },
+    [username, t]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -294,15 +348,26 @@ export default function MessagesPanel() {
     void loadTaskboardContext();
   }, [ready, username, sessionReady, loadTaskboardContext]);
 
-  const filteredMessages = useMemo(() => {
+  const messagesForProject = useMemo(() => {
     if (projectFilter === 'all') return messages;
     return messages.filter((message) => message.project_id === projectFilter);
   }, [messages, projectFilter]);
 
+  const unreadCount = useMemo(() => {
+    return messagesForProject.filter((message) => !readMessageIds.has(message.id)).length;
+  }, [messagesForProject, readMessageIds]);
+
+  const filteredMessages = useMemo(() => {
+    if (readFilter === 'unread') {
+      return messagesForProject.filter((message) => !readMessageIds.has(message.id));
+    }
+    return messagesForProject;
+  }, [messagesForProject, readFilter, readMessageIds]);
+
   useEffect(() => {
     stickToBottomRef.current = true;
     pinFeedToBottomRef.current = true;
-  }, [projectFilter]);
+  }, [projectFilter, readFilter]);
 
   useEffect(() => {
     const onComposeWillOpen = () => {
@@ -471,6 +536,30 @@ export default function MessagesPanel() {
 
   return (
     <div className="flex flex-col flex-1 min-h-0 w-full gap-3">
+      {username && messages.length > 0 ? (
+        <div
+          className="tb-header-scroll-row tb-header-scroll-row--filters shrink-0"
+          role="group"
+          aria-label={t('messages.filterByRead')}
+        >
+          <button
+            type="button"
+            onClick={() => setReadFilter('all')}
+            className={`tb-filter-btn relative ${readFilter === 'all' ? 'tb-filter-btn--active' : ''}`}
+          >
+            {t('messages.showAllMessages')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setReadFilter('unread')}
+            className={`tb-filter-btn relative ${readFilter === 'unread' ? 'tb-filter-btn--active' : ''}`}
+          >
+            {t('messages.showUnreadOnly')}
+            {unreadCount > 0 ? <span className="tb-filter-count">{unreadCount}</span> : null}
+          </button>
+        </div>
+      ) : null}
+
       {projects.length > 0 ? (
         <div
           className="tb-header-scroll-row tb-header-scroll-row--filters shrink-0"
@@ -518,7 +607,11 @@ export default function MessagesPanel() {
           <p className="text-sm tb-muted">{t('messages.empty')}</p>
         ) : null}
         {!loading && messages.length > 0 && filteredMessages.length === 0 ? (
-          <p className="text-sm tb-muted">{t('messages.noMessagesForProject')}</p>
+          <p className="text-sm tb-muted">
+            {readFilter === 'unread'
+              ? t('messages.noUnreadMessages')
+              : t('messages.noMessagesForProject')}
+          </p>
         ) : null}
         {error ? <p className="text-sm text-red-600 mb-4">{error}</p> : null}
         {hasMoreOlder ? (
@@ -542,6 +635,8 @@ export default function MessagesPanel() {
               currentUsername={username}
               projects={projects}
               isAdmin={isAdmin}
+              readByMe={readMessageIds.has(message.id)}
+              onReadChange={(read) => void handleReadChange(message.id, read)}
               onMutated={onMessageMutated}
               onDeleted={onMessageDeleted}
             />

@@ -40,6 +40,8 @@ interface MessageRowProps {
   currentUsername: string | null;
   projects: Project[];
   isAdmin: boolean;
+  readByMe: boolean;
+  onReadChange: (read: boolean) => void;
   onMutated: () => void;
   onDeleted?: (messageId: string) => void;
 }
@@ -50,6 +52,8 @@ function MessageRow({
   currentUsername,
   projects,
   isAdmin,
+  readByMe,
+  onReadChange,
   onMutated,
   onDeleted,
 }: MessageRowProps) {
@@ -180,26 +184,41 @@ function MessageRow({
           <time className="text-xs tb-muted" dateTime={message.created_at}>
             {formatCommentTimestamp(message.created_at)}
           </time>
-          {canEdit && !editing ? (
-            <span className="inline-flex items-center gap-2 text-xs ml-auto">
-              <button
-                type="button"
-                onClick={startEdit}
-                disabled={deleting}
-                className="tb-link hover:underline disabled:opacity-50"
-              >
-                {t('comments.edit')}
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleDelete()}
-                disabled={deleting}
-                className="text-red-600 hover:underline disabled:opacity-50"
-              >
-                {deleting ? t('messages.deleting') : t('comments.delete')}
-              </button>
-            </span>
-          ) : null}
+          <span className="inline-flex items-center gap-2 text-xs ml-auto">
+            {currentUsername ? (
+              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={readByMe}
+                  onChange={(e) => onReadChange(e.target.checked)}
+                  disabled={editing || saving || deleting}
+                  className="rounded border-[var(--tb-border)]"
+                  aria-label={t('messages.readLabel')}
+                />
+                <span className="tb-muted">{t('messages.readLabel')}</span>
+              </label>
+            ) : null}
+            {canEdit && !editing ? (
+              <>
+                <button
+                  type="button"
+                  onClick={startEdit}
+                  disabled={deleting}
+                  className="tb-link hover:underline disabled:opacity-50"
+                >
+                  {t('comments.edit')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleDelete()}
+                  disabled={deleting}
+                  className="text-red-600 hover:underline disabled:opacity-50"
+                >
+                  {deleting ? t('messages.deleting') : t('comments.delete')}
+                </button>
+              </>
+            ) : null}
+          </span>
         </div>
 
         {editing ? (

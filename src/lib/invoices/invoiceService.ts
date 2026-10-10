@@ -1,4 +1,5 @@
 import { isPdfFile } from '../installations/installationDocumentService';
+import type { InvoiceDocumentKind } from './constants';
 import { isSupabaseConfigured } from '../taskboard/config';
 import { getAttachmentUrl } from '../taskboard/taskService';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
@@ -8,6 +9,7 @@ const MAX_PDF_BYTES = 25 * 1024 * 1024;
 export type InvoiceRecord = {
   id: string;
   title: string;
+  document_kind: InvoiceDocumentKind;
   storage_path: string;
   uploaded_by: string;
   forwarded_to_finance: boolean;
@@ -25,10 +27,17 @@ async function db() {
   return getSupabase();
 }
 
+function parseDocumentKind(value: unknown): InvoiceDocumentKind {
+  const raw = String(value ?? 'invoice').trim().toLowerCase();
+  if (raw === 'receipt' || raw === 'quotation') return raw;
+  return 'invoice';
+}
+
 function mapInvoice(row: Record<string, unknown>): InvoiceRecord {
   return {
     id: String(row.id),
     title: String(row.title ?? ''),
+    document_kind: parseDocumentKind(row.document_kind),
     storage_path: String(row.storage_path ?? ''),
     uploaded_by: String(row.uploaded_by ?? ''),
     forwarded_to_finance: Boolean(row.forwarded_to_finance),
@@ -64,7 +73,11 @@ export async function listInvoices(): Promise<InvoiceRecord[]> {
   return (data ?? []).map((row) => mapInvoice(row as Record<string, unknown>));
 }
 
-export async function uploadInvoicePdf(file: File, uploadedBy: string): Promise<InvoiceRecord> {
+export async function uploadInvoicePdf(
+  file: File,
+  uploadedBy: string,
+  documentKind: InvoiceDocumentKind = 'invoice',
+): Promise<InvoiceRecord> {
   if (!isSupabaseConfigured()) {
     throw new Error('Upload requires Supabase to be connected.');
   }
@@ -88,18 +101,37 @@ export async function uploadInvoicePdf(file: File, uploadedBy: string): Promise<
 
   if (uploadError) throw uploadError;
 
-  const { data, error } = await supabase
+  const baseRow = {
+    title,
+    storage_path: path,
+    uploaded_by: uploadedBy.trim().toLowerCase(),
+  };
+
+  let data: Record<string, unknown> | null = null;
+  let error: { message: string } | null = null;
+
+  const withKind = await supabase
     .from('invoices')
-    .insert({
-      title,
-      storage_path: path,
-      uploaded_by: uploadedBy.trim().toLowerCase(),
-    })
+    .insert({ ...baseRow, document_kind: documentKind })
     .select('*')
     .single();
 
+  data = withKind.data as Record<string, unknown> | null;
+  error = withKind.error;
+
+  if (error && /document_kind|column|schema cache/i.test(error.message)) {
+    const fallback = await supabase.from('invoices').insert(baseRow).select('*').single();
+    data = fallback.data as Record<string, unknown> | null;
+    error = fallback.error;
+  }
+
   if (error) {
     await supabase.storage.from('task-attachments').remove([path]);
+    if (/document_kind|column|schema cache/i.test(error.message)) {
+      throw new Error(
+        'Document types need a database update. Run supabase/migrations/035_invoices_document_kind.sql in Supabase.',
+      );
+    }
     throw error;
   }
 
