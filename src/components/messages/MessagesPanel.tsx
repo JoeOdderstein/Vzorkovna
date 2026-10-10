@@ -141,7 +141,8 @@ export default function MessagesPanel() {
   }, [t]);
 
   const loadOlder = useCallback(async () => {
-    const oldest = messagesRef.current[0];
+    const oldest =
+      messagesRef.current.find((message) => !message.thread_root_id) ?? messagesRef.current[0];
     if (!oldest || loadingOlder) return;
 
     const el = feedScrollRef.current;
@@ -179,13 +180,22 @@ export default function MessagesPanel() {
   }, [reload]);
 
   const onMessageDeleted = useCallback((messageId: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+    setMessages((prev) =>
+      prev.filter((m) => m.id !== messageId && m.thread_root_id !== messageId)
+    );
     setReadMessageIds((prev) => {
-      if (!prev.has(messageId)) return prev;
       const next = new Set(prev);
-      next.delete(messageId);
-      return next;
+      for (const id of prev) {
+        if (id === messageId) next.delete(id);
+      }
+      return next.size === prev.size ? prev : next;
     });
+  }, []);
+
+  const onReplyPosted = useCallback((reply: TeamMessage) => {
+    setMessages((prev) => mergeTeamMessagesById(prev, [reply]));
+    stickToBottomRef.current = true;
+    pinFeedToBottomRef.current = true;
   }, []);
 
   useEffect(() => {
@@ -348,21 +358,68 @@ export default function MessagesPanel() {
     void loadTaskboardContext();
   }, [ready, username, sessionReady, loadTaskboardContext]);
 
-  const messagesForProject = useMemo(() => {
-    if (projectFilter === 'all') return messages;
-    return messages.filter((message) => message.project_id === projectFilter);
-  }, [messages, projectFilter]);
+  const { rootMessages, repliesByRoot, rootsById } = useMemo(() => {
+    const replies = new Map<string, TeamMessage[]>();
+    const roots: TeamMessage[] = [];
+    const byId = new Map<string, TeamMessage>();
+    for (const message of messages) {
+      if (!message.thread_root_id) {
+        roots.push(message);
+        byId.set(message.id, message);
+      } else {
+        const list = replies.get(message.thread_root_id) ?? [];
+        list.push(message);
+        replies.set(message.thread_root_id, list);
+      }
+    }
+    for (const [id, list] of replies) {
+      replies.set(
+        id,
+        list.slice().sort((a, b) => a.created_at.localeCompare(b.created_at))
+      );
+    }
+    roots.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return { rootMessages: roots, repliesByRoot: replies, rootsById: byId };
+  }, [messages]);
+
+  const projectIdForMessage = useCallback(
+    (message: TeamMessage) => {
+      if (!message.thread_root_id) return message.project_id;
+      return rootsById.get(message.thread_root_id)?.project_id ?? message.project_id;
+    },
+    [rootsById]
+  );
+
+  const threadIsUnread = useCallback(
+    (rootId: string) => {
+      if (!readMessageIds.has(rootId)) return true;
+      const replies = repliesByRoot.get(rootId) ?? [];
+      return replies.some((reply) => !readMessageIds.has(reply.id));
+    },
+    [readMessageIds, repliesByRoot]
+  );
+
+  const rootsForProject = useMemo(() => {
+    if (projectFilter === 'all') return rootMessages;
+    return rootMessages.filter((message) => message.project_id === projectFilter);
+  }, [rootMessages, projectFilter]);
 
   const unreadCount = useMemo(() => {
-    return messagesForProject.filter((message) => !readMessageIds.has(message.id)).length;
-  }, [messagesForProject, readMessageIds]);
+    let count = 0;
+    for (const message of messages) {
+      const projectId = projectIdForMessage(message);
+      if (projectFilter !== 'all' && projectId !== projectFilter) continue;
+      if (!readMessageIds.has(message.id)) count += 1;
+    }
+    return count;
+  }, [messages, projectFilter, readMessageIds, projectIdForMessage]);
 
   const filteredMessages = useMemo(() => {
     if (readFilter === 'unread') {
-      return messagesForProject.filter((message) => !readMessageIds.has(message.id));
+      return rootsForProject.filter((root) => threadIsUnread(root.id));
     }
-    return messagesForProject;
-  }, [messagesForProject, readFilter, readMessageIds]);
+    return rootsForProject;
+  }, [rootsForProject, readFilter, threadIsUnread]);
 
   useEffect(() => {
     stickToBottomRef.current = true;
@@ -482,19 +539,21 @@ export default function MessagesPanel() {
   const messageCountsByProject = useMemo(() => {
     const counts = new Map<string, number>();
     for (const message of messages) {
-      if (!message.project_id) continue;
+      if (readFilter === 'all' && message.thread_root_id) continue;
+      const projectId = projectIdForMessage(message);
+      if (!projectId) continue;
       if (readFilter === 'unread' && readMessageIds.has(message.id)) continue;
-      counts.set(message.project_id, (counts.get(message.project_id) ?? 0) + 1);
+      counts.set(projectId, (counts.get(projectId) ?? 0) + 1);
     }
     return counts;
-  }, [messages, readFilter, readMessageIds]);
+  }, [messages, readFilter, readMessageIds, projectIdForMessage]);
 
   const allMessagesFilterCount = useMemo(() => {
     if (readFilter === 'unread') {
       return messages.filter((message) => !readMessageIds.has(message.id)).length;
     }
-    return messages.length;
-  }, [messages, readFilter, readMessageIds]);
+    return rootMessages.length;
+  }, [messages, readFilter, readMessageIds, rootMessages.length]);
 
   const projectsByMessageCount = useMemo(() => {
     return [...projects].sort((a, b) => {
@@ -639,12 +698,16 @@ export default function MessagesPanel() {
             <MessageRow
               key={message.id}
               message={message}
+              threadReplies={repliesByRoot.get(message.id) ?? []}
               locale={locale}
               currentUsername={username}
               projects={projects}
               isAdmin={isAdmin}
               readByMe={readMessageIds.has(message.id)}
+              replyReadById={readMessageIds}
               onReadChange={(read) => void handleReadChange(message.id, read)}
+              onReplyReadChange={(replyId, read) => void handleReadChange(replyId, read)}
+              onReplyPosted={onReplyPosted}
               onMutated={onMessageMutated}
               onDeleted={onMessageDeleted}
             />

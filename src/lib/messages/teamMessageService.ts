@@ -7,6 +7,7 @@ import {
 import type { TaskCategory } from '../taskboard/constants';
 import type {
   CreateTeamMessageInput,
+  CreateTeamMessageReplyInput,
   TeamMessage,
   TeamMessageLinkedTask,
   TeamMessageProject,
@@ -56,10 +57,56 @@ function mapRow(row: Record<string, unknown>): TeamMessage {
       typeof row.feed_summary === 'string' && row.feed_summary.trim()
         ? String(row.feed_summary).trim()
         : null,
+    thread_root_id: row.thread_root_id ? String(row.thread_root_id) : null,
     project: null,
     linked_task: null,
     linked_tasks: [],
   };
+}
+
+function isRootTeamMessage(message: TeamMessage): boolean {
+  return !message.thread_root_id;
+}
+
+async function fetchThreadRepliesForRoots(rootIds: string[]): Promise<TeamMessage[]> {
+  const unique = [...new Set(rootIds.filter(Boolean))];
+  if (unique.length === 0) return [];
+
+  if (isLocalTaskboardMode()) {
+    return loadLocalMessages().filter(
+      (m) => m.thread_root_id && unique.includes(m.thread_root_id)
+    );
+  }
+
+  const { data, error } = await (await db())
+    .from('team_messages')
+    .select('*')
+    .in('thread_root_id', unique)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    if (/thread_root_id|column|schema cache/i.test(error.message)) return [];
+    throw error;
+  }
+
+  return (data ?? []).map((row) => mapRow(row as Record<string, unknown>));
+}
+
+async function findTeamMessageById(messageId: string): Promise<TeamMessage | null> {
+  if (isLocalTaskboardMode()) {
+    const found = loadLocalMessages().find((m) => m.id === messageId);
+    return found ? { ...found } : null;
+  }
+
+  const { data, error } = await (await db())
+    .from('team_messages')
+    .select('*')
+    .eq('id', messageId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+  return mapRow(data as Record<string, unknown>);
 }
 
 function loadLocalMessages(): TeamMessage[] {
@@ -225,9 +272,17 @@ export async function isTeamMessagesReady() {
 }
 
 async function enrichMessages(messages: TeamMessage[]): Promise<TeamMessage[]> {
+  const rootIds = messages.filter((m) => isRootTeamMessage(m)).map((m) => m.id);
+  const replies = rootIds.length > 0 ? await fetchThreadRepliesForRoots(rootIds) : [];
+
+  const byId = new Map<string, TeamMessage>();
+  for (const message of messages) byId.set(message.id, message);
+  for (const reply of replies) byId.set(reply.id, reply);
+  const combined = Array.from(byId.values());
+
   const withProjects = isLocalTaskboardMode()
-    ? enrichLocalMessageProjects(messages)
-    : await enrichMessageProjects(messages);
+    ? enrichLocalMessageProjects(combined)
+    : await enrichMessageProjects(combined);
   return enrichLinkedTasks(withProjects);
 }
 
@@ -277,7 +332,7 @@ function normalizeLocalMessages(): TeamMessage[] {
 }
 
 function localMessagesPageRecent(all: TeamMessage[], limit: number): TeamMessagesPage {
-  const sorted = sortMessagesChronological(all);
+  const sorted = sortMessagesChronological(all.filter((m) => isRootTeamMessage(m)));
   const hasMoreOlder = sorted.length > limit;
   const messages = sorted.slice(-limit);
   return { messages, hasMoreOlder };
@@ -288,7 +343,7 @@ function localMessagesPageBefore(
   cursor: TeamMessage,
   limit: number
 ): TeamMessagesPage {
-  const sorted = sortMessagesChronological(all);
+  const sorted = sortMessagesChronological(all.filter((m) => isRootTeamMessage(m)));
   const older = sorted.filter((m) => isMessageBefore(m, cursor));
   const hasMoreOlder = older.length > limit;
   const messages = older.slice(-limit);
@@ -302,15 +357,28 @@ function olderThanCursorFilter(cursor: TeamMessage): string {
 }
 
 async function fetchSupabasePageRecent(limit: number): Promise<TeamMessagesPage> {
-  const { data, error } = await (await db())
+  const supabase = await db();
+  let result = await supabase
     .from('team_messages')
     .select('*')
+    .is('thread_root_id', null)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1);
 
-  if (error) throw error;
-  const rows = ((data ?? []) as Record<string, unknown>[]).map(mapRow);
+  if (result.error && /thread_root_id|column|schema cache/i.test(result.error.message)) {
+    result = await supabase
+      .from('team_messages')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit + 1);
+  }
+
+  if (result.error) throw result.error;
+  const rows = ((result.data ?? []) as Record<string, unknown>[])
+    .map(mapRow)
+    .filter((m) => isRootTeamMessage(m));
   const hasMoreOlder = rows.length > limit;
   const page = rows.slice(0, limit).reverse();
   const messages = await enrichMessages(page);
@@ -318,16 +386,30 @@ async function fetchSupabasePageRecent(limit: number): Promise<TeamMessagesPage>
 }
 
 async function fetchSupabasePageBefore(cursor: TeamMessage, limit: number): Promise<TeamMessagesPage> {
-  const { data, error } = await (await db())
+  const supabase = await db();
+  let result = await supabase
     .from('team_messages')
     .select('*')
+    .is('thread_root_id', null)
     .or(olderThanCursorFilter(cursor))
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
     .limit(limit + 1);
 
-  if (error) throw error;
-  const rows = ((data ?? []) as Record<string, unknown>[]).map(mapRow);
+  if (result.error && /thread_root_id|column|schema cache/i.test(result.error.message)) {
+    result = await supabase
+      .from('team_messages')
+      .select('*')
+      .or(olderThanCursorFilter(cursor))
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(limit + 1);
+  }
+
+  if (result.error) throw result.error;
+  const rows = ((result.data ?? []) as Record<string, unknown>[])
+    .map(mapRow)
+    .filter((m) => isRootTeamMessage(m));
   const hasMoreOlder = rows.length > limit;
   const page = rows.slice(0, limit).reverse();
   const messages = await enrichMessages(page);
@@ -467,6 +549,97 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
     throw new Error(
       'Messages need title and project fields. Run supabase/migrations/029_team_message_title_project.sql in Supabase.'
     );
+  }
+
+  if (error) throw error;
+  const message = mapRow(data as Record<string, unknown>);
+  const [enriched] = await enrichMessages([message]);
+  return enriched;
+}
+
+export async function createTeamMessageReply(
+  input: CreateTeamMessageReplyInput,
+  options: { isAdmin: boolean }
+): Promise<TeamMessage> {
+  if (!options.isAdmin) {
+    throw new Error('Only admin can reply to messages for now.');
+  }
+
+  const body = normalizeOutgoingMessageBody(input.body);
+  if (!htmlMessageHasContent(body)) throw new Error('Message cannot be empty.');
+  if (!input.author.username) throw new Error('You must be logged in to post.');
+  if (!input.threadRootId.trim()) throw new Error('Thread not found.');
+
+  const root = await findTeamMessageById(input.threadRootId);
+  if (!root || root.thread_root_id) throw new Error('Thread not found.');
+  if (!root.project_id || !root.category) {
+    throw new Error('This message cannot receive replies yet (missing project).');
+  }
+
+  const title = root.title.trim() || messageBodyToPlainText(root.body).slice(0, 120) || 'Message';
+
+  if (isLocalTaskboardMode()) {
+    const message: TeamMessage = {
+      id: crypto.randomUUID(),
+      title,
+      body,
+      thread_root_id: root.id,
+      feed_summary: null,
+      project_id: root.project_id,
+      category: root.category,
+      author_username: input.author.username,
+      author_display_name: input.author.displayName,
+      linked_task_id: null,
+      linked_task_ids: [],
+      created_at: new Date().toISOString(),
+    };
+    const all = loadLocalMessages();
+    all.push(message);
+    saveLocalMessages(all);
+    const [enriched] = await enrichMessages([message]);
+    return enriched;
+  }
+
+  let insertPayload: Record<string, unknown> = {
+    title,
+    body,
+    thread_root_id: root.id,
+    project_id: root.project_id,
+    category: root.category,
+    author_username: input.author.username,
+    author_display_name: input.author.displayName,
+    linked_task_id: null,
+    linked_task_ids: [],
+  };
+
+  let { data, error } = await (await db())
+    .from('team_messages')
+    .insert(insertPayload)
+    .select('*')
+    .single();
+
+  if (error && /thread_root_id|column|schema cache/i.test(error.message)) {
+    throw new Error(
+      'Message replies need a database update. Run supabase/migrations/036_team_message_threads.sql in Supabase.'
+    );
+  }
+
+  if (error && /linked_task_ids|column/i.test(error.message)) {
+    insertPayload = {
+      title,
+      body,
+      thread_root_id: root.id,
+      project_id: root.project_id,
+      category: root.category,
+      author_username: input.author.username,
+      author_display_name: input.author.displayName,
+      linked_task_id: null,
+    };
+    ({ data, error } = await (await db())
+      .from('team_messages')
+      .insert(insertPayload)
+      .select('*')
+      .single());
   }
 
   if (error) throw error;
@@ -673,7 +846,9 @@ export async function deleteTeamMessage(
     if (!authorUsernamesMatch(target.author_username, actorUsername)) {
       throw new Error('You can only delete your own messages.');
     }
-    saveLocalMessages(all.filter((m) => m.id !== messageId));
+    saveLocalMessages(
+      all.filter((m) => m.id !== messageId && m.thread_root_id !== messageId)
+    );
     return;
   }
 

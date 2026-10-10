@@ -18,6 +18,8 @@ export interface TeamMessage {
   id: string;
   title: string;
   body: string;
+  /** Set on replies; null on root posts in the feed. */
+  thread_root_id?: string | null;
   project_id: string | null;
   category: TaskCategory | null;
   author_username: string;
@@ -37,6 +39,12 @@ export interface TeamMessageActionPoint {
   projectId: string;
   category: TaskCategory;
   assignees: Assignee[];
+}
+
+export interface CreateTeamMessageReplyInput {
+  threadRootId: string;
+  body: string;
+  author: { username: string; displayName: string };
 }
 
 export interface CreateTeamMessageInput {

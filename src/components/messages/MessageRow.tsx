@@ -2,13 +2,16 @@ import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckSquare, ExternalLink } from 'lucide-react';
 import CommentAuthorBlock from '../CommentAuthorBlock';
+import { useUserProfile } from '../../context/UserProfileContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
 import { formatAssignees } from '../../lib/taskboard/assigneeUtils';
 import { formatCommentTimestamp } from '../../lib/taskboard/commentFormat';
 import { fetchCategoriesForProject } from '../../lib/taskboard/categoryService';
 import { DEFAULT_CATEGORIES } from '../../lib/taskboard/categoryUtils';
 import type { TaskCategory } from '../../lib/taskboard/constants';
 import {
+  createTeamMessageReply,
   deleteTeamMessage,
   updateTeamMessage,
 } from '../../lib/messages/teamMessageService';
@@ -16,7 +19,7 @@ import type { TeamMessage } from '../../lib/messages/types';
 import type { CategoryOption, Project } from '../../lib/taskboard/types';
 import { translateCategoryLabel } from '../../lib/taskboard/i18n/messages';
 import CategorySelect from '../../taskboard/components/CategorySelect';
-import MessageBodyContent from './MessageBodyContent';
+import MessageBodyContent, { messageBodyActionBtnClass } from './MessageBodyContent';
 import MessageRichTextEditor from './MessageRichTextEditor';
 import { fetchMessageFeedSummary } from '../../lib/messages/messageFeedSummary';
 import {
@@ -36,12 +39,16 @@ function authorUsernamesMatch(stored: string, actor: string) {
 
 interface MessageRowProps {
   message: TeamMessage;
+  threadReplies: TeamMessage[];
   locale: 'en' | 'uk';
   currentUsername: string | null;
   projects: Project[];
   isAdmin: boolean;
   readByMe: boolean;
+  replyReadById: Set<string>;
   onReadChange: (read: boolean) => void;
+  onReplyReadChange: (replyId: string, read: boolean) => void;
+  onReplyPosted: (reply: TeamMessage) => void;
   onMutated: () => void;
   onDeleted?: (messageId: string) => void;
 }
@@ -52,12 +59,17 @@ function MessageRow({
   currentUsername,
   projects,
   isAdmin,
+  threadReplies,
   readByMe,
+  replyReadById,
   onReadChange,
+  onReplyReadChange,
+  onReplyPosted,
   onMutated,
   onDeleted,
 }: MessageRowProps) {
   const { t } = useTaskboardI18n();
+  const { profile } = useUserProfile();
   const canEdit =
     Boolean(currentUsername) &&
     authorUsernamesMatch(message.author_username, currentUsername ?? '');
@@ -74,6 +86,9 @@ function MessageRow({
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [replyOpen, setReplyOpen] = useState(false);
+  const [replyBody, setReplyBody] = useState('');
+  const [postingReply, setPostingReply] = useState(false);
   const titleScrollAnchorRef = useRef<HTMLHeadingElement>(null);
 
   const authorLabel = message.author_display_name || message.author_username;
@@ -83,6 +98,12 @@ function MessageRow({
   const categoryLabel = message.category
     ? translateCategoryLabel(locale, message.category, message.category)
     : null;
+
+  const projectCategoryLine = useMemo(() => {
+    if (!message.project?.name && !categoryLabel) return null;
+    const projectName = message.project?.name ?? t('common.project');
+    return categoryLabel ? `${projectName} · ${categoryLabel}` : projectName;
+  }, [message.project?.name, categoryLabel, t]);
 
   const localizedEditCategories = useMemo(
     () =>
@@ -161,6 +182,35 @@ function MessageRow({
     }
   };
 
+  const postReply = async () => {
+    if (!isAdmin || !currentUsername || postingReply) return;
+    setPostingReply(true);
+    setActionError('');
+    try {
+      const displayName =
+        profile?.board_name?.trim() ||
+        defaultBoardNameForUsername(currentUsername);
+      const reply = await createTeamMessageReply(
+        {
+          threadRootId: message.id,
+          body: replyBody,
+          author: {
+            username: currentUsername,
+            displayName,
+          },
+        },
+        { isAdmin }
+      );
+      setReplyBody('');
+      setReplyOpen(false);
+      onReplyPosted(reply);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('messages.replyError'));
+    } finally {
+      setPostingReply(false);
+    }
+  };
+
   const handleDelete = async () => {
     if (!currentUsername || deleting || saving) return;
     if (!window.confirm(t('messages.deleteConfirm'))) return;
@@ -181,10 +231,24 @@ function MessageRow({
       <CommentAuthorBlock username={message.author_username}>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-1">
           <span className="text-sm font-semibold">{authorLabel}</span>
-          <time className="text-xs tb-muted" dateTime={message.created_at}>
+          <time className="text-xs tb-muted shrink-0" dateTime={message.created_at}>
             {formatCommentTimestamp(message.created_at)}
           </time>
-          <span className="inline-flex items-center gap-2 text-xs ml-auto">
+          {projectCategoryLine ? (
+            <>
+              <span className="text-xs tb-muted shrink-0" aria-hidden>
+                {' '}
+                -{' '}
+              </span>
+              <span
+                className="text-xs tb-muted min-w-0 truncate"
+                title={projectCategoryLine}
+              >
+                {projectCategoryLine}
+              </span>
+            </>
+          ) : null}
+          <span className="inline-flex items-center gap-2 text-xs ml-auto shrink-0">
             {currentUsername ? (
               <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
                 <input
@@ -289,38 +353,128 @@ function MessageRow({
           </div>
         ) : (
           <>
-            <div className="flex items-start justify-between gap-3 mb-2">
-              <h3
-                ref={titleScrollAnchorRef}
-                className="text-base font-semibold min-w-0 flex-1 leading-snug"
-              >
-                {displayTitle}
-              </h3>
-              {message.project?.name || categoryLabel ? (
-                <p
-                  className="text-xs tb-muted shrink-0 max-w-[min(100%,14rem)] text-right leading-snug"
-                  title={
-                    message.project?.name || categoryLabel
-                      ? `${message.project?.name ?? t('common.project')}${
-                          categoryLabel ? ` · ${categoryLabel}` : ''
-                        }`
-                      : undefined
-                  }
-                >
-                  <span className="block truncate">
-                    {message.project?.name ?? t('common.project')}
-                    {categoryLabel ? ` · ${categoryLabel}` : null}
-                  </span>
-                </p>
-              ) : null}
-            </div>
+            <h3
+              ref={titleScrollAnchorRef}
+              className="text-base font-semibold min-w-0 leading-snug mb-2"
+            >
+              {displayTitle}
+            </h3>
             <MessageBodyContent
               messageId={message.id}
               title={displayTitle}
               body={message.body}
               feedSummary={message.feed_summary}
               scrollAnchorRef={titleScrollAnchorRef}
+              trailingAction={
+                isAdmin && currentUsername ? (
+                  <button
+                    type="button"
+                    className={messageBodyActionBtnClass}
+                    disabled={editing || saving || deleting || postingReply}
+                    onClick={() => {
+                      setReplyOpen((open) => !open);
+                      setActionError('');
+                    }}
+                  >
+                    {t('messages.reply')}
+                  </button>
+                ) : null
+              }
             />
+
+            {threadReplies.length > 0 ? (
+              <ul
+                className="mt-4 space-y-3 border-l-2 border-[var(--tb-border)] pl-4 ml-1"
+                aria-label={t('messages.replyCount', { count: threadReplies.length })}
+              >
+                {threadReplies.map((reply) => {
+                  const replyAuthor = reply.author_display_name || reply.author_username;
+                  const replyCanDelete =
+                    Boolean(currentUsername) &&
+                    authorUsernamesMatch(reply.author_username, currentUsername ?? '');
+                  return (
+                    <li key={reply.id} className="min-w-0">
+                      <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-1">
+                        <span className="text-sm font-medium">{replyAuthor}</span>
+                        <time className="text-xs tb-muted" dateTime={reply.created_at}>
+                          {formatCommentTimestamp(reply.created_at)}
+                        </time>
+                        <span className="inline-flex items-center gap-2 text-xs ml-auto">
+                          {currentUsername ? (
+                            <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                              <input
+                                type="checkbox"
+                                checked={replyReadById.has(reply.id)}
+                                onChange={(e) =>
+                                  onReplyReadChange(reply.id, e.target.checked)
+                                }
+                                className="rounded border-[var(--tb-border)]"
+                                aria-label={t('messages.readLabel')}
+                              />
+                              <span className="tb-muted">{t('messages.readLabel')}</span>
+                            </label>
+                          ) : null}
+                          {replyCanDelete ? (
+                            <button
+                              type="button"
+                              className="text-red-600 hover:underline"
+                              onClick={() => {
+                                if (!window.confirm(t('messages.deleteConfirm'))) return;
+                                void deleteTeamMessage(reply.id, currentUsername ?? '').then(
+                                  () => onDeleted?.(reply.id)
+                                );
+                              }}
+                            >
+                              {t('comments.delete')}
+                            </button>
+                          ) : null}
+                        </span>
+                      </div>
+                      <MessageBodyContent
+                        messageId={reply.id}
+                        title={displayTitle}
+                        body={reply.body}
+                        feedSummary={null}
+                      />
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+
+            {replyOpen && isAdmin && currentUsername ? (
+              <div className="mt-4 space-y-3 rounded-lg border border-[var(--tb-border)] bg-[var(--tb-surface-muted)]/40 p-3">
+                <MessageRichTextEditor
+                  username={currentUsername}
+                  value={replyBody}
+                  onChange={setReplyBody}
+                  disabled={postingReply}
+                  minHeightClassName="min-h-[4rem]"
+                  aria-label={t('messages.reply')}
+                />
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    className="tb-btn-secondary text-sm px-3 py-1.5"
+                    disabled={postingReply}
+                    onClick={() => {
+                      setReplyOpen(false);
+                      setReplyBody('');
+                    }}
+                  >
+                    {t('common.cancel')}
+                  </button>
+                  <button
+                    type="button"
+                    className="tb-btn-primary text-sm px-3 py-1.5 disabled:opacity-50"
+                    disabled={postingReply}
+                    onClick={() => void postReply()}
+                  >
+                    {postingReply ? t('messages.posting') : t('messages.postReply')}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </>
         )}
 

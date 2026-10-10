@@ -5,6 +5,7 @@ import {
   useLayoutEffect,
   useRef,
   useState,
+  type ReactNode,
   type RefObject,
 } from 'react';
 import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
@@ -48,6 +49,8 @@ interface MessageBodyContentProps {
   onFeedSummaryChange?: (summary: string) => void;
   /** Message title (or row) — kept fixed on screen when expanding at the bottom of the feed. */
   scrollAnchorRef?: RefObject<HTMLElement | null>;
+  /** Shown on the same row as Open/Close message (e.g. Reply). */
+  trailingAction?: ReactNode;
 }
 
 type MessageImageSlide = {
@@ -68,6 +71,9 @@ function collectMessageImages(container: HTMLElement): MessageImageSlide[] {
   return slides;
 }
 
+export const messageBodyActionBtnClass =
+  'text-sm font-medium text-[var(--tb-accent)] hover:opacity-85 underline-offset-2 hover:underline disabled:opacity-50';
+
 function MessageBodyExpandToggle({
   expanded,
   onToggle,
@@ -79,12 +85,27 @@ function MessageBodyExpandToggle({
   return (
     <button
       type="button"
-      className="mt-2 text-sm font-medium text-[var(--tb-accent)] hover:opacity-85 underline-offset-2 hover:underline"
+      className={messageBodyActionBtnClass}
       onClick={onToggle}
       aria-expanded={expanded}
     >
       {expanded ? t('messages.closeMessage') : t('messages.openMessage')}
     </button>
+  );
+}
+
+function MessageBodyActionRow({
+  expandToggle,
+  trailingAction,
+}: {
+  expandToggle: ReactNode;
+  trailingAction?: ReactNode;
+}) {
+  return (
+    <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 min-h-[1.25rem]">
+      <div className="shrink-0">{expandToggle}</div>
+      {trailingAction ? <div className="shrink-0 ml-auto">{trailingAction}</div> : null}
+    </div>
   );
 }
 
@@ -96,6 +117,7 @@ function MessageBodyContent({
   className = 'text-sm break-words',
   onFeedSummaryChange,
   scrollAnchorRef,
+  trailingAction,
 }: MessageBodyContentProps) {
   const { t } = useTaskboardI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -361,9 +383,14 @@ function MessageBodyContent({
         ) : (
           <p className={`text-sm tb-muted ${className}`}>{t('messages.feedSummaryUnavailable')}</p>
         )}
-        <MessageBodyExpandToggle
-          expanded={false}
-          onToggle={() => setExpandedWithScrollAnchor(true)}
+        <MessageBodyActionRow
+          expandToggle={
+            <MessageBodyExpandToggle
+              expanded={false}
+              onToggle={() => setExpandedWithScrollAnchor(true)}
+            />
+          }
+          trailingAction={trailingAction}
         />
       </>
     );
@@ -377,9 +404,14 @@ function MessageBodyContent({
           className={`message-rich-text ${className}`}
           dangerouslySetInnerHTML={{ __html: html }}
         />
-        <MessageBodyExpandToggle
-          expanded
-          onToggle={() => setExpandedWithScrollAnchor(false)}
+        <MessageBodyActionRow
+          expandToggle={
+            <MessageBodyExpandToggle
+              expanded
+              onToggle={() => setExpandedWithScrollAnchor(false)}
+            />
+          }
+          trailingAction={trailingAction}
         />
         {activeSlide ? (
           <TaskPhotoLightbox
@@ -411,9 +443,14 @@ function MessageBodyContent({
     return (
       <>
         <p className={`text-sm tb-muted ${className}`}>…</p>
-        <MessageBodyExpandToggle
-          expanded
-          onToggle={() => setExpandedWithScrollAnchor(false)}
+        <MessageBodyActionRow
+          expandToggle={
+            <MessageBodyExpandToggle
+              expanded
+              onToggle={() => setExpandedWithScrollAnchor(false)}
+            />
+          }
+          trailingAction={trailingAction}
         />
       </>
     );
@@ -422,9 +459,14 @@ function MessageBodyContent({
   return (
     <>
       <p className={`whitespace-pre-wrap ${className}`}>{body}</p>
-      <MessageBodyExpandToggle
-        expanded
-        onToggle={() => setExpandedWithScrollAnchor(false)}
+      <MessageBodyActionRow
+        expandToggle={
+          <MessageBodyExpandToggle
+            expanded
+            onToggle={() => setExpandedWithScrollAnchor(false)}
+          />
+        }
+        trailingAction={trailingAction}
       />
     </>
   );

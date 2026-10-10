@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { useUserProfile } from '../../context/UserProfileContext';
@@ -46,6 +46,16 @@ export default function AssigneeFilterBar() {
     () => orderAssigneeFiltersForUser(currentAssignee, counts, assigneeNames),
     [currentAssignee, counts, assigneeNames]
   );
+
+  const didInitAssigneeFilterRef = useRef(false);
+
+  useEffect(() => {
+    if (didInitAssigneeFilterRef.current || !username) return;
+    const selfFilter = currentAssignee;
+    if (!selfFilter || !assigneeNames.includes(selfFilter)) return;
+    didInitAssigneeFilterRef.current = true;
+    setAssigneeFilter(selfFilter as AssigneeFilter);
+  }, [username, currentAssignee, assigneeNames, setAssigneeFilter]);
 
   return (
     <div className="tb-header-scroll-row tb-header-scroll-row--filters">
