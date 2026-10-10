@@ -483,10 +483,18 @@ export default function MessagesPanel() {
     const counts = new Map<string, number>();
     for (const message of messages) {
       if (!message.project_id) continue;
+      if (readFilter === 'unread' && readMessageIds.has(message.id)) continue;
       counts.set(message.project_id, (counts.get(message.project_id) ?? 0) + 1);
     }
     return counts;
-  }, [messages]);
+  }, [messages, readFilter, readMessageIds]);
+
+  const allMessagesFilterCount = useMemo(() => {
+    if (readFilter === 'unread') {
+      return messages.filter((message) => !readMessageIds.has(message.id)).length;
+    }
+    return messages.length;
+  }, [messages, readFilter, readMessageIds]);
 
   const projectsByMessageCount = useMemo(() => {
     return [...projects].sort((a, b) => {
@@ -572,9 +580,9 @@ export default function MessagesPanel() {
             className={`tb-filter-btn relative ${projectFilter === 'all' ? 'tb-filter-btn--active' : ''}`}
           >
             {t('filter.all')}
-            {messages.length > 0 && (
-              <span className="tb-filter-count">{messages.length}</span>
-            )}
+            {allMessagesFilterCount > 0 ? (
+              <span className="tb-filter-count">{allMessagesFilterCount}</span>
+            ) : null}
           </button>
           {projectsByMessageCount.map((project) => {
             const count = messageCountsByProject.get(project.id) ?? 0;
