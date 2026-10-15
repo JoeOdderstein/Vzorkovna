@@ -16,9 +16,11 @@ import TbIconTooltip from '../taskboard/components/TbIconTooltip';
 import AssigneeFilterBar from '../taskboard/components/AssigneeFilterBar';
 import CalendarProjectFilterBar from '../taskboard/components/CalendarProjectFilterBar';
 import TaskDrawerHost from '../taskboard/components/TaskDrawerHost';
+import { useSyncCalendarProjectQuery } from '../hooks/useSyncCalendarProjectQuery';
 import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 
 function CalendarShell() {
+  useSyncCalendarProjectQuery();
   const { authenticated, loading, sessionReady } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
   const { loading: profileLoading } = useUserProfile();
@@ -39,7 +41,13 @@ function CalendarShell() {
   }
 
   if (!authenticated) {
-    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: `${location.pathname}${location.search}` }}
+      />
+    );
   }
 
   return (

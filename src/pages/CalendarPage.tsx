@@ -1,3 +1,4 @@
+import ProjectTimelinePanel from '../taskboard/components/ProjectTimelinePanel';
 import TaskCalendarDialog from '../taskboard/components/TaskCalendarDialog';
 import { useTaskboardI18n } from '../hooks/useTaskboardI18n';
 
@@ -10,6 +11,7 @@ export default function CalendarPage() {
         <span className="tb-label block mb-2">{t('nav.calendar')}</span>
         <p className="text-sm tb-muted">{t('calendar.pageDescription')}</p>
       </header>
+      <ProjectTimelinePanel />
       <TaskCalendarDialog open variant="page" />
     </div>
   );
