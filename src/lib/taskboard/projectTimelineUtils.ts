@@ -1,3 +1,7 @@
+import {
+  htmlMessageHasContent,
+  normalizeOutgoingMessageBody,
+} from '../messages/messageRichText';
 import { addCalendarDays, startOfWeekMonday } from './calendarEventLayout';
 import { formatDateKey } from './deadlineUtils';
 
@@ -100,8 +104,18 @@ export type TimelineBlockInput = {
   description: string;
 };
 
+export function timelineRichFieldHasContent(value: string): boolean {
+  return htmlMessageHasContent(value);
+}
+
+export function normalizeTimelineRichField(value: string): string {
+  return normalizeOutgoingMessageBody(value);
+}
+
 export function timelineBlockHasContent(block: Pick<TimelineBlockInput, 'name' | 'description'>): boolean {
-  return Boolean(block.name.trim() || block.description.trim());
+  return (
+    timelineRichFieldHasContent(block.name) || timelineRichFieldHasContent(block.description)
+  );
 }
 
 /** Ongoing timeline: not marked completed and at least one block with name or description. */
@@ -136,9 +150,7 @@ export function validateTimelineBlocks(
   const normalized: { start: string; end: string; startIdx: number; endIdx: number }[] = [];
 
   for (const block of blocks) {
-    const name = block.name.trim();
-    const description = block.description.trim();
-    if (!name && !description) continue;
+    if (!timelineBlockHasContent(block)) continue;
 
     let start = block.week_start;
     let end = block.week_end;
@@ -178,9 +190,7 @@ export function normalizeTimelineBlocksForSave(
   const out: TimelineBlockInput[] = [];
 
   for (const block of blocks) {
-    const name = block.name.trim();
-    const description = block.description.trim();
-    if (!name && !description) continue;
+    if (!timelineBlockHasContent(block)) continue;
 
     let start = block.week_start;
     let end = block.week_end;
@@ -190,8 +200,8 @@ export function normalizeTimelineBlocksForSave(
     out.push({
       week_start: start,
       week_end: end,
-      name,
-      description,
+      name: normalizeTimelineRichField(block.name),
+      description: normalizeTimelineRichField(block.description),
     });
   }
 

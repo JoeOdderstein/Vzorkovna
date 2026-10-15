@@ -16,9 +16,13 @@ import {
   normalizeTimelineBlocksForSave,
   PROJECT_TIMELINE_WEEKS_AHEAD,
   sortTimelineBlocks,
+  timelineBlockHasContent,
   timelineSlotsInBlockRange,
   validateTimelineBlocks,
 } from '../../lib/taskboard/projectTimelineUtils';
+import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
+import MessageRichTextEditor from '../../components/messages/MessageRichTextEditor';
+import ProjectTimelineRichText from './ProjectTimelineRichText';
 
 function newEmptyBlock(firstWeekKey: string): ProjectTimelineBlockInput {
   return {
@@ -44,6 +48,7 @@ function entriesToBlocks(
 
 export default function ProjectTimelinePanel() {
   const { t } = useTaskboardI18n();
+  const { username } = useTaskboardAuth();
   const { projectFilter, filterProjects } = useTaskboardFilter();
   const { refreshProjects } = useTaskboardRefresh();
 
@@ -65,7 +70,7 @@ export default function ProjectTimelinePanel() {
   );
 
   const displayBlocks = useMemo(
-    () => sortTimelineBlocks(draftBlocks.filter((b) => b.name.trim() || b.description.trim())),
+    () => sortTimelineBlocks(draftBlocks.filter(timelineBlockHasContent)),
     [draftBlocks]
   );
 
@@ -313,7 +318,6 @@ export default function ProjectTimelinePanel() {
               {blocksToRender.map((block, index) => {
                 const name = block.name;
                 const description = block.description;
-                const hasContent = Boolean(name.trim() || description.trim());
 
                 return (
                   <tr
@@ -321,34 +325,36 @@ export default function ProjectTimelinePanel() {
                     className="border-b border-[var(--tb-border)] align-top"
                   >
                     <td className="py-3 pr-3">{renderWeekCell(block, index)}</td>
-                    <td className="py-3 pr-3">
+                    <td className="py-3 pr-3 min-w-[10rem]">
                       {editing ? (
-                        <input
-                          type="text"
-                          className="field-input w-full text-sm"
+                        <MessageRichTextEditor
+                          key={`name-${index}-${block.week_start}-${block.week_end}`}
+                          username={username ?? ''}
                           value={name}
+                          onChange={(html) => updateBlock(index, { name: html })}
                           disabled={saving}
-                          onChange={(e) => updateBlock(index, { name: e.target.value })}
+                          minHeightClassName="min-h-[2.75rem]"
+                          maxHeightClassName="max-h-[10rem]"
+                          aria-label={t('calendar.projectTimelineColName')}
                         />
                       ) : (
-                        <span className={hasContent ? '' : 'tb-muted'}>
-                          {name.trim() || '—'}
-                        </span>
+                        <ProjectTimelineRichText body={name} />
                       )}
                     </td>
-                    <td className="py-3">
+                    <td className="py-3 min-w-[14rem]">
                       {editing ? (
-                        <textarea
-                          className="field-input w-full text-sm min-h-[2.5rem] resize-y"
+                        <MessageRichTextEditor
+                          key={`desc-${index}-${block.week_start}-${block.week_end}`}
+                          username={username ?? ''}
                           value={description}
+                          onChange={(html) => updateBlock(index, { description: html })}
                           disabled={saving}
-                          rows={2}
-                          onChange={(e) => updateBlock(index, { description: e.target.value })}
+                          minHeightClassName="min-h-[4rem]"
+                          maxHeightClassName="max-h-[14rem]"
+                          aria-label={t('calendar.projectTimelineColDescription')}
                         />
                       ) : (
-                        <span className={`whitespace-pre-wrap ${hasContent ? '' : 'tb-muted'}`}>
-                          {description.trim() || '—'}
-                        </span>
+                        <ProjectTimelineRichText body={description} />
                       )}
                     </td>
                     {editing ? (

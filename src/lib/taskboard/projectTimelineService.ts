@@ -1,6 +1,10 @@
 import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { isSupabaseConfigured } from './config';
-import { isActiveProjectTimeline, type TimelineBlockInput } from './projectTimelineUtils';
+import {
+  isActiveProjectTimeline,
+  normalizeTimelineRichField,
+  type TimelineBlockInput,
+} from './projectTimelineUtils';
 import { isLocalTaskboardMode } from './taskService';
 
 export type ProjectTimelineEntry = {
@@ -212,8 +216,8 @@ export async function saveProjectTimeline(
       project_id: projectId,
       week_start: block.week_start,
       week_end: block.week_end,
-      name: block.name.trim(),
-      description: block.description.trim(),
+      name: normalizeTimelineRichField(block.name),
+      description: normalizeTimelineRichField(block.description),
     }));
     store[projectId] = { timelineCompleted, entries };
     saveLocal(store);
@@ -258,8 +262,8 @@ export async function saveProjectTimeline(
     project_id: projectId,
     week_start: block.week_start,
     week_end: block.week_end,
-    name: block.name.trim(),
-    description: block.description.trim(),
+    name: normalizeTimelineRichField(block.name),
+    description: normalizeTimelineRichField(block.description),
   }));
 
   if (toInsert.length > 0) {
