@@ -72,7 +72,8 @@ const en = {
   'calendar.projectTimelineWeekTo': 'To week',
   'calendar.projectTimelineNoBlocks': 'No timeline blocks yet.',
   'calendar.projectTimelineOverlap': 'Timeline blocks cannot overlap.',
-  'calendar.projectTimelineInvalidWeek': 'Each block must use weeks from the 10-week timeline window.',
+  'calendar.projectTimelineInvalidWeek':
+    'Each block must use weeks from the 3-year timeline window.',
   'calendar.projectTimelineMarkCompleted': 'Mark project as completed',
   'calendar.projectTimelineLoadError': 'Could not load project timeline.',
   'calendar.projectTimelineSaveError': 'Could not save project timeline.',
@@ -582,7 +583,7 @@ const uk: Record<MessageKey, string> = {
   'calendar.projectTimelineNoBlocks': 'Блоків хронології ще немає.',
   'calendar.projectTimelineOverlap': 'Блоки хронології не можуть перетинатися.',
   'calendar.projectTimelineInvalidWeek':
-    'Кожен блок має використовувати тижні з 10-тижневого вікна хронології.',
+    'Кожен блок має використовувати тижні з 3-річного вікна хронології.',
   'calendar.projectTimelineMarkCompleted': 'Позначити проєкт як завершений',
   'calendar.projectTimelineLoadError': 'Не вдалося завантажити хронологію проєкту.',
   'calendar.projectTimelineSaveError': 'Не вдалося зберегти хронологію проєкту.',

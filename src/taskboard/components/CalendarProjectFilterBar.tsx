@@ -23,6 +23,7 @@ export default function CalendarProjectFilterBar() {
     setProjectFilter,
     filterProjects,
     tasksForCounts,
+    activeTimelineProjectIds,
   } = useTaskboardFilter();
   const { t } = useTaskboardI18n();
 
@@ -39,8 +40,14 @@ export default function CalendarProjectFilterBar() {
   );
 
   const orderedProjects = useMemo(
-    () => sortProjectsByWorkload(filterProjects, tasksForCounts, assigneeFilter),
-    [filterProjects, tasksForCounts, assigneeFilter]
+    () =>
+      sortProjectsByWorkload(
+        filterProjects,
+        tasksForCounts,
+        assigneeFilter,
+        activeTimelineProjectIds
+      ),
+    [filterProjects, tasksForCounts, assigneeFilter, activeTimelineProjectIds]
   );
 
   const projectColorIndex = useMemo(

@@ -1,7 +1,8 @@
 import { addCalendarDays, startOfWeekMonday } from './calendarEventLayout';
 import { formatDateKey } from './deadlineUtils';
 
-export const PROJECT_TIMELINE_WEEKS_AHEAD = 10;
+/** Monday-based weeks from the current week through ~3 years ahead. */
+export const PROJECT_TIMELINE_WEEKS_AHEAD = 52 * 3;
 
 export type TimelineWeekSlot = {
   weekStart: Date;
@@ -98,6 +99,19 @@ export type TimelineBlockInput = {
   name: string;
   description: string;
 };
+
+export function timelineBlockHasContent(block: Pick<TimelineBlockInput, 'name' | 'description'>): boolean {
+  return Boolean(block.name.trim() || block.description.trim());
+}
+
+/** Ongoing timeline: not marked completed and at least one block with name or description. */
+export function isActiveProjectTimeline(state: {
+  timelineCompleted: boolean;
+  entries: Pick<TimelineBlockInput, 'name' | 'description'>[];
+}): boolean {
+  if (state.timelineCompleted) return false;
+  return state.entries.some(timelineBlockHasContent);
+}
 
 export function sortTimelineBlocks(blocks: TimelineBlockInput[]): TimelineBlockInput[] {
   return blocks.slice().sort((a, b) => {

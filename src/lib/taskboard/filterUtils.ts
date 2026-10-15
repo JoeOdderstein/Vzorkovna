@@ -84,15 +84,29 @@ function projectPriorityScore(tasks: Task[]) {
   return tasks.reduce((sum, task) => sum + PRIORITY_WEIGHT[task.priority], 0);
 }
 
-/** Most open tasks first, then highest combined priority, then original sort order. */
+function projectHasActiveTimeline(projectId: string, activeTimelineProjectIds?: ReadonlySet<string>) {
+  return activeTimelineProjectIds?.has(projectId) ?? false;
+}
+
+/**
+ * Projects with open tasks or an active timeline first (left), then by open-task count,
+ * priority, and sort order.
+ */
 export function sortProjectsByWorkload(
   projects: Project[],
   tasks: Task[],
-  filter: AssigneeFilter
+  filter: AssigneeFilter,
+  activeTimelineProjectIds?: ReadonlySet<string>
 ): Project[] {
   return [...projects].sort((a, b) => {
     const aTasks = visibleProjectTasks(tasks, a.id, filter);
     const bTasks = visibleProjectTasks(tasks, b.id, filter);
+
+    const aFeatured =
+      aTasks.length > 0 || projectHasActiveTimeline(a.id, activeTimelineProjectIds);
+    const bFeatured =
+      bTasks.length > 0 || projectHasActiveTimeline(b.id, activeTimelineProjectIds);
+    if (aFeatured !== bFeatured) return aFeatured ? -1 : 1;
 
     const countDiff = bTasks.length - aTasks.length;
     if (countDiff !== 0) return countDiff;

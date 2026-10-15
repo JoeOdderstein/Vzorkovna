@@ -11,6 +11,8 @@ interface TaskboardFilterContextValue {
   setFilterProjects: (projects: Project[]) => void;
   tasksForCounts: Task[];
   setTasksForCounts: (tasks: Task[]) => void;
+  activeTimelineProjectIds: ReadonlySet<string>;
+  setActiveTimelineProjectIds: (ids: ReadonlySet<string>) => void;
 }
 
 const TaskboardFilterContext = createContext<TaskboardFilterContextValue | null>(null);
@@ -20,6 +22,9 @@ export function TaskboardFilterProvider({ children }: { children: React.ReactNod
   const [projectFilter, setProjectFilter] = useState<ProjectFilter>('all');
   const [filterProjects, setFilterProjectsState] = useState<Project[]>([]);
   const [tasksForCounts, setTasksForCountsState] = useState<Task[]>([]);
+  const [activeTimelineProjectIds, setActiveTimelineProjectIdsState] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
 
   const setTasksForCounts = useCallback((tasks: Task[]) => {
     setTasksForCountsState(tasks);
@@ -27,6 +32,10 @@ export function TaskboardFilterProvider({ children }: { children: React.ReactNod
 
   const setFilterProjects = useCallback((projects: Project[]) => {
     setFilterProjectsState(projects);
+  }, []);
+
+  const setActiveTimelineProjectIds = useCallback((ids: ReadonlySet<string>) => {
+    setActiveTimelineProjectIdsState(ids);
   }, []);
 
   const value = useMemo(
@@ -39,14 +48,18 @@ export function TaskboardFilterProvider({ children }: { children: React.ReactNod
       setFilterProjects,
       tasksForCounts,
       setTasksForCounts,
+      activeTimelineProjectIds,
+      setActiveTimelineProjectIds,
     }),
     [
       assigneeFilter,
       projectFilter,
       filterProjects,
       tasksForCounts,
+      activeTimelineProjectIds,
       setTasksForCounts,
       setFilterProjects,
+      setActiveTimelineProjectIds,
     ]
   );
 

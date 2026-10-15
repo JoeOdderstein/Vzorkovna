@@ -26,6 +26,7 @@ import {
   updateCalendarEvent,
 } from '../../lib/taskboard/calendarEventService';
 import { filterTasksByAssignee, filterTasksByProject } from '../../lib/taskboard/filterUtils';
+import { fetchActiveTimelineProjectIds } from '../../lib/taskboard/projectTimelineService';
 import {
   buildProjectCalendarColorIndex,
   projectCalendarColorClassForId,
@@ -142,8 +143,13 @@ export default function TaskCalendarDialog({
   const isActive = isPage || open;
   const mobileCalendar = useMobileCalendarLayout();
   const { username, isAdmin } = useTaskboardAuth();
-  const { assigneeFilter, projectFilter, setTasksForCounts, setFilterProjects } =
-    useTaskboardFilter();
+  const {
+    assigneeFilter,
+    projectFilter,
+    setTasksForCounts,
+    setFilterProjects,
+    setActiveTimelineProjectIds,
+  } = useTaskboardFilter();
   const { projectsToken } = useTaskboardRefresh();
   const { openTask } = useTaskboardSelection();
   const { t } = useTaskboardI18n();
@@ -191,14 +197,19 @@ export default function TaskCalendarDialog({
     }
 
     try {
-      const [projectList, deadlineTasks, visitEvents] = await Promise.all([
-        fetchVisibleProjects(username, isAdmin),
+      const projectsPromise = fetchVisibleProjects(username, isAdmin);
+      const [projectList, deadlineTasks, visitEvents, timelineActiveIds] = await Promise.all([
+        projectsPromise,
         fetchActiveTasksWithDeadlines(),
         fetchCalendarEvents(),
+        projectsPromise.then((projects) =>
+          fetchActiveTimelineProjectIds(projects.map((project) => project.id))
+        ),
       ]);
 
       setProjects(projectList);
       setFilterProjects(projectList);
+      setActiveTimelineProjectIds(timelineActiveIds);
       const visible = filterTasksForProjects(deadlineTasks, projectList);
       setVisibleTasksUnfiltered(visible);
       setTasksForCounts(visible);
@@ -209,7 +220,7 @@ export default function TaskCalendarDialog({
     } finally {
       setLoading(false);
     }
-  }, [username, isAdmin, setTasksForCounts, setFilterProjects]);
+  }, [username, isAdmin, setTasksForCounts, setFilterProjects, setActiveTimelineProjectIds]);
 
   useEffect(() => {
     if (!isActive) return;

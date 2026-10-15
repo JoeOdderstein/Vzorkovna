@@ -1,6 +1,6 @@
 import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { isSupabaseConfigured } from './config';
-import type { TimelineBlockInput } from './projectTimelineUtils';
+import { isActiveProjectTimeline, type TimelineBlockInput } from './projectTimelineUtils';
 import { isLocalTaskboardMode } from './taskService';
 
 export type ProjectTimelineEntry = {
@@ -119,6 +119,81 @@ export async function fetchProjectTimeline(projectId: string): Promise<ProjectTi
     timelineCompleted,
     entries: (data ?? []).map((row) => mapEntry(row as Record<string, unknown>)),
   };
+}
+
+/** Which projects have an ongoing timeline (for project filter ordering). */
+export async function fetchActiveTimelineProjectIds(
+  projectIds: string[]
+): Promise<Set<string>> {
+  const active = new Set<string>();
+  if (projectIds.length === 0) return active;
+
+  if (isLocalTaskboardMode()) {
+    const store = loadLocal();
+    for (const projectId of projectIds) {
+      const bucket = store[projectId];
+      if (bucket && isActiveProjectTimeline(bucket)) active.add(projectId);
+    }
+    return active;
+  }
+
+  if (!isSupabaseConfigured()) return active;
+
+  const supabase = await db();
+  const ids = [...new Set(projectIds)];
+
+  const completedByProject = new Map<string, boolean>();
+  for (const id of ids) completedByProject.set(id, false);
+
+  const { data: projectRows, error: projectError } = await supabase
+    .from('projects')
+    .select('id, timeline_completed')
+    .in('id', ids);
+
+  if (projectError && !/timeline_completed|column|schema cache/i.test(projectError.message)) {
+    throw projectError;
+  }
+  for (const row of projectRows ?? []) {
+    const id = String(row.id);
+    completedByProject.set(id, Boolean(row.timeline_completed));
+  }
+
+  const { data: entryRows, error: entryError } = await supabase
+    .from('project_timeline_entries')
+    .select('project_id, name, description')
+    .in('project_id', ids);
+
+  if (entryError) {
+    if (/project_timeline_entries|relation|schema cache/i.test(entryError.message)) {
+      return active;
+    }
+    throw entryError;
+  }
+
+  const entriesByProject = new Map<string, { name: string; description: string }[]>();
+  for (const id of ids) entriesByProject.set(id, []);
+  for (const row of entryRows ?? []) {
+    const projectId = String(row.project_id);
+    const list = entriesByProject.get(projectId);
+    if (!list) continue;
+    list.push({
+      name: String(row.name ?? ''),
+      description: String(row.description ?? ''),
+    });
+  }
+
+  for (const projectId of ids) {
+    if (
+      isActiveProjectTimeline({
+        timelineCompleted: completedByProject.get(projectId) ?? false,
+        entries: entriesByProject.get(projectId) ?? [],
+      })
+    ) {
+      active.add(projectId);
+    }
+  }
+
+  return active;
 }
 
 export type ProjectTimelineBlockInput = TimelineBlockInput;
