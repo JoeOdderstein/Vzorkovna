@@ -1,11 +1,13 @@
 import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { isSupabaseConfigured } from './config';
+import type { TimelineBlockInput } from './projectTimelineUtils';
 import { isLocalTaskboardMode } from './taskService';
 
 export type ProjectTimelineEntry = {
   id: string;
   project_id: string;
   week_start: string;
+  week_end: string;
   name: string;
   description: string;
 };
@@ -15,7 +17,7 @@ export type ProjectTimelineState = {
   entries: ProjectTimelineEntry[];
 };
 
-const LOCAL_KEY = 'project_timeline_v1';
+const LOCAL_KEY = 'project_timeline_v2';
 
 type LocalStore = Record<
   string,
@@ -25,7 +27,24 @@ type LocalStore = Record<
 function loadLocal(): LocalStore {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
-    return raw ? (JSON.parse(raw) as LocalStore) : {};
+    if (raw) return JSON.parse(raw) as LocalStore;
+    const legacyRaw = localStorage.getItem('project_timeline_v1');
+    if (!legacyRaw) return {};
+    const legacy = JSON.parse(legacyRaw) as Record<
+      string,
+      { timelineCompleted: boolean; entries: Omit<ProjectTimelineEntry, 'week_end'>[] }
+    >;
+    const migrated: LocalStore = {};
+    for (const [projectId, bucket] of Object.entries(legacy)) {
+      migrated[projectId] = {
+        timelineCompleted: bucket.timelineCompleted,
+        entries: bucket.entries.map((e) => ({
+          ...e,
+          week_end: e.week_start,
+        })),
+      };
+    }
+    return migrated;
   } catch {
     return {};
   }
@@ -36,10 +55,13 @@ function saveLocal(store: LocalStore) {
 }
 
 function mapEntry(row: Record<string, unknown>): ProjectTimelineEntry {
+  const week_start = String(row.week_start).slice(0, 10);
+  const week_endRaw = row.week_end ? String(row.week_end).slice(0, 10) : week_start;
   return {
     id: String(row.id),
     project_id: String(row.project_id),
-    week_start: String(row.week_start).slice(0, 10),
+    week_start,
+    week_end: week_endRaw,
     name: String(row.name ?? ''),
     description: String(row.description ?? ''),
   };
@@ -99,30 +121,25 @@ export async function fetchProjectTimeline(projectId: string): Promise<ProjectTi
   };
 }
 
-export type ProjectTimelineRowInput = {
-  week_start: string;
-  name: string;
-  description: string;
-};
+export type ProjectTimelineBlockInput = TimelineBlockInput;
 
 export async function saveProjectTimeline(
   projectId: string,
-  rows: ProjectTimelineRowInput[],
+  blocks: ProjectTimelineBlockInput[],
   timelineCompleted: boolean
 ): Promise<ProjectTimelineState> {
   if (!projectId) throw new Error('Project is required.');
 
   if (isLocalTaskboardMode()) {
     const store = loadLocal();
-    const entries: ProjectTimelineEntry[] = rows
-      .filter((row) => row.name.trim() || row.description.trim())
-      .map((row) => ({
-        id: crypto.randomUUID(),
-        project_id: projectId,
-        week_start: row.week_start,
-        name: row.name.trim(),
-        description: row.description.trim(),
-      }));
+    const entries: ProjectTimelineEntry[] = blocks.map((block) => ({
+      id: crypto.randomUUID(),
+      project_id: projectId,
+      week_start: block.week_start,
+      week_end: block.week_end,
+      name: block.name.trim(),
+      description: block.description.trim(),
+    }));
     store[projectId] = { timelineCompleted, entries };
     saveLocal(store);
     return store[projectId];
@@ -162,18 +179,36 @@ export async function saveProjectTimeline(
     throw deleteError;
   }
 
-  const toInsert = rows
-    .map((row) => ({
-      project_id: projectId,
-      week_start: row.week_start,
-      name: row.name.trim(),
-      description: row.description.trim(),
-    }))
-    .filter((row) => row.name || row.description);
+  const toInsert = blocks.map((block) => ({
+    project_id: projectId,
+    week_start: block.week_start,
+    week_end: block.week_end,
+    name: block.name.trim(),
+    description: block.description.trim(),
+  }));
 
   if (toInsert.length > 0) {
-    const { error: insertError } = await supabase.from('project_timeline_entries').insert(toInsert);
-    if (insertError) throw insertError;
+    let { error: insertError } = await supabase.from('project_timeline_entries').insert(toInsert);
+
+    if (insertError && /week_end|column|schema cache/i.test(insertError.message)) {
+      ({ error: insertError } = await supabase.from('project_timeline_entries').insert(
+        toInsert.map((row) => ({
+          project_id: row.project_id,
+          week_start: row.week_start,
+          name: row.name,
+          description: row.description,
+        }))
+      ));
+    }
+
+    if (insertError) {
+      if (/week_end|column|schema cache/i.test(insertError.message)) {
+        throw new Error(
+          'Multi-week timeline needs supabase/migrations/039_project_timeline_week_ranges.sql in Supabase.'
+        );
+      }
+      throw insertError;
+    }
   }
 
   return fetchProjectTimeline(projectId);
