@@ -51,6 +51,7 @@ interface MessageBodyContentProps {
   scrollAnchorRef?: RefObject<HTMLElement | null>;
   /** Shown on the same row as Open/Close message (e.g. Reply). */
   trailingAction?: ReactNode;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 type MessageImageSlide = {
@@ -118,6 +119,7 @@ function MessageBodyContent({
   onFeedSummaryChange,
   scrollAnchorRef,
   trailingAction,
+  onExpandedChange,
 }: MessageBodyContentProps) {
   const { t } = useTaskboardI18n();
   const containerRef = useRef<HTMLDivElement>(null);
@@ -149,8 +151,9 @@ function MessageBodyContent({
         suppressFeedAutoScroll(600);
       }
       setExpanded(next);
+      onExpandedChange?.(next);
     },
-    [scrollAnchorRef]
+    [scrollAnchorRef, onExpandedChange]
   );
 
   useLayoutEffect(() => {
@@ -206,11 +209,12 @@ function MessageBodyContent({
 
   useEffect(() => {
     setExpanded(false);
+    onExpandedChange?.(false);
     expandScrollPinRef.current = null;
     setPdfPreview(null);
     setSummary(feedSummary?.trim() || null);
     setSummaryError('');
-  }, [body, feedSummary, messageId]);
+  }, [body, feedSummary, messageId, onExpandedChange]);
 
   useEffect(() => {
     const pin = expandScrollPinRef.current;

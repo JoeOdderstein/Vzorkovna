@@ -89,7 +89,12 @@ function MessageRow({
   const [replyOpen, setReplyOpen] = useState(false);
   const [replyBody, setReplyBody] = useState('');
   const [postingReply, setPostingReply] = useState(false);
+  const [bodyExpanded, setBodyExpanded] = useState(false);
   const titleScrollAnchorRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    setBodyExpanded(false);
+  }, [message.id]);
 
   const authorLabel = message.author_display_name || message.author_username;
   const linkedTasks =
@@ -365,6 +370,7 @@ function MessageRow({
               body={message.body}
               feedSummary={message.feed_summary}
               scrollAnchorRef={titleScrollAnchorRef}
+              onExpandedChange={setBodyExpanded}
               trailingAction={
                 isAdmin && currentUsername ? (
                   <button
@@ -482,7 +488,7 @@ function MessageRow({
           <p className="text-xs text-red-600 mt-2">{actionError}</p>
         ) : null}
 
-        {linkedTasks.length > 0 ? (
+        {!editing && bodyExpanded && linkedTasks.length > 0 ? (
           <ul className="mt-3 space-y-2">
             {linkedTasks.map((task) => (
               <li
