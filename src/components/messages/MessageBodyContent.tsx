@@ -26,7 +26,6 @@ import {
   buildLocalFeedSummary,
   fetchMessageFeedSummary,
 } from '../../lib/messages/messageFeedSummary';
-import { isLocalTaskboardMode } from '../../lib/taskboard/taskService';
 import {
   htmlMessageHasContent,
   isLikelyHtmlMessageBody,
@@ -162,50 +161,31 @@ function MessageBodyContent({
     scheduleFeedScrollAnchorPin(pin);
   }, [expanded, html, body, summaryLoading]);
 
-  const loadSummary = useCallback(
-    (force = false) => {
-      if (expanded) return;
+  const loadAiSummary = useCallback(() => {
+    if (expanded) return;
 
-      const requestId = ++summaryRequestRef.current;
-      setSummaryLoading(true);
-      setSummaryError('');
+    const requestId = ++summaryRequestRef.current;
+    setSummaryLoading(true);
+    setSummaryError('');
 
-      if (isLocalTaskboardMode()) {
-        const local = buildLocalFeedSummary(body);
-        setSummary(local || null);
-        setSummaryLoading(false);
-        if (local) onFeedSummaryChange?.(local);
-        return;
-      }
-
-      if (feedSummary?.trim() && !force) {
-        setSummary(feedSummary.trim());
-        setSummaryLoading(false);
-        return;
-      }
-
-      void fetchMessageFeedSummary(messageId, { force })
-        .then((text) => {
-          if (requestId !== summaryRequestRef.current) return;
-          const trimmed = text.trim();
-          setSummary(trimmed || null);
-          if (trimmed) onFeedSummaryChange?.(trimmed);
-        })
-        .catch((err) => {
-          if (requestId !== summaryRequestRef.current) return;
-          setSummary(null);
-          setSummaryError(
-            err instanceof Error ? err.message : t('messages.feedSummaryError')
-          );
-        })
-        .finally(() => {
-          if (requestId === summaryRequestRef.current) {
-            setSummaryLoading(false);
-          }
-        });
-    },
-    [body, expanded, feedSummary, messageId, onFeedSummaryChange, t]
-  );
+    void fetchMessageFeedSummary(messageId, { force: true })
+      .then((text) => {
+        if (requestId !== summaryRequestRef.current) return;
+        const trimmed = text.trim();
+        setSummary(trimmed || null);
+        if (trimmed) onFeedSummaryChange?.(trimmed);
+      })
+      .catch((err) => {
+        if (requestId !== summaryRequestRef.current) return;
+        setSummary(null);
+        setSummaryError(err instanceof Error ? err.message : t('messages.feedSummaryError'));
+      })
+      .finally(() => {
+        if (requestId === summaryRequestRef.current) {
+          setSummaryLoading(false);
+        }
+      });
+  }, [expanded, messageId, onFeedSummaryChange, t]);
 
   useEffect(() => {
     setExpanded(false);
@@ -237,9 +217,14 @@ function MessageBodyContent({
 
   useEffect(() => {
     if (expanded) return;
-    if (feedSummary?.trim()) return;
-    loadSummary(false);
-  }, [body, expanded, feedSummary, loadSummary, messageId]);
+    setSummaryError('');
+    setSummaryLoading(false);
+    if (feedSummary?.trim()) {
+      setSummary(feedSummary.trim());
+      return;
+    }
+    setSummary(buildLocalFeedSummary(body) || null);
+  }, [body, expanded, feedSummary]);
 
   useEffect(() => {
     if (!expanded) {
@@ -379,7 +364,7 @@ function MessageBodyContent({
             <button
               type="button"
               className="text-sm font-medium text-[var(--tb-accent)] hover:underline"
-              onClick={() => loadSummary(true)}
+              onClick={() => loadAiSummary()}
             >
               {t('messages.feedSummaryRetry')}
             </button>

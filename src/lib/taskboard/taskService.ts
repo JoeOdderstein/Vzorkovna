@@ -43,9 +43,15 @@ function mapProjects(rows: Record<string, unknown>[]): Project[] {
   return rows.map(normalizeProject);
 }
 
+let allProjectsCache: Project[] | null = null;
+
 async function fetchAllProjectsRaw(): Promise<Project[]> {
+  if (allProjectsCache) return allProjectsCache;
+
   if (isLocalTaskboardMode()) {
-    return localStore.getProjects().map((project) => normalizeProject(project));
+    const projects = localStore.getProjects().map((project) => normalizeProject(project));
+    allProjectsCache = projects;
+    return projects;
   }
 
   const { data, error } = await (await db())
@@ -54,7 +60,9 @@ async function fetchAllProjectsRaw(): Promise<Project[]> {
     .order('sort_order', { ascending: true });
 
   if (error) throw error;
-  return mapProjects((data ?? []) as Record<string, unknown>[]);
+  const projects = mapProjects((data ?? []) as Record<string, unknown>[]);
+  allProjectsCache = projects;
+  return projects;
 }
 
 /** All projects (admin manage dialog). */
@@ -70,10 +78,27 @@ export async function isProjectVisibilityReady() {
   return !error;
 }
 
-/** Projects visible to the current user. */
+type VisibleProjectsCacheEntry = {
+  key: string;
+  projects: Project[];
+};
+
+let visibleProjectsCache: VisibleProjectsCacheEntry | null = null;
+
+export function invalidateVisibleProjectsCache() {
+  visibleProjectsCache = null;
+  allProjectsCache = null;
+}
+
+/** Projects visible to the current user (cached until project list changes). */
 export async function fetchVisibleProjects(username: string | null, isAdmin = false) {
-  const projects = await fetchAllProjectsRaw();
-  return filterProjectsForUser(projects, username, isAdmin);
+  const key = `${username ?? ''}:${isAdmin ? '1' : '0'}`;
+  if (visibleProjectsCache?.key === key) {
+    return visibleProjectsCache.projects;
+  }
+  const projects = filterProjectsForUser(await fetchAllProjectsRaw(), username, isAdmin);
+  visibleProjectsCache = { key, projects };
+  return projects;
 }
 
 export async function fetchTaskboardUsernames() {
@@ -130,6 +155,7 @@ export async function createProject(
   } catch {
     // Project was created; categories can be seeded on first open.
   }
+  invalidateVisibleProjectsCache();
   return project;
 }
 
@@ -178,17 +204,20 @@ export async function updateProject(
     }
     throw error;
   }
+  invalidateVisibleProjectsCache();
   return normalizeProject(data as Record<string, unknown>);
 }
 
 export async function deleteProject(id: string): Promise<void> {
   if (isLocalTaskboardMode()) {
     localStore.deleteProject(id);
+    invalidateVisibleProjectsCache();
     return;
   }
 
   const { error } = await (await db()).from('projects').delete().eq('id', id);
   if (error) throw error;
+  invalidateVisibleProjectsCache();
 }
 
 export async function fetchActiveTaskCountsByProject() {
@@ -378,12 +407,43 @@ export async function createTask(
   return task;
 }
 
+type TaskboardSupabase = Awaited<ReturnType<typeof db>>;
+
+async function nextSortOrderForTaskRow(
+  supabase: TaskboardSupabase,
+  projectId: string,
+  category: TaskCategory,
+  parentTaskId: string | null,
+) {
+  const { data: existing } = await supabase
+    .from('tasks')
+    .select('sort_order')
+    .eq('project_id', projectId)
+    .eq('category', category)
+    .eq('completed', false)
+    .is('parent_task_id', parentTaskId)
+    .order('sort_order', { ascending: false })
+    .limit(1);
+
+  return existing?.[0]?.sort_order != null ? existing[0].sort_order + 1 : 0;
+}
+
 export async function updateTask(
   id: string,
   updates: TaskUpdate,
   options?: { previousAssignees?: Assignee[]; skipBugSync?: boolean },
 ) {
-  if (isLocalTaskboardMode()) return localStore.updateTask(id, updates);
+  if (isLocalTaskboardMode()) {
+    const updated = localStore.updateTask(id, updates);
+    if (updates.project_id !== undefined && !updated.parent_task_id) {
+      const tasks = localStore.getAllActiveTasks();
+      const category = updated.category;
+      for (const sub of tasks.filter((t) => t.parent_task_id === id)) {
+        localStore.updateTask(sub.id, { project_id: updates.project_id, category });
+      }
+    }
+    return updated;
+  }
 
   let previousAssignees = options?.previousAssignees;
   if (updates.assignees !== undefined && previousAssignees === undefined) {
@@ -401,6 +461,62 @@ export async function updateTask(
   }
   if (updates.completed === false) {
     payload.completed_at = null;
+  }
+
+  let moveSubtasksWithParent = false;
+  if (updates.project_id !== undefined) {
+    const supabase = await db();
+    const { data: current, error: fetchError } = await supabase
+      .from('tasks')
+      .select('project_id, category, parent_task_id')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) throw fetchError;
+    if (!current) throw new Error('Task not found.');
+
+    const targetCategory = (updates.category ?? current.category) as TaskCategory;
+    const parentTaskId = current.parent_task_id ? String(current.parent_task_id) : null;
+    payload.project_id = updates.project_id;
+    payload.category = targetCategory;
+    payload.sort_order = await nextSortOrderForTaskRow(
+      supabase,
+      updates.project_id,
+      targetCategory,
+      parentTaskId,
+    );
+
+    moveSubtasksWithParent = !current.parent_task_id;
+
+    const { data, error } = await supabase
+      .from('tasks')
+      .update(payload)
+      .eq('id', id)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    const task = normalizeTask(data);
+
+    if (moveSubtasksWithParent) {
+      const { error: subtaskError } = await supabase
+        .from('tasks')
+        .update({
+          project_id: updates.project_id,
+          category: task.category,
+        })
+        .eq('parent_task_id', id);
+
+      if (subtaskError) throw subtaskError;
+    }
+
+    if (updates.assignees !== undefined) {
+      notifyTaskAssignment(id, previousAssignees ?? []);
+    }
+    if (updates.completed !== undefined && !options?.skipBugSync) {
+      await syncBugFromTaskCompletion(id, Boolean(updates.completed));
+    }
+    return task;
   }
 
   const { data, error } = await (await db())

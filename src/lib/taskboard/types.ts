@@ -63,6 +63,7 @@ export type TaskInsert = Pick<Task, 'project_id' | 'category'> &
 export type TaskUpdate = Partial<
   Pick<
     Task,
+    | 'project_id'
     | 'category'
     | 'task_name'
     | 'description'

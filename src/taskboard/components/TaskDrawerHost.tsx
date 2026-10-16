@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useCompleteUndo } from '../../context/CompleteUndoContext';
 import { useTaskboardSelection } from '../../context/TaskboardSelectionContext';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import type { TaskCategory } from '../../lib/taskboard/constants';
-import type { CategoryOption, Task } from '../../lib/taskboard/types';
+import type { CategoryOption, Project, Task } from '../../lib/taskboard/types';
 import {
   createProjectCategory,
   deleteProjectCategory,
@@ -14,6 +14,7 @@ import { DEFAULT_CATEGORIES } from '../../lib/taskboard/categoryUtils';
 import {
   createTask,
   fetchActiveTasks,
+  fetchVisibleProjects,
   updateTask,
 } from '../../lib/taskboard/taskService';
 import { withRetry } from '../../lib/taskboard/loadUtils';
@@ -23,9 +24,21 @@ export default function TaskDrawerHost() {
   const { selected, taskSnapshot, taskChangeToken, openTask, closeTask, notifyTaskChange } =
     useTaskboardSelection();
   const { showCompleteUndo, dismissCompleteUndo } = useCompleteUndo();
-  const { isAdmin } = useTaskboardAuth();
+  const { username, isAdmin } = useTaskboardAuth();
   const [task, setTask] = useState<Task | null>(null);
   const [categories, setCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const categoriesByProjectRef = useRef(new Map<string, CategoryOption[]>());
+  const skipTaskRefetchOnceRef = useRef(false);
+
+  const resolveCategoriesForProject = useCallback(async (projectId: string) => {
+    const cached = categoriesByProjectRef.current.get(projectId);
+    if (cached) return cached;
+
+    const options = await fetchCategoriesForProject(projectId).catch(() => DEFAULT_CATEGORIES);
+    categoriesByProjectRef.current.set(projectId, options);
+    return options;
+  }, []);
 
   useEffect(() => {
     if (!selected) {
@@ -38,6 +51,13 @@ export default function TaskDrawerHost() {
     }
 
     let cancelled = false;
+
+    if (skipTaskRefetchOnceRef.current) {
+      skipTaskRefetchOnceRef.current = false;
+      return () => {
+        cancelled = true;
+      };
+    }
 
     withRetry(() => fetchActiveTasks(selected.projectId))
       .then((tasks) => {
@@ -60,16 +80,26 @@ export default function TaskDrawerHost() {
     };
   }, [selected, taskSnapshot, taskChangeToken, closeTask]);
 
+  const selectedProjectId = selected?.projectId ?? null;
+
   useEffect(() => {
-    if (!selected) {
+    if (!selectedProjectId) {
       setCategories(DEFAULT_CATEGORIES);
       return;
     }
 
-    fetchCategoriesForProject(selected.projectId)
+    void resolveCategoriesForProject(selectedProjectId)
       .then(setCategories)
       .catch(() => setCategories(DEFAULT_CATEGORIES));
-  }, [selected, taskChangeToken]);
+  }, [selectedProjectId, resolveCategoriesForProject]);
+
+  useEffect(() => {
+    if (!selected) return;
+
+    void fetchVisibleProjects(username, isAdmin)
+      .then(setProjects)
+      .catch(() => setProjects([]));
+  }, [selected, username, isAdmin]);
 
   const handleSaved = useCallback(() => {
     notifyTaskChange();
@@ -85,6 +115,31 @@ export default function TaskDrawerHost() {
       notifyTaskChange();
     },
     [selected, notifyTaskChange]
+  );
+
+  const handleProjectChange = useCallback(
+    async (taskId: string, projectId: string) => {
+      if (!selected || projectId === selected.projectId) return;
+
+      const categoryOptions = await resolveCategoriesForProject(projectId);
+      const currentCategory = task?.category ?? DEFAULT_CATEGORIES[0].id;
+      const categoryStillValid = categoryOptions.some((item) => item.id === currentCategory);
+      const nextCategory = categoryStillValid
+        ? currentCategory
+        : (categoryOptions[0]?.id ?? currentCategory);
+
+      const updated = await updateTask(taskId, {
+        project_id: projectId,
+        category: nextCategory,
+      });
+
+      skipTaskRefetchOnceRef.current = true;
+      setTask(updated);
+      setCategories(categoryOptions);
+      openTask(updated, projectId);
+      window.setTimeout(() => notifyTaskChange(), 0);
+    },
+    [selected, task, notifyTaskChange, openTask, resolveCategoriesForProject]
   );
 
   const handleAddSubtask = useCallback(
@@ -142,6 +197,7 @@ export default function TaskDrawerHost() {
       if (!selected) return;
       const created = await createProjectCategory(selected.projectId, label);
       const next = await refreshCategoriesForProject(selected.projectId, created);
+      categoriesByProjectRef.current.set(selected.projectId, next);
       setCategories(next);
       return created.slug;
     },
@@ -153,23 +209,29 @@ export default function TaskDrawerHost() {
       if (!selected) return;
       await deleteProjectCategory(selected.projectId, categoryId);
       const next = await fetchCategoriesForProject(selected.projectId);
+      categoriesByProjectRef.current.set(selected.projectId, next);
       setCategories(next);
       notifyTaskChange();
     },
     [selected, notifyTaskChange]
   );
 
-  if (!selected || !task) return null;
+  const drawerTask =
+    task ?? (taskSnapshot?.id === selected?.taskId ? taskSnapshot : null);
+
+  if (!selected || !drawerTask) return null;
 
   return (
     <TaskDrawer
-      task={task}
+      task={drawerTask}
       projectId={selected.projectId}
-      category={task.category}
+      category={drawerTask.category}
       categories={categories}
+      projects={projects}
       onClose={closeTask}
       onSaved={handleSaved}
       onAddSubtask={handleAddSubtask}
+      onProjectChange={handleProjectChange}
       onCategoryChange={handleCategoryChange}
       onComplete={handleCompleteTask}
       isAdmin={isAdmin}

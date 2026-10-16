@@ -5,7 +5,7 @@ import type { Task } from '../../lib/taskboard/types';
 import type { Assignee, Priority, TaskCategory } from '../../lib/taskboard/constants';
 import { PRIORITIES } from '../../lib/taskboard/constants';
 import { useAssigneeNames } from '../../hooks/useAssigneeNames';
-import type { CategoryOption } from '../../lib/taskboard/types';
+import type { CategoryOption, Project } from '../../lib/taskboard/types';
 import CategorySelect from './CategorySelect';
 import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
 import { notifyTaskAttachment } from '../../lib/taskboard/notifyAssignment';
@@ -35,9 +35,11 @@ interface TaskDrawerProps {
   projectId: string;
   category: TaskCategory;
   categories: CategoryOption[];
+  projects: Project[];
   onClose: () => void;
   onSaved: () => void;
   onAddSubtask: (parentId: string) => void;
+  onProjectChange?: (taskId: string, projectId: string) => Promise<void>;
   onCategoryChange?: (taskId: string, category: TaskCategory) => Promise<void>;
   onComplete?: (taskId: string) => void;
   isAdmin?: boolean;
@@ -53,6 +55,8 @@ export default function TaskDrawer({
   onClose,
   onSaved,
   onAddSubtask,
+  projects,
+  onProjectChange,
   onCategoryChange,
   onComplete,
   isAdmin = false,
@@ -368,6 +372,40 @@ export default function TaskDrawer({
               className="field-input"
             />
           </Field>
+
+          {projects.length > 0 ? (
+            <Field label={t('task.project')}>
+              <select
+                value={form.project_id ?? task.project_id}
+                disabled={saving || !onProjectChange}
+                onChange={(e) => {
+                  const nextProjectId = e.target.value;
+                  if (!nextProjectId || nextProjectId === task.project_id) return;
+                  setForm((prev) => ({ ...prev, project_id: nextProjectId }));
+                  setSaving(true);
+                  setError('');
+                  void (async () => {
+                    try {
+                      await onProjectChange?.(task.id, nextProjectId);
+                    } catch {
+                      setForm((prev) => ({ ...prev, project_id: task.project_id }));
+                      setError('Could not save changes.');
+                    } finally {
+                      setSaving(false);
+                    }
+                  })();
+                }}
+                className="field-input"
+                aria-label={t('task.project')}
+              >
+                {projects.map((project) => (
+                  <option key={project.id} value={project.id}>
+                    {project.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
 
           <Field label={t('task.category')}>
             <CategorySelect

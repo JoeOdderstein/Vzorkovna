@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
@@ -33,10 +33,18 @@ export default function TaskboardOverviewPage() {
   const { t } = useTaskboardI18n();
   const projectColorClass = useProjectCalendarColorClass(projects);
 
+  const refreshAllTasksTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const refreshAllTasks = useCallback(() => {
-    fetchAllActiveTasks()
-      .then(setAllTasks)
-      .catch(() => {});
+    if (refreshAllTasksTimerRef.current) {
+      clearTimeout(refreshAllTasksTimerRef.current);
+    }
+    refreshAllTasksTimerRef.current = setTimeout(() => {
+      refreshAllTasksTimerRef.current = null;
+      fetchAllActiveTasks()
+        .then(setAllTasks)
+        .catch(() => {});
+    }, 350);
   }, []);
 
   useEffect(() => {
