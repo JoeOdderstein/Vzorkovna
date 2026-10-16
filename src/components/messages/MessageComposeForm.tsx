@@ -730,7 +730,7 @@ function MessageComposeForm({
                     <button
                       type="button"
                       onClick={closeCompose}
-                      className="text-[#80868b] hover:text-[#202124] transition-colors shrink-0"
+                      className="text-[#80868b] hover:text-[var(--tb-text)] transition-colors shrink-0"
                       aria-label={t('messages.composeMinimize')}
                     >
                       <X size={20} />

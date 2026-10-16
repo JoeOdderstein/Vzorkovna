@@ -1995,6 +1995,57 @@ body {
   font-weight: 700;
 }
 
+/* Dark mode: pasted/legacy inline “document black” → readable body text */
+[data-theme='dark'].taskboard .message-rich-text,
+[data-theme='dark'].taskboard .message-rich-text-editor {
+  color: var(--tb-text);
+}
+
+[data-theme='dark'].taskboard .message-rich-text [style*='color: rgb(0, 0, 0)'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:rgb(0, 0, 0)'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: rgb(0,0,0)'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:rgb(0,0,0)'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: rgba(0, 0, 0,'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:rgba(0, 0, 0,'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: rgba(0,0,0,'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:#000'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: #000'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:#000000'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: #000000'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:black'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: black'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:#202124'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: #202124'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: rgb(32, 33, 36)'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color:rgb(32, 33, 36)'],
+[data-theme='dark'].taskboard .message-rich-text [style*='color: rgb(32,33,36)'],
+[data-theme='dark'].taskboard .message-rich-text font[color='#000000'],
+[data-theme='dark'].taskboard .message-rich-text font[color='#000'],
+[data-theme='dark'].taskboard .message-rich-text font[color='black'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: rgb(0, 0, 0)'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:rgb(0, 0, 0)'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: rgb(0,0,0)'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:rgb(0,0,0)'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: rgba(0, 0, 0,'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:rgba(0, 0, 0,'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: rgba(0,0,0,'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:#000'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: #000'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:#000000'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: #000000'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:black'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: black'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:#202124'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: #202124'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: rgb(32, 33, 36)'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color:rgb(32, 33, 36)'],
+[data-theme='dark'].taskboard .message-rich-text-editor [style*='color: rgb(32,33,36)'],
+[data-theme='dark'].taskboard .message-rich-text-editor font[color='#000000'],
+[data-theme='dark'].taskboard .message-rich-text-editor font[color='#000'],
+[data-theme='dark'].taskboard .message-rich-text-editor font[color='black'] {
+  color: var(--tb-text) !important;
+}
+
 .message-rich-text-editor .message-image-block--selected {
   outline: 2px solid color-mix(in srgb, var(--tb-accent) 55%, transparent);
   outline-offset: 2px;
