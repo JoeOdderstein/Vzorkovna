@@ -1,5 +1,5 @@
 import { isPdfFile } from '../installations/installationDocumentService';
-import type { InvoiceDocumentKind } from './constants';
+import type { InvoiceDocumentKind, QuotationStatus } from './constants';
 import { isSupabaseConfigured } from '../taskboard/config';
 import { getAttachmentUrl } from '../taskboard/taskService';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
@@ -18,6 +18,9 @@ export type InvoiceRecord = {
   payment_received: boolean;
   payment_received_by: string | null;
   payment_received_at: string | null;
+  quotation_status: QuotationStatus | null;
+  quotation_status_by: string | null;
+  quotation_status_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -33,6 +36,12 @@ function parseDocumentKind(value: unknown): InvoiceDocumentKind {
   return 'invoice';
 }
 
+function parseQuotationStatus(value: unknown): QuotationStatus | null {
+  const raw = String(value ?? '').trim().toLowerCase();
+  if (raw === 'approved' || raw === 'revisions_needed') return raw;
+  return null;
+}
+
 function mapInvoice(row: Record<string, unknown>): InvoiceRecord {
   return {
     id: String(row.id),
@@ -46,6 +55,9 @@ function mapInvoice(row: Record<string, unknown>): InvoiceRecord {
     payment_received: Boolean(row.payment_received),
     payment_received_by: row.payment_received_by ? String(row.payment_received_by) : null,
     payment_received_at: row.payment_received_at ? String(row.payment_received_at) : null,
+    quotation_status: parseQuotationStatus(row.quotation_status),
+    quotation_status_by: row.quotation_status_by ? String(row.quotation_status_by) : null,
+    quotation_status_at: row.quotation_status_at ? String(row.quotation_status_at) : null,
     created_at: String(row.created_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
   };
@@ -145,6 +157,7 @@ export async function getInvoicePdfUrl(storagePath: string): Promise<string> {
 export type InvoiceStatusPatch = {
   forwarded_to_finance?: boolean;
   payment_received?: boolean;
+  quotation_status?: QuotationStatus | null;
 };
 
 export async function updateInvoiceStatus(
@@ -183,13 +196,31 @@ export async function updateInvoiceStatus(
     }
   }
 
+  if (patch.quotation_status !== undefined) {
+    if (patch.quotation_status) {
+      payload.quotation_status = patch.quotation_status;
+      payload.quotation_status_by = actor;
+      payload.quotation_status_at = new Date().toISOString();
+    } else {
+      payload.quotation_status = null;
+      payload.quotation_status_by = null;
+      payload.quotation_status_at = null;
+    }
+  }
+
   const supabase = await db();
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from('invoices')
     .update(payload)
     .eq('id', invoiceId)
     .select('*')
     .single();
+
+  if (error && /quotation_status|column|schema cache/i.test(error.message)) {
+    throw new Error(
+      'Quotation status needs a database update. Run supabase/migrations/040_invoices_quotation_status.sql in Supabase.',
+    );
+  }
 
   if (error) throw error;
   return mapInvoice(data as Record<string, unknown>);

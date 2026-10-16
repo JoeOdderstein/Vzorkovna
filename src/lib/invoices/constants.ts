@@ -8,3 +8,5 @@ export const INVOICE_DOCUMENT_KINDS: InvoiceDocumentKind[] = [
   'receipt',
   'quotation',
 ];
+
+export type QuotationStatus = 'approved' | 'revisions_needed';
