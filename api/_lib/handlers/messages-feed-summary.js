@@ -1,4 +1,4 @@
-import { getTokenFromRequest, verifySessionToken } from '../auth.js';
+import { requireMessageAreaAccess } from '../messageAccess.js';
 import { generateMessageFeedSummary, readRequestBody } from '../parseMessageFeedSummary.js';
 import { getSupabaseAdmin } from '../supabaseAdmin.js';
 
@@ -7,16 +7,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = getTokenFromRequest(req);
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    await verifySessionToken(token);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const auth = await requireMessageAreaAccess(req, res);
+  if (!auth) return;
 
   const body = readRequestBody(req);
   const messageId = typeof body.messageId === 'string' ? body.messageId.trim() : '';

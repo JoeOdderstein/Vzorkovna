@@ -182,6 +182,21 @@ const en = {
   'members.addAndInvite': 'Add and send invite',
   'members.inviteLink': 'Invite link',
   'members.copyLink': 'Copy link',
+  'members.messagesAccessHeading': 'Messages tab access',
+  'members.messagesAccessHint':
+    'Only admin and people listed here see the Messages tab in the navigation. Everyone else can still use the taskboard.',
+  'members.messagesAccessCurrent': 'Can see Messages',
+  'members.messagesAccessEmpty': 'No one else has access yet — grant it below.',
+  'members.messagesAccessAddLabel': 'Grant access to',
+  'members.messagesAccessAddPlaceholder': 'Select a team member…',
+  'members.messagesAccessAddNone':
+    'Everyone on the roster already has access, or add them as a member first.',
+  'members.messagesAccessAddButton': 'Grant access',
+  'members.messagesAccessGranted': '{name} can now see Messages.',
+  'members.messagesAccessRevoked': 'Removed Messages access for {name}.',
+  'members.messagesAccessRevokeConfirm': 'Remove Messages access for {name}?',
+  'members.messagesAccessMigrationHint':
+    'Run supabase/migrations/041_message_access_members.sql in Supabase to enable Messages access control.',
 
   'theme.light': 'Light',
   'theme.dark': 'Dark',
@@ -699,6 +714,21 @@ const uk: Record<MessageKey, string> = {
   'members.addAndInvite': 'Додати і надіслати запрошення',
   'members.inviteLink': 'Посилання запрошення',
   'members.copyLink': 'Копіювати',
+  'members.messagesAccessHeading': 'Доступ до вкладки «Повідомлення»',
+  'members.messagesAccessHint':
+    'Лише адмін і люди зі списку бачать вкладку «Повідомлення» в меню. Решта може користуватися табло.',
+  'members.messagesAccessCurrent': 'Бачать «Повідомлення»',
+  'members.messagesAccessEmpty': 'Більше ніхто не має доступу — надайте його нижче.',
+  'members.messagesAccessAddLabel': 'Надати доступ',
+  'members.messagesAccessAddPlaceholder': 'Оберіть учасника…',
+  'members.messagesAccessAddNone':
+    'Усі зі списку вже мають доступ або спочатку додайте їх як учасників.',
+  'members.messagesAccessAddButton': 'Надати доступ',
+  'members.messagesAccessGranted': '{name} тепер бачить «Повідомлення».',
+  'members.messagesAccessRevoked': 'Доступ до «Повідомлення» для {name} прибрано.',
+  'members.messagesAccessRevokeConfirm': 'Прибрати доступ до «Повідомлення» для {name}?',
+  'members.messagesAccessMigrationHint':
+    'Застосуйте supabase/migrations/041_message_access_members.sql у Supabase для керування доступом.',
 
   'theme.light': 'Світла',
   'theme.dark': 'Темна',

@@ -9,6 +9,7 @@ interface AuthContextValue {
   username: string | null;
   isAdmin: boolean;
   canAccessInvoices: boolean;
+  canAccessMessages: boolean;
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -23,6 +24,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
   const [username, setUsername] = useState<string | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [canAccessInvoices, setCanAccessInvoices] = useState(false);
+  const [canAccessMessages, setCanAccessMessages] = useState(false);
   const authOpRef = useRef(0);
 
   const applySession = useCallback(
@@ -31,6 +33,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       sessionUsername?: string | null,
       sessionIsAdmin = false,
       sessionCanAccessInvoices = false,
+      sessionCanAccessMessages = false,
     ) => {
     authOpRef.current += 1;
 
@@ -43,6 +46,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
     setUsername(sessionUsername ?? null);
     setIsAdmin(sessionIsAdmin);
     setCanAccessInvoices(sessionIsAdmin || sessionCanAccessInvoices);
+    setCanAccessMessages(sessionIsAdmin || sessionCanAccessMessages);
     setLoading(false);
   },
   []);
@@ -60,6 +64,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setUsername(null);
         setIsAdmin(false);
         setCanAccessInvoices(false);
+        setCanAccessMessages(false);
         if (isSupabaseConfigured()) await clearSupabaseSession();
         return;
       }
@@ -78,12 +83,14 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setUsername(typeof data.username === 'string' ? data.username : null);
         setIsAdmin(sessionIsAdmin);
         setCanAccessInvoices(sessionIsAdmin || Boolean(data.canAccessInvoices));
+        setCanAccessMessages(sessionIsAdmin || Boolean(data.canAccessMessages));
       } else {
         setAuthenticated(false);
         setSessionReady(false);
         setUsername(null);
         setIsAdmin(false);
         setCanAccessInvoices(false);
+        setCanAccessMessages(false);
       }
     } catch {
       if (opId !== authOpRef.current) return;
@@ -92,6 +99,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setUsername(null);
       setIsAdmin(false);
       setCanAccessInvoices(false);
+      setCanAccessMessages(false);
     } finally {
       if (opId === authOpRef.current) setLoading(false);
     }
@@ -123,6 +131,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
             typeof data.username === 'string' ? data.username : username,
             Boolean(data.isAdmin),
             Boolean(data.canAccessInvoices),
+            Boolean(data.canAccessMessages),
           );
         }
         return null;
@@ -150,6 +159,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setUsername(null);
       setIsAdmin(false);
       setCanAccessInvoices(false);
+      setCanAccessMessages(false);
       setLoading(false);
     }
   }, []);
@@ -162,6 +172,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       username,
       isAdmin,
       canAccessInvoices,
+      canAccessMessages,
       login,
       logout,
       refreshSession: checkSession,
@@ -173,6 +184,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       username,
       isAdmin,
       canAccessInvoices,
+      canAccessMessages,
       login,
       logout,
       checkSession,

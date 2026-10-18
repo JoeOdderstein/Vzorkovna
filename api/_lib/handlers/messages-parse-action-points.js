@@ -1,20 +1,12 @@
-import { getTokenFromRequest, isAdminUsername, verifySessionToken } from '../auth.js';
 import { handleParseActionPoints } from '../parseActionPoints.js';
+import { requireMessageAreaAccess } from '../messageAccess.js';
 
 export default async function handler(req, res) {
-  const token = getTokenFromRequest(req);
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-  let claims;
-  try {
-    claims = await verifySessionToken(token);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const auth = await requireMessageAreaAccess(req, res);
+  if (!auth) return;
 
-  const username = typeof claims.username === 'string' ? claims.username : '';
-  const isAdmin = isAdminUsername(username);
+  const username = auth.username;
+  const isAdmin = auth.isAdmin;
 
   try {
     return await handleParseActionPoints(req, res, { username, isAdmin });

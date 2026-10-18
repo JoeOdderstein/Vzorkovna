@@ -1,4 +1,5 @@
-import { getTokenFromRequest, isAdminUsername, verifySessionToken } from '../auth.js';
+import { isAdminUsername } from '../auth.js';
+import { requireMessageAreaAccess } from '../messageAccess.js';
 import { getSupabaseAdmin } from '../supabaseAdmin.js';
 
 function usernamesMatch(stored, actor) {
@@ -17,22 +18,10 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = getTokenFromRequest(req);
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const auth = await requireMessageAreaAccess(req, res);
+  if (!auth) return;
 
-  let claims;
-  try {
-    claims = await verifySessionToken(token);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const actor = typeof claims.username === 'string' ? claims.username.trim() : '';
-  if (!actor) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const actor = auth.username.trim();
 
   const messageId = req.body?.messageId ?? req.body?.id;
   if (!messageId || typeof messageId !== 'string') {

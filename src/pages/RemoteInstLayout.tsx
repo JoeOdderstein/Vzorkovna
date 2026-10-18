@@ -9,6 +9,7 @@ import { UserProfileProvider, useUserProfile } from '../context/UserProfileConte
 import { TaskboardThemeProvider, useTaskboardTheme } from '../context/TaskboardThemeContext';
 import { isSupabaseConfigured } from '../lib/taskboard/config';
 import ProfileSettingsDialog from '../taskboard/components/ProfileSettingsDialog';
+import ManageMembersHeaderAction from '../taskboard/components/ManageMembersHeaderAction';
 import TaskboardThemeToggle from '../taskboard/components/TaskboardThemeToggle';
 import TbIconTooltip from '../taskboard/components/TbIconTooltip';
 import {
@@ -17,7 +18,7 @@ import {
 } from '../context/MessagesComposeContext';
 
 function RemoteInstShell() {
-  const { authenticated, loading, sessionReady } = useTaskboardAuth();
+  const { authenticated, loading, sessionReady, canAccessMessages, isAdmin } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
   const { drawerOpen: composeDrawerOpen } = useMessagesCompose();
   const { loading: profileLoading } = useUserProfile();
@@ -40,6 +41,10 @@ function RemoteInstShell() {
 
   if (!authenticated) {
     return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
+  if (!canAccessMessages) {
+    return <Navigate to="/taskboard" replace />;
   }
 
   const layoutPush =
@@ -73,6 +78,7 @@ function RemoteInstShell() {
               <span className="flex-1" aria-hidden />
             )}
             <div className="flex shrink-0 items-center gap-3">
+              {isAdmin ? <ManageMembersHeaderAction /> : null}
               <TaskboardThemeToggle />
               <TbIconTooltip label={t('header.profile')}>
                 <button

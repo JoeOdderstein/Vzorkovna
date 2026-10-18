@@ -4,6 +4,7 @@ import {
   verifySessionToken,
 } from '../auth.js';
 import { userCanAccessInvoices } from '../invoiceAccess.js';
+import { userCanAccessMessages } from '../messageAccess.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -20,12 +21,14 @@ export default async function handler(req, res) {
     const username = typeof claims.username === 'string' ? claims.username : null;
     const isAdmin = isAdminUsername(username);
     const canAccessInvoices = await userCanAccessInvoices(username, isAdmin);
+    const canAccessMessages = await userCanAccessMessages(username, isAdmin);
     return res.status(200).json({
       authenticated: true,
       accessToken: token,
       username,
       isAdmin,
       canAccessInvoices,
+      canAccessMessages,
     });
   } catch {
     return res.status(401).json({ authenticated: false });

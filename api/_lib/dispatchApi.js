@@ -5,6 +5,7 @@ import authLogout from './handlers/auth-logout.js';
 import authMembers from './handlers/auth-members.js';
 import authMembersInvite from './handlers/auth-members-invite.js';
 import authInvoiceAccess from './handlers/auth-invoice-access.js';
+import authMessageAccess from './handlers/auth-message-access.js';
 import authNotifyRecipients from './handlers/auth-notify-recipients.js';
 import authSession from './handlers/auth-session.js';
 import authUsernames from './handlers/auth-usernames.js';
@@ -29,6 +30,7 @@ const ROUTES = {
   'auth/members': authMembers,
   'auth/members-invite': authMembersInvite,
   'auth/invoice-access': authInvoiceAccess,
+  'auth/message-access': authMessageAccess,
   'auth/invite': authInvite,
   'auth/assignees': authAssignees,
   'auth/usernames': authUsernames,

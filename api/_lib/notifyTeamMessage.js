@@ -1,7 +1,7 @@
 import { defaultBoardNameForUsername } from './boardNameDefaults.js';
 import { sendTeamMessageEmail } from './email.js';
 import { buildMessageBodyHtmlForEmail } from './messageBodyForEmail.js';
-import { getTokenFromRequest, verifySessionToken } from './auth.js';
+import { requireMessageAreaAccess } from './messageAccess.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 
 function readRequestBody(req) {
@@ -35,16 +35,8 @@ export async function handleNotifyTeamMessage(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const token = getTokenFromRequest(req);
-  if (!token) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  try {
-    await verifySessionToken(token);
-  } catch {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const auth = await requireMessageAreaAccess(req, res);
+  if (!auth) return;
 
   const body = readRequestBody(req);
   const messageId = typeof body.messageId === 'string' ? body.messageId.trim() : '';

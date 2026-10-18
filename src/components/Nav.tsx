@@ -41,7 +41,8 @@ export default function Nav({ activeSection }: NavProps) {
     isCalendarPage;
   const hideSiteNavLinks =
     isAppPage || location.pathname === '/login';
-  const { authenticated, username, isAdmin, canAccessInvoices, logout } = useTaskboardAuth();
+  const { authenticated, username, isAdmin, canAccessInvoices, canAccessMessages, logout } =
+    useTaskboardAuth();
   const showPrivateNav = canAccessTaskboardPrivateNav(username, isAdmin);
   const { t } = useTaskboardI18n();
 
@@ -177,14 +178,16 @@ export default function Nav({ activeSection }: NavProps) {
                     {t('nav.drive').toUpperCase()}
                   </a>
                 )}
-                <Link
-                  to={MESSAGES_PATH}
-                  className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
-                    isMessagesPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
-                  }`}
-                >
-                  {t('nav.remoteInst').toUpperCase()}
-                </Link>
+                {canAccessMessages ? (
+                  <Link
+                    to={MESSAGES_PATH}
+                    className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
+                      isMessagesPage ? 'text-[var(--color-accent)]' : 'site-link-muted'
+                    }`}
+                  >
+                    {t('nav.remoteInst').toUpperCase()}
+                  </Link>
+                ) : null}
                 <Link
                   to={CALENDAR_PATH}
                   className={`nav-link font-sans text-xs tracking-[0.2em] uppercase transition-colors duration-300 ${
@@ -282,13 +285,15 @@ export default function Nav({ activeSection }: NavProps) {
                     {t('nav.drive')}
                   </a>
                 )}
-                <Link
-                  to={MESSAGES_PATH}
-                  onClick={() => setMenuOpen(false)}
-                  className={`site-mobile-nav-link${isMessagesPage ? ' site-mobile-nav-link--active' : ''}`}
-                >
-                  {t('nav.remoteInst')}
-                </Link>
+                {canAccessMessages ? (
+                  <Link
+                    to={MESSAGES_PATH}
+                    onClick={() => setMenuOpen(false)}
+                    className={`site-mobile-nav-link${isMessagesPage ? ' site-mobile-nav-link--active' : ''}`}
+                  >
+                    {t('nav.remoteInst')}
+                  </Link>
+                ) : null}
                 <Link
                   to={CALENDAR_PATH}
                   onClick={() => setMenuOpen(false)}

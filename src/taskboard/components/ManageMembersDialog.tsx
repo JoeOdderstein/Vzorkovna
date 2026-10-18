@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useEffect, useMemo, useState } from 'react';
 import { X } from 'lucide-react';
 import {
   createMember,
@@ -7,6 +7,13 @@ import {
   sendMemberInvite,
   type TaskboardMember,
 } from '../../lib/taskboard/memberService';
+import {
+  fetchMessageAccessMembers,
+  grantMessageAccess,
+  revokeMessageAccess,
+  type MessageAccessMember,
+} from '../../lib/taskboard/messageAccessService';
+import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 
 interface ManageMembersDialogProps {
   open: boolean;
@@ -37,8 +44,15 @@ function canDeleteMember(member: TaskboardMember) {
 }
 
 export default function ManageMembersDialog({ open, onClose }: ManageMembersDialogProps) {
+  const { t } = useTaskboardI18n();
   const [members, setMembers] = useState<TaskboardMember[]>([]);
   const [membersReady, setMembersReady] = useState(true);
+  const [messageAccessMembers, setMessageAccessMembers] = useState<MessageAccessMember[]>([]);
+  const [messageAccessReady, setMessageAccessReady] = useState(true);
+  const [messageAccessLoading, setMessageAccessLoading] = useState(false);
+  const [messageAccessUsername, setMessageAccessUsername] = useState('');
+  const [grantingMessageAccess, setGrantingMessageAccess] = useState(false);
+  const [revokingMessageAccess, setRevokingMessageAccess] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [username, setUsername] = useState('');
   const [boardName, setBoardName] = useState('');
@@ -52,26 +66,70 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
   const [savingEmail, setSavingEmail] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  const grantedMessageUsernames = useMemo(
+    () => new Set(messageAccessMembers.map((member) => member.username)),
+    [messageAccessMembers],
+  );
+
+  const addableMessageAccessMembers = useMemo(
+    () =>
+      members
+        .filter((member) => !member.isAdmin && !grantedMessageUsernames.has(member.username))
+        .sort((a, b) => {
+          const nameA = a.board_name || a.username;
+          const nameB = b.board_name || b.username;
+          return nameA.localeCompare(nameB);
+        }),
+    [members, grantedMessageUsernames],
+  );
+
   const load = () => {
     setLoading(true);
-    fetchMembers()
-      .then(({ members: list, membersReady: ready }) => {
-        setMembers(list);
-        setMembersReady(ready);
-        setEmailDrafts((prev) => {
-          const next = { ...prev };
-          for (const member of list) {
-            if (member.email) next[member.username] = member.email;
-            else if (next[member.username] === undefined) next[member.username] = '';
+    setMessageAccessLoading(true);
+    Promise.allSettled([fetchMembers(), fetchMessageAccessMembers()])
+      .then(([rosterResult, accessResult]) => {
+        if (rosterResult.status === 'fulfilled') {
+          const list = rosterResult.value.members;
+          setMembers(list);
+          setMembersReady(rosterResult.value.membersReady);
+          setEmailDrafts((prev) => {
+            const next = { ...prev };
+            for (const member of list) {
+              if (member.email) next[member.username] = member.email;
+              else if (next[member.username] === undefined) next[member.username] = '';
+            }
+            return next;
+          });
+        } else {
+          setError(
+            rosterResult.reason instanceof Error
+              ? rosterResult.reason.message
+              : 'Could not load members.',
+          );
+        }
+
+        if (accessResult.status === 'fulfilled') {
+          setMessageAccessMembers(accessResult.value.members);
+          setMessageAccessReady(accessResult.value.messageAccessReady);
+        } else {
+          setMessageAccessReady(false);
+          if (rosterResult.status === 'fulfilled') {
+            setError(
+              accessResult.reason instanceof Error
+                ? accessResult.reason.message
+                : 'Could not load Messages access settings.',
+            );
           }
-          return next;
-        });
-        setError('');
+        }
+
+        if (rosterResult.status === 'fulfilled' && accessResult.status === 'fulfilled') {
+          setError('');
+        }
       })
-      .catch((err) => {
-        setError(err instanceof Error ? err.message : 'Could not load members.');
-      })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setMessageAccessLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -79,6 +137,7 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
     setUsername('');
     setBoardName('');
     setEmail('');
+    setMessageAccessUsername('');
     setNotice('');
     setLastInviteUrl('');
     setError('');
@@ -212,6 +271,45 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
     }
   };
 
+  const handleGrantMessageAccess = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!messageAccessUsername) return;
+    setGrantingMessageAccess(true);
+    setError('');
+    setNotice('');
+    try {
+      const member = await grantMessageAccess(messageAccessUsername);
+      setMessageAccessMembers((prev) => {
+        const without = prev.filter((item) => item.username !== member.username);
+        return [...without, member].sort((a, b) => a.board_name.localeCompare(b.board_name));
+      });
+      setMessageAccessUsername('');
+      setNotice(t('members.messagesAccessGranted', { name: member.board_name }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not grant message access.');
+    } finally {
+      setGrantingMessageAccess(false);
+    }
+  };
+
+  const handleRevokeMessageAccess = async (member: MessageAccessMember) => {
+    const label = member.board_name || member.username;
+    if (!window.confirm(t('members.messagesAccessRevokeConfirm', { name: label }))) return;
+
+    setRevokingMessageAccess(member.username);
+    setError('');
+    setNotice('');
+    try {
+      await revokeMessageAccess(member.username);
+      setMessageAccessMembers((prev) => prev.filter((item) => item.username !== member.username));
+      setNotice(t('members.messagesAccessRevoked', { name: label }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not revoke message access.');
+    } finally {
+      setRevokingMessageAccess(null);
+    }
+  };
+
   const copyInvite = async () => {
     if (!lastInviteUrl) return;
     try {
@@ -249,6 +347,81 @@ export default function ManageMembersDialog({ open, onClose }: ManageMembersDial
               Supabase SQL Editor.
             </p>
           )}
+
+          <div className="pb-6 border-b border-[#eceff1]">
+            <p className="tb-field-label mb-1">{t('members.messagesAccessHeading')}</p>
+            <p className="text-xs tb-muted mb-3">{t('members.messagesAccessHint')}</p>
+            {!messageAccessReady && (
+              <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2 mb-3">
+                {t('members.messagesAccessMigrationHint')}
+              </p>
+            )}
+            <p className="tb-field-label mb-2 text-xs">{t('members.messagesAccessCurrent')}</p>
+            {messageAccessLoading && <p className="text-sm tb-muted">{t('members.loading')}</p>}
+            {!messageAccessLoading && messageAccessMembers.length === 0 && (
+              <p className="text-sm tb-muted mb-3">{t('members.messagesAccessEmpty')}</p>
+            )}
+            {!messageAccessLoading && messageAccessMembers.length > 0 && (
+              <ul className="space-y-2 mb-4">
+                {messageAccessMembers.map((member) => (
+                  <li
+                    key={member.username}
+                    className="flex items-center justify-between gap-3 py-1 border-b border-[#eceff1] last:border-0"
+                  >
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium tb-text truncate">
+                        {member.board_name || member.username}
+                      </p>
+                      <p className="text-xs tb-muted">{member.username}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-xs tb-btn-secondary shrink-0"
+                      disabled={revokingMessageAccess === member.username || !messageAccessReady}
+                      onClick={() => void handleRevokeMessageAccess(member)}
+                    >
+                      {revokingMessageAccess === member.username ? '…' : t('common.remove')}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <form onSubmit={(e) => void handleGrantMessageAccess(e)} className="space-y-2">
+              <p className="tb-field-label text-xs">{t('members.messagesAccessAddLabel')}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={messageAccessUsername}
+                  onChange={(e) => setMessageAccessUsername(e.target.value)}
+                  className="field-input flex-1 min-w-[12rem] text-sm py-1.5"
+                  disabled={!messageAccessReady || addableMessageAccessMembers.length === 0}
+                >
+                  <option value="">{t('members.messagesAccessAddPlaceholder')}</option>
+                  {addableMessageAccessMembers.map((member) => (
+                    <option key={member.username} value={member.username}>
+                      {member.board_name || member.username} ({member.username})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="submit"
+                  disabled={
+                    grantingMessageAccess ||
+                    !messageAccessReady ||
+                    !messageAccessUsername ||
+                    addableMessageAccessMembers.length === 0
+                  }
+                  className="tb-btn-secondary text-xs disabled:opacity-50"
+                >
+                  {grantingMessageAccess
+                    ? t('common.saving')
+                    : t('members.messagesAccessAddButton')}
+                </button>
+              </div>
+              {addableMessageAccessMembers.length === 0 && !messageAccessLoading ? (
+                <p className="text-xs tb-muted">{t('members.messagesAccessAddNone')}</p>
+              ) : null}
+            </form>
+          </div>
 
           <div>
             <p className="tb-field-label mb-1">Team on the taskboard</p>
