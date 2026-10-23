@@ -1,10 +1,10 @@
-import { messageBodyToPlainText } from './messageRichText';
+import { messageBodyToPlainText, normalizeMessageSummaryText } from './messageRichText';
 import { clampSummaryWords, MESSAGE_FEED_SUMMARY_WORD_LIMIT } from './messageBodyWordLimit';
 import { isLocalTaskboardMode } from '../taskboard/taskService';
 
 /** Plain excerpt when AI is unavailable (local dev only — readable, not a summary). */
 export function buildLocalFeedSummary(body: string): string {
-  const plain = messageBodyToPlainText(body).trim();
+  const plain = normalizeMessageSummaryText(messageBodyToPlainText(body)).trim();
   if (!plain) return '';
   return clampSummaryWords(plain, MESSAGE_FEED_SUMMARY_WORD_LIMIT);
 }

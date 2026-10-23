@@ -511,6 +511,8 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
     return enriched;
   }
 
+  const initialFeedSummary = buildLocalFeedSummary(body) || null;
+
   let insertPayload: Record<string, unknown> = {
     title,
     body,
@@ -520,6 +522,7 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
     author_display_name: input.author.displayName,
     linked_task_id: linkedTaskId,
     linked_task_ids: linkedTaskIds,
+    feed_summary: initialFeedSummary,
   };
 
   let { data, error } = await (await db())
@@ -527,6 +530,24 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
     .insert(insertPayload)
     .select('*')
     .single();
+
+  if (error && /feed_summary|column/i.test(error.message)) {
+    insertPayload = {
+      title,
+      body,
+      project_id: input.projectId,
+      category: input.category,
+      author_username: input.author.username,
+      author_display_name: input.author.displayName,
+      linked_task_id: linkedTaskId,
+      linked_task_ids: linkedTaskIds,
+    };
+    ({ data, error } = await (await db())
+      .from('team_messages')
+      .insert(insertPayload)
+      .select('*')
+      .single());
+  }
 
   if (error && /linked_task_ids|column/i.test(error.message)) {
     insertPayload = {

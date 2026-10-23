@@ -486,8 +486,8 @@ const en = {
   'messages.attachRemove': 'Remove {name}',
   'messages.notifyLabel': 'Email notifications',
   'messages.notifyHint':
-    'Everyone with an email on file is notified by default. Uncheck people to leave them out. You can include yourself to confirm delivery.',
-  'messages.notifyAllTeam': 'All team members',
+    'Only people who can use the Messages tab and have an email on file appear here. Everyone listed is notified by default — uncheck to leave someone out.',
+  'messages.notifyAllTeam': 'All on Messages (with email)',
   'messages.notifyExceptSummary': 'All except {names}',
   'messages.notifyNoneAvailable': 'No email recipients',
   'messages.notifyNoRecipients': 'No team members with email addresses yet.',
@@ -1020,8 +1020,8 @@ const uk: Record<MessageKey, string> = {
   'messages.attachRemove': 'Прибрати {name}',
   'messages.notifyLabel': 'Email-сповіщення',
   'messages.notifyHint':
-    'За замовчуванням отримують усі з email у профілі. Зніміть позначку, щоб когось пропустити. Можете включити себе, щоб перевірити доставку.',
-  'messages.notifyAllTeam': 'Уся команда',
+    'Тут лише ті, хто має доступ до вкладки «Повідомлення» та email у профілі. Усі в списку отримують лист за замовчуванням — зніміть позначку, щоб когось пропустити.',
+  'messages.notifyAllTeam': 'Усі з доступом до «Повідомлення»',
   'messages.notifyExceptSummary': 'Усі, крім {names}',
   'messages.notifyNoneAvailable': 'Немає одержувачів email',
   'messages.notifyNoRecipients': 'Ще немає учасників з email.',

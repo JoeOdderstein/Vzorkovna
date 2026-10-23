@@ -2,6 +2,10 @@ import { defaultBoardNameForUsername } from './boardNameDefaults.js';
 import { sendTeamMessageEmail } from './email.js';
 import { buildMessageBodyHtmlForEmail } from './messageBodyForEmail.js';
 import { requireMessageAreaAccess } from './messageAccess.js';
+import {
+  loadMessageAreaAccessAllowSet,
+  usernameHasMessageAreaAccess,
+} from './messageAreaAccessSet.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 
 function readRequestBody(req) {
@@ -99,6 +103,13 @@ export async function handleNotifyTeamMessage(req, res) {
     return res.status(500).json({ error: 'Could not load recipients' });
   }
 
+  let messageAccess = { active: false, allowed: new Set() };
+  try {
+    messageAccess = await loadMessageAreaAccessAllowSet();
+  } catch (err) {
+    console.error('Team message notify access lookup failed:', err);
+  }
+
   let sent = 0;
   const failures = [];
   const skipped = [];
@@ -108,6 +119,10 @@ export async function handleNotifyTeamMessage(req, res) {
     const email = String(row.email ?? '').trim();
     if (!username || !email) {
       if (username) skipped.push({ username, reason: 'no_email' });
+      continue;
+    }
+    if (!usernameHasMessageAreaAccess(username, messageAccess)) {
+      skipped.push({ username, reason: 'no_message_access' });
       continue;
     }
     if (included) {

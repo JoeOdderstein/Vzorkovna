@@ -156,6 +156,41 @@ export function messageBodyToPlainText(body: string): string {
   return (div.textContent ?? '').replace(/\u00a0/g, ' ').trim();
 }
 
+/** Plain text with paragraph breaks — for safe display when HTML must not be shown raw. */
+export function messageBodyToPlainTextWithBreaks(body: string): string {
+  const trimmed = body.trim();
+  if (!trimmed) return '';
+  const looksLikeHtml = isLikelyHtmlMessageBody(trimmed) || /<\/?[a-z][\s>/]/i.test(trimmed);
+  if (!looksLikeHtml) return trimmed;
+
+  if (typeof document === 'undefined') {
+    return trimmed
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/div>/gi, '\n')
+      .replace(/<\/p>/gi, '\n\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\u00a0/g, ' ')
+      .replace(/[ \t]+\n/g, '\n')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
+  const div = document.createElement('div');
+  div.innerHTML = sanitizeMessageHtml(trimmed);
+  return (div.innerText ?? div.textContent ?? '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** Feed summary / preview lines must never show HTML markup. */
+export function normalizeMessageSummaryText(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed) return '';
+  if (!/<[a-z/]/i.test(trimmed)) return trimmed;
+  return messageBodyToPlainText(trimmed);
+}
+
 export function htmlMessageHasContent(html: string): boolean {
   if (messageBodyToPlainText(html).length > 0) return true;
   if (typeof document === 'undefined') {

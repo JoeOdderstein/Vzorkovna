@@ -7,6 +7,10 @@ import {
   isAdminUsername,
   verifySessionToken,
 } from './auth.js';
+import {
+  loadMessageAreaAccessAllowSet,
+  usernameHasMessageAreaAccess,
+} from './messageAreaAccessSet.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
 import {
   createInviteToken,
@@ -685,6 +689,13 @@ export async function handleListNotifyRecipients(req, res) {
   }
 
   const byUsername = new Map();
+  let messageAccess = { active: false, allowed: new Set() };
+
+  try {
+    messageAccess = await loadMessageAreaAccessAllowSet();
+  } catch (error) {
+    console.error('Notify recipients message access lookup failed:', error);
+  }
 
   const supabase = getSupabaseAdmin();
   if (supabase) {
@@ -694,6 +705,7 @@ export async function handleListNotifyRecipients(req, res) {
         const username = String(row.username ?? '').trim();
         const email = row.email?.trim();
         if (!username || !email) continue;
+        if (!usernameHasMessageAreaAccess(username, messageAccess)) continue;
         byUsername.set(username, {
           username,
           board_name: row.board_name ?? defaultBoardNameForUsername(username) ?? username,

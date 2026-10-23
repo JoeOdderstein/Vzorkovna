@@ -29,7 +29,10 @@ import {
 import {
   htmlMessageHasContent,
   isLikelyHtmlMessageBody,
+  messageBodyToPlainTextWithBreaks,
+  normalizeMessageSummaryText,
   resolveMessageBodyHtml,
+  sanitizeMessageHtml,
 } from '../../lib/messages/messageRichText';
 import {
   applyFeedScrollAnchorPin,
@@ -128,7 +131,9 @@ function MessageBodyContent({
   const [slides, setSlides] = useState<MessageImageSlide[]>([]);
   const [pdfPreview, setPdfPreview] = useState<{ url: string; fileName: string; storagePath: string } | null>(null);
   const [expanded, setExpanded] = useState(false);
-  const [summary, setSummary] = useState<string | null>(feedSummary?.trim() || null);
+  const [summary, setSummary] = useState<string | null>(
+    normalizeMessageSummaryText(feedSummary ?? '') || null,
+  );
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [summaryError, setSummaryError] = useState('');
   const summaryRequestRef = useRef(0);
@@ -171,7 +176,7 @@ function MessageBodyContent({
     void fetchMessageFeedSummary(messageId, { force: true })
       .then((text) => {
         if (requestId !== summaryRequestRef.current) return;
-        const trimmed = text.trim();
+        const trimmed = normalizeMessageSummaryText(text);
         setSummary(trimmed || null);
         if (trimmed) onFeedSummaryChange?.(trimmed);
       })
@@ -192,7 +197,7 @@ function MessageBodyContent({
     onExpandedChange?.(false);
     expandScrollPinRef.current = null;
     setPdfPreview(null);
-    setSummary(feedSummary?.trim() || null);
+    setSummary(normalizeMessageSummaryText(feedSummary ?? '') || null);
     setSummaryError('');
   }, [body, feedSummary, messageId, onExpandedChange]);
 
@@ -220,7 +225,7 @@ function MessageBodyContent({
     setSummaryError('');
     setSummaryLoading(false);
     if (feedSummary?.trim()) {
-      setSummary(feedSummary.trim());
+      setSummary(normalizeMessageSummaryText(feedSummary) || null);
       return;
     }
     setSummary(buildLocalFeedSummary(body) || null);
@@ -245,9 +250,13 @@ function MessageBodyContent({
     }
     void resolveMessageBodyHtml(body).then((resolved) => {
       if (cancelled) return;
-      if (htmlMessageHasContent(resolved) || htmlMessageHasContent(body)) {
+      const safeHtml = resolved.trim() || sanitizeMessageHtml(body);
+      if (htmlMessageHasContent(safeHtml) || htmlMessageHasContent(body)) {
         resolvedForBodyRef.current = body;
-        setHtml(resolved);
+        setHtml(safeHtml);
+      } else {
+        resolvedForBodyRef.current = body;
+        setHtml(null);
       }
     });
     return () => {
@@ -445,9 +454,11 @@ function MessageBodyContent({
     );
   }
 
+  const plainFallback = messageBodyToPlainTextWithBreaks(body);
+
   return (
     <>
-      <p className={`whitespace-pre-wrap ${className}`}>{body}</p>
+      <p className={`whitespace-pre-wrap ${className}`}>{plainFallback || body}</p>
       <MessageBodyActionRow
         expandToggle={
           <MessageBodyExpandToggle
