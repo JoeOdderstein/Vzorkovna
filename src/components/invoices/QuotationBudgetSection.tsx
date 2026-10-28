@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Copy, Eye, FileSpreadsheet, Link2, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Archive, ArchiveRestore, Copy, Eye, FileSpreadsheet, Link2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import { fetchVisibleProjects } from '../../lib/taskboard/taskService';
@@ -12,6 +12,7 @@ import {
   duplicateProjectQuotation,
   fetchProjectQuotation,
   listProjectQuotations,
+  setProjectQuotationArchived,
 } from '../../lib/quotations/quotationBudgetService';
 import { formatQuotationMoney, recomputeQuotationLines } from '../../lib/quotations/quotationBudgetCalc';
 import { quotationBudgetShareUrl } from '../../lib/quotations/quotationBudgetUrl';
@@ -33,6 +34,8 @@ export default function QuotationBudgetSection({
   const deepLinkOpenedBudgetRef = useRef<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [budgets, setBudgets] = useState<ProjectQuotation[]>([]);
+  const [archivedBudgets, setArchivedBudgets] = useState<ProjectQuotation[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [shareNotice, setShareNotice] = useState('');
@@ -41,15 +44,28 @@ export default function QuotationBudgetSection({
   const [editorReadOnly, setEditorReadOnly] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
+  const loadActive = useCallback(() => {
+    return listProjectQuotations({ archived: false });
+  }, []);
+
+  const loadArchived = useCallback(() => {
+    if (!isAdmin) return Promise.resolve([] as ProjectQuotation[]);
+    return listProjectQuotations({ archived: true });
+  }, [isAdmin]);
+
   const load = useCallback(() => {
     setLoading(true);
-    void listProjectQuotations()
-      .then(setBudgets)
+    Promise.all([loadActive(), loadArchived()])
+      .then(([active, archived]) => {
+        setBudgets(active);
+        setArchivedBudgets(archived);
+        setError('');
+      })
       .catch((err) => {
         setError(err instanceof Error ? err.message : t('quotations.budgetLoadError'));
       })
       .finally(() => setLoading(false));
-  }, [t]);
+  }, [loadActive, loadArchived, t]);
 
   useEffect(() => {
     load();
@@ -70,7 +86,8 @@ export default function QuotationBudgetSection({
     setBudgetIdInUrl(id);
     try {
       const full = await fetchProjectQuotation(id);
-      setEditorReadOnly(readOnly);
+      const isArchived = Boolean(full.archived_at);
+      setEditorReadOnly(readOnly || isArchived || !canEditQuotations);
       setEditorQuotation(full);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('quotations.budgetLoadError'));
@@ -82,17 +99,38 @@ export default function QuotationBudgetSection({
   useEffect(() => {
     if (loading || !urlBudgetId) return;
 
-    const row = budgets.find((b) => b.id === urlBudgetId);
-    if (!row) {
-      setBudgetIdInUrl(null);
-      deepLinkOpenedBudgetRef.current = null;
+    const row =
+      budgets.find((b) => b.id === urlBudgetId) ?? archivedBudgets.find((b) => b.id === urlBudgetId);
+
+    if (row) {
+      if (deepLinkOpenedBudgetRef.current === urlBudgetId) return;
+      deepLinkOpenedBudgetRef.current = urlBudgetId;
+      const readOnly = Boolean(row.archived_at) || !canEditQuotations;
+      void openEditor(urlBudgetId, readOnly);
       return;
     }
 
     if (deepLinkOpenedBudgetRef.current === urlBudgetId) return;
-    deepLinkOpenedBudgetRef.current = urlBudgetId;
-    void openEditor(urlBudgetId, !canEditQuotations);
-  }, [loading, urlBudgetId, budgets, canEditQuotations, setBudgetIdInUrl]);
+
+    void fetchProjectQuotation(urlBudgetId)
+      .then((full) => {
+        deepLinkOpenedBudgetRef.current = urlBudgetId;
+        if (full.archived_at) {
+          setArchivedBudgets((prev) =>
+            prev.some((b) => b.id === full.id) ? prev : [full, ...prev],
+          );
+        } else {
+          setBudgets((prev) => (prev.some((b) => b.id === full.id) ? prev : [full, ...prev]));
+        }
+        const readOnly = Boolean(full.archived_at) || !canEditQuotations;
+        setEditorReadOnly(readOnly);
+        setEditorQuotation(full);
+      })
+      .catch(() => {
+        setBudgetIdInUrl(null);
+        deepLinkOpenedBudgetRef.current = null;
+      });
+  }, [loading, urlBudgetId, budgets, archivedBudgets, canEditQuotations, setBudgetIdInUrl]);
 
   const closeEditor = () => {
     setEditorQuotation(null);
@@ -161,6 +199,40 @@ export default function QuotationBudgetSection({
     }
   };
 
+  const handleArchive = async (row: ProjectQuotation) => {
+    if (!isAdmin) return;
+    if (!window.confirm(t('quotations.budgetArchiveConfirm'))) return;
+    setBusyId(row.id);
+    setError('');
+    try {
+      await setProjectQuotationArchived(row.id, true);
+      const full = await fetchProjectQuotation(row.id);
+      setBudgets((prev) => prev.filter((b) => b.id !== row.id));
+      setArchivedBudgets((prev) => [full, ...prev.filter((b) => b.id !== row.id)]);
+      if (urlBudgetId === row.id) closeEditor();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('quotations.budgetArchiveError'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const handleRestore = async (row: ProjectQuotation) => {
+    if (!isAdmin) return;
+    setBusyId(row.id);
+    setError('');
+    try {
+      await setProjectQuotationArchived(row.id, false);
+      const full = await fetchProjectQuotation(row.id);
+      setArchivedBudgets((prev) => prev.filter((b) => b.id !== row.id));
+      setBudgets((prev) => [full, ...prev.filter((b) => b.id !== row.id)]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('quotations.budgetRestoreError'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const handleDelete = async (row: ProjectQuotation) => {
     if (!canEditQuotations) return;
     if (!window.confirm(t('quotations.budgetDeleteConfirm'))) return;
@@ -169,6 +241,7 @@ export default function QuotationBudgetSection({
     try {
       await deleteProjectQuotation(row.id);
       setBudgets((prev) => prev.filter((b) => b.id !== row.id));
+      setArchivedBudgets((prev) => prev.filter((b) => b.id !== row.id));
       if (urlBudgetId === row.id) setBudgetIdInUrl(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : t('quotations.budgetDeleteError'));
@@ -196,6 +269,113 @@ export default function QuotationBudgetSection({
       rate,
     );
     return computed.find((line) => line.summary_key === 'grand_total')?.total ?? null;
+  };
+
+  const renderBudgetRow = (row: ProjectQuotation, mode: 'active' | 'archived') => {
+    const total = grandTotalFor(row);
+    const busy = busyId === row.id;
+    const isArchived = mode === 'archived';
+
+    return (
+      <li
+        key={row.id}
+        className={`flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border px-4 py-3 ${
+          isArchived
+            ? 'border-[var(--tb-border)]/70 bg-[color-mix(in_srgb,var(--tb-text)_3%,var(--tb-surface))]'
+            : 'border-[var(--tb-border)]'
+        }`}
+      >
+        <div className="min-w-0 flex-1">
+          <p className="font-medium tb-text truncate">
+            {row.title.trim() || t('quotations.budgetTitlePlaceholder')}
+          </p>
+          <p className="text-xs tb-muted truncate">
+            {row.project?.name ?? t('task.project')} ·{' '}
+            {total != null ? formatQuotationMoney(total, row.currency) : t('quotations.totalPending')}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          <button
+            type="button"
+            className="tb-btn-secondary p-2"
+            disabled={busy}
+            onClick={() => void copyBudgetLink(row)}
+            aria-label={t('quotations.budgetShare')}
+            title={t('quotations.budgetShare')}
+          >
+            <Link2 size={16} aria-hidden />
+          </button>
+          {canEditQuotations && !isArchived ? (
+            <>
+              <button
+                type="button"
+                className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+                disabled={busy}
+                onClick={() => void handleDuplicate(row)}
+                title={t('quotations.budgetDuplicateHint')}
+              >
+                <Copy size={14} aria-hidden />
+                {t('quotations.budgetDuplicate')}
+              </button>
+              <button
+                type="button"
+                className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+                disabled={busy}
+                onClick={() => void openEditor(row.id, false)}
+              >
+                <Pencil size={14} aria-hidden />
+                {t('common.edit')}
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+              disabled={busy}
+              onClick={() => void openEditor(row.id, true)}
+            >
+              <Eye size={14} aria-hidden />
+              {t('quotations.viewBudget')}
+            </button>
+          )}
+          {isAdmin && !isArchived ? (
+            <button
+              type="button"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+              disabled={busy}
+              onClick={() => void handleArchive(row)}
+              title={t('quotations.budgetArchiveHint')}
+            >
+              <Archive size={14} aria-hidden />
+              {t('quotations.budgetArchive')}
+            </button>
+          ) : null}
+          {isAdmin && isArchived ? (
+            <button
+              type="button"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+              disabled={busy}
+              onClick={() => void handleRestore(row)}
+              title={t('quotations.budgetRestoreHint')}
+            >
+              <ArchiveRestore size={14} aria-hidden />
+              {t('quotations.budgetRestore')}
+            </button>
+          ) : null}
+          {canEditQuotations ? (
+            <button
+              type="button"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 text-red-700"
+              disabled={busy}
+              onClick={() => void handleDelete(row)}
+            >
+              <Trash2 size={14} aria-hidden />
+              {t('common.delete')}
+            </button>
+          ) : null}
+        </div>
+      </li>
+    );
   };
 
   return (
@@ -262,86 +442,32 @@ export default function QuotationBudgetSection({
         ) : null}
 
         {!loading && budgets.length > 0 ? (
-          <ul className="space-y-2">
-            {budgets.map((row) => {
-              const total = grandTotalFor(row);
-              const busy = busyId === row.id;
-              return (
-                <li
-                  key={row.id}
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 rounded-lg border border-[var(--tb-border)] px-4 py-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium tb-text truncate">
-                      {row.title.trim() || t('quotations.budgetTitlePlaceholder')}
-                    </p>
-                    <p className="text-xs tb-muted truncate">
-                      {row.project?.name ?? t('task.project')} ·{' '}
-                      {total != null
-                        ? formatQuotationMoney(total, row.currency)
-                        : t('quotations.totalPending')}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                    <button
-                      type="button"
-                      className="tb-btn-secondary p-2"
-                      disabled={busy}
-                      onClick={() => void copyBudgetLink(row)}
-                      aria-label={t('quotations.budgetShare')}
-                      title={t('quotations.budgetShare')}
-                    >
-                      <Link2 size={16} aria-hidden />
-                    </button>
-                    {canEditQuotations ? (
-                      <>
-                        <button
-                          type="button"
-                          className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
-                          disabled={busy}
-                          onClick={() => void handleDuplicate(row)}
-                          title={t('quotations.budgetDuplicateHint')}
-                        >
-                          <Copy size={14} aria-hidden />
-                          {t('quotations.budgetDuplicate')}
-                        </button>
-                        <button
-                          type="button"
-                          className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
-                          disabled={busy}
-                          onClick={() => void openEditor(row.id, false)}
-                        >
-                          <Pencil size={14} aria-hidden />
-                          {t('common.edit')}
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
-                        disabled={busy}
-                        onClick={() => void openEditor(row.id, true)}
-                      >
-                        <Eye size={14} aria-hidden />
-                        {t('quotations.viewBudget')}
-                      </button>
-                    )}
-                    {canEditQuotations ? (
-                      <button
-                        type="button"
-                        className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 text-red-700"
-                        disabled={busy}
-                        onClick={() => void handleDelete(row)}
-                      >
-                        <Trash2 size={14} aria-hidden />
-                        {t('common.delete')}
-                      </button>
-                    ) : null}
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+          <ul className="space-y-2">{budgets.map((row) => renderBudgetRow(row, 'active'))}</ul>
+        ) : null}
+
+        {isAdmin && !loading ? (
+          <div className="mt-8 pt-6 border-t border-[var(--tb-border)]">
+            <button
+              type="button"
+              className="text-sm tb-link mb-4"
+              onClick={() => setShowArchived((v) => !v)}
+            >
+              {showArchived ? t('quotations.toggleArchivedHide') : t('quotations.toggleArchivedShow')}
+              {archivedBudgets.length > 0 ? ` (${archivedBudgets.length})` : ''}
+            </button>
+            {showArchived ? (
+              <>
+                <h3 className="text-sm font-semibold tb-text mb-3">{t('quotations.archivedHeading')}</h3>
+                {archivedBudgets.length === 0 ? (
+                  <p className="text-sm tb-muted">{t('quotations.archivedEmpty')}</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {archivedBudgets.map((row) => renderBudgetRow(row, 'archived'))}
+                  </ul>
+                )}
+              </>
+            ) : null}
+          </div>
         ) : null}
       </section>
 
@@ -352,7 +478,11 @@ export default function QuotationBudgetSection({
           readOnly={editorReadOnly}
           onClose={closeEditor}
           onSaved={(updated) => {
-            setBudgets((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+            if (updated.archived_at) {
+              setArchivedBudgets((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+            } else {
+              setBudgets((prev) => prev.map((b) => (b.id === updated.id ? updated : b)));
+            }
           }}
         />
       ) : null}

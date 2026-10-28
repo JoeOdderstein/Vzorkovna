@@ -44,6 +44,8 @@ function mapQuotation(row: Record<string, unknown>, lines: QuotationLineRecord[]
     template_id: row.template_id ? String(row.template_id) : null,
     source_invoice_id: row.source_invoice_id ? String(row.source_invoice_id) : null,
     created_by: String(row.created_by ?? ''),
+    archived_at: row.archived_at ? String(row.archived_at) : null,
+    archived_by: row.archived_by ? String(row.archived_by) : null,
     created_at: String(row.created_at ?? ''),
     updated_at: String(row.updated_at ?? ''),
     lines,
@@ -53,13 +55,19 @@ function mapQuotation(row: Record<string, unknown>, lines: QuotationLineRecord[]
   };
 }
 
-export async function listProjectQuotations(): Promise<ProjectQuotation[]> {
+export async function listProjectQuotations(options?: {
+  archived?: boolean;
+}): Promise<ProjectQuotation[]> {
   if (!isSupabaseConfigured()) return [];
 
-  const { data, error } = await (await db())
+  const archived = options?.archived === true;
+  let query = (await db())
     .from('project_quotations')
-    .select('*, projects(id, name), project_quotation_lines(*)')
-    .order('updated_at', { ascending: false });
+    .select('*, projects(id, name), project_quotation_lines(*)');
+
+  query = archived ? query.not('archived_at', 'is', null) : query.is('archived_at', null);
+
+  const { data, error } = await query.order('updated_at', { ascending: false });
 
   if (error) {
     if (/project_quotations|relation|schema cache/i.test(error.message)) {
@@ -201,6 +209,22 @@ export async function saveProjectQuotation(
 export async function deleteProjectQuotation(id: string): Promise<void> {
   const { error } = await (await db()).from('project_quotations').delete().eq('id', id);
   if (error) throw error;
+}
+
+export async function setProjectQuotationArchived(id: string, archived: boolean): Promise<void> {
+  const { error } = await (await db()).rpc('set_project_quotation_archived', {
+    p_quotation_id: id,
+    p_archived: archived,
+  });
+
+  if (error) {
+    if (/set_project_quotation_archived|function|schema cache/i.test(error.message)) {
+      throw new Error(
+        'Run supabase/migrations/045_project_quotations_archive.sql to enable archiving.',
+      );
+    }
+    throw error;
+  }
 }
 
 function duplicateBudgetTitle(sourceTitle: string): string {

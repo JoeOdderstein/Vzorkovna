@@ -41,7 +41,11 @@ export function parseBudgetXlsxToDraft(
   projectName: string,
 ): QuotationDraft {
   const workbook = XLSX.read(buffer, { type: 'array' });
-  const sheet = workbook.Sheets[workbook.SheetNames[0]];
+  const sheetName =
+    workbook.SheetNames.find((name) => name.trim().toLowerCase() === 'budget') ??
+    workbook.SheetNames.find((name) => !/export summary/i.test(name)) ??
+    workbook.SheetNames[0];
+  const sheet = sheetName ? workbook.Sheets[sheetName] : undefined;
   if (!sheet) throw new Error('Workbook has no sheets.');
 
   const rows = XLSX.utils.sheet_to_json<(string | number | null)[]>(sheet, {
