@@ -57,7 +57,9 @@ export async function handleNotifyAssignment(req, res) {
 
   const { data: task, error: taskError } = await supabase
     .from('tasks')
-    .select('id, task_name, description, assignees, deadline, project_id, attachment_path, attachment_name')
+    .select(
+      'id, task_name, description, assignees, deadline, project_id, attachment_path, attachment_name, notify_assign_emails'
+    )
     .eq('id', taskId)
     .maybeSingle();
 
@@ -68,6 +70,14 @@ export async function handleNotifyAssignment(req, res) {
 
   if (!task) {
     return res.status(404).json({ error: 'Task not found' });
+  }
+
+  if (task.notify_assign_emails === false) {
+    return res.status(200).json({
+      notified: 0,
+      skipped: [],
+      reason: 'task_notifications_disabled',
+    });
   }
 
   let project = { name: 'Taskboard', slug: null };

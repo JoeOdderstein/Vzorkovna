@@ -1,10 +1,12 @@
-import { isPdfFile } from '../installations/installationDocumentService';
 import type { InvoiceDocumentKind, QuotationStatus } from './constants';
+import {
+  sanitizeInvoiceFileName,
+  uploadContentTypeForFile,
+  validateInvoiceUploadFile,
+} from './invoiceUploadRules';
 import { isSupabaseConfigured } from '../taskboard/config';
 import { getAttachmentUrl } from '../taskboard/taskService';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
-
-const MAX_PDF_BYTES = 25 * 1024 * 1024;
 
 export type InvoiceRecord = {
   id: string;
@@ -63,11 +65,6 @@ function mapInvoice(row: Record<string, unknown>): InvoiceRecord {
   };
 }
 
-function sanitizePdfFileName(name: string) {
-  const base = name.replace(/\.pdf$/i, '').trim() || 'invoice';
-  return base.replace(/[^\w.-]+/g, '-').slice(0, 120);
-}
-
 export async function listInvoices(): Promise<InvoiceRecord[]> {
   if (!isSupabaseConfigured()) return [];
 
@@ -96,20 +93,22 @@ export async function uploadInvoicePdf(
   if (!uploadedBy.trim()) {
     throw new Error('You must be logged in to upload an invoice.');
   }
-  if (!isPdfFile(file)) {
-    throw new Error('Please choose a PDF file.');
-  }
-  if (file.size > MAX_PDF_BYTES) {
-    throw new Error('PDF must be 25 MB or smaller.');
+  const validationError = validateInvoiceUploadFile(file, documentKind);
+  if (validationError) {
+    throw new Error(validationError);
   }
 
-  const title = sanitizePdfFileName(file.name);
-  const path = `invoices/${Date.now()}-${title}.pdf`;
+  const safeName = sanitizeInvoiceFileName(file.name, 'document');
+  const path = `invoices/${Date.now()}-${safeName}`;
+  const title = safeName.replace(/\.[^.]+$/, '') || 'document';
   const supabase = await db();
 
   const { error: uploadError } = await supabase.storage
     .from('task-attachments')
-    .upload(path, file, { upsert: false, contentType: 'application/pdf' });
+    .upload(path, file, {
+      upsert: false,
+      contentType: uploadContentTypeForFile(file),
+    });
 
   if (uploadError) throw uploadError;
 

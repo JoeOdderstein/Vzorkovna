@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FileText, Link2, Trash2, Upload } from 'lucide-react';
 import UploadInvoiceDialog from './UploadInvoiceDialog';
+import QuotationBudgetSection from './QuotationBudgetSection';
 import InstallationPdfViewer from '../installations/InstallationPdfViewer';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
@@ -11,6 +12,7 @@ import {
   type InvoiceDocumentKind,
   type QuotationStatus,
 } from '../../lib/invoices/constants';
+import { isInvoicePdfStoragePath } from '../../lib/invoices/invoiceUploadRules';
 import {
   deleteInvoice,
   getInvoicePdfUrl,
@@ -45,8 +47,14 @@ function kindMessageKey(prefix: string, kind: InvoiceDocumentKind): string {
 export default function InvoicesPanel() {
   const { username } = useTaskboardAuth();
   const { t } = useTaskboardI18n();
-  const { documentKind, setDocumentKind, urlInvoiceId, setInvoiceIdInUrl } =
-    useSyncInvoicesPageQuery();
+  const {
+    documentKind,
+    setDocumentKind,
+    urlInvoiceId,
+    setInvoiceIdInUrl,
+    urlBudgetId,
+    setBudgetIdInUrl,
+  } = useSyncInvoicesPageQuery();
   const isQuotationView = documentKind === 'quotation';
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [shareNotice, setShareNotice] = useState('');
@@ -114,7 +122,12 @@ export default function InvoicesPanel() {
       setInvoiceIdInUrl(invoice.id);
       try {
         const url = await getInvoicePdfUrl(invoice.storage_path);
-        setViewer({ url, title: invoice.title || t('invoices.defaultViewerTitle') });
+        const title = invoice.title || t('invoices.defaultViewerTitle');
+        if (isInvoicePdfStoragePath(invoice.storage_path)) {
+          setViewer({ url, title });
+        } else {
+          window.open(url, '_blank', 'noopener,noreferrer');
+        }
       } catch {
         setError(t('invoices.openError'));
       } finally {
@@ -252,7 +265,7 @@ export default function InvoicesPanel() {
         aria-label={t('invoices.filterByKind')}
       >
         {INVOICE_DOCUMENT_KINDS.map((kind) => {
-          const count = countsByKind.get(kind) ?? 0;
+          const count = kind === 'quotation' ? 0 : (countsByKind.get(kind) ?? 0);
           const active = documentKind === kind;
           return (
             <button
@@ -272,11 +285,20 @@ export default function InvoicesPanel() {
         })}
       </div>
 
+      {isQuotationView ? (
+        <QuotationBudgetSection urlBudgetId={urlBudgetId} setBudgetIdInUrl={setBudgetIdInUrl} />
+      ) : null}
+
+      {!isQuotationView ? (
       <section className="tb-remote-inst-card p-6 md:p-8">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
         <div>
-          <h2 className="tb-heading text-lg">{t(kindMessageKey('listHeading', documentKind))}</h2>
-          <p className="text-sm tb-muted mt-1">{t('invoices.uploadHint')}</p>
+          <h2 className="tb-heading text-lg">
+            {isQuotationView ? t('quotations.uploadedFilesHeading') : t(kindMessageKey('listHeading', documentKind))}
+          </h2>
+          <p className="text-sm tb-muted mt-1">
+            {isQuotationView ? t('invoices.uploadHint.quotation') : t('invoices.uploadHint')}
+          </p>
         </div>
         <div>
           <button
@@ -566,14 +588,6 @@ export default function InvoicesPanel() {
         </div>
       ) : null}
 
-      {viewer ? (
-        <InstallationPdfViewer
-          pdfUrl={viewer.url}
-          title={viewer.title}
-          onClose={() => setViewer(null)}
-        />
-      ) : null}
-
       <UploadInvoiceDialog
         open={uploadDialogOpen}
         documentKind={documentKind}
@@ -581,6 +595,15 @@ export default function InvoicesPanel() {
         onUploaded={(created) => setInvoices((prev) => [created, ...prev])}
       />
       </section>
+      ) : null}
+
+      {viewer ? (
+        <InstallationPdfViewer
+          pdfUrl={viewer.url}
+          title={viewer.title}
+          onClose={() => setViewer(null)}
+        />
+      ) : null}
     </div>
   );
 }

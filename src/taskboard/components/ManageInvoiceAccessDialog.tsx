@@ -8,6 +8,10 @@ import {
   type InvoiceAccessMember,
 } from '../../lib/taskboard/invoiceAccessService';
 import { fetchMembers, type TaskboardMember } from '../../lib/taskboard/memberService';
+import {
+  fetchQuotationEditors,
+  setQuotationEditorAccess,
+} from '../../lib/taskboard/quotationEditAccessService';
 
 interface ManageInvoiceAccessDialogProps {
   open: boolean;
@@ -19,7 +23,10 @@ export default function ManageInvoiceAccessDialog({ open, onClose }: ManageInvoi
   const [accessMembers, setAccessMembers] = useState<InvoiceAccessMember[]>([]);
   const [taskboardMembers, setTaskboardMembers] = useState<TaskboardMember[]>([]);
   const [accessReady, setAccessReady] = useState(true);
+  const [quotationEditors, setQuotationEditors] = useState<Set<string>>(new Set());
+  const [quotationEditReady, setQuotationEditReady] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [togglingQuotationEdit, setTogglingQuotationEdit] = useState<string | null>(null);
   const [selectedUsername, setSelectedUsername] = useState('');
   const [adding, setAdding] = useState(false);
   const [revoking, setRevoking] = useState<string | null>(null);
@@ -45,10 +52,12 @@ export default function ManageInvoiceAccessDialog({ open, onClose }: ManageInvoi
 
   const load = () => {
     setLoading(true);
-    Promise.all([fetchInvoiceAccessMembers(), fetchMembers()])
-      .then(([access, roster]) => {
+    Promise.all([fetchInvoiceAccessMembers(), fetchMembers(), fetchQuotationEditors()])
+      .then(([access, roster, quotationEdit]) => {
         setAccessMembers(access.members);
         setAccessReady(access.invoiceAccessReady);
+        setQuotationEditors(new Set(quotationEdit.editors));
+        setQuotationEditReady(quotationEdit.quotationEditReady);
         setTaskboardMembers(roster.members);
         setError('');
       })
@@ -97,6 +106,25 @@ export default function ManageInvoiceAccessDialog({ open, onClose }: ManageInvoi
       setError(err instanceof Error ? err.message : t('invoices.accessGrantError'));
     } finally {
       setAdding(false);
+    }
+  };
+
+  const handleQuotationEditToggle = async (member: InvoiceAccessMember, enabled: boolean) => {
+    setTogglingQuotationEdit(member.username);
+    setError('');
+    setNotice('');
+    try {
+      await setQuotationEditorAccess(member.username, enabled);
+      setQuotationEditors((prev) => {
+        const next = new Set(prev);
+        if (enabled) next.add(member.username);
+        else next.delete(member.username);
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('invoices.quotationEditUpdateError'));
+    } finally {
+      setTogglingQuotationEdit(null);
     }
   };
 
@@ -155,6 +183,18 @@ export default function ManageInvoiceAccessDialog({ open, onClose }: ManageInvoi
 
           <div>
             <p className="tb-field-label mb-2">{t('invoices.accessCurrentList')}</p>
+            {!loading && accessMembers.length > 0 ? (
+              <div className="mb-3 space-y-2">
+                <p className="text-xs font-medium tb-text">{t('invoices.quotationEditSection')}</p>
+                {!quotationEditReady ? (
+                  <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                    {t('invoices.quotationEditMigrationHint')}
+                  </p>
+                ) : (
+                  <p className="text-xs tb-muted">{t('invoices.quotationEditHint')}</p>
+                )}
+              </div>
+            ) : null}
             {loading && <p className="text-sm tb-muted">{t('common.loading')}</p>}
             {!loading && accessMembers.length === 0 && (
               <p className="text-sm tb-muted">{t('invoices.accessEmpty')}</p>
@@ -164,20 +204,34 @@ export default function ManageInvoiceAccessDialog({ open, onClose }: ManageInvoi
                 {accessMembers.map((member) => (
                   <li
                     key={member.username}
-                    className="flex items-center justify-between gap-3 py-2 border-b border-[#dadce0] last:border-b-0"
+                    className="py-3 border-b border-[#dadce0] last:border-b-0 space-y-2"
                   >
-                    <div className="min-w-0">
-                      <p className="text-sm tb-text font-medium truncate">{member.board_name}</p>
-                      <p className="text-xs tb-muted">{member.username}</p>
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm tb-text font-medium truncate">{member.board_name}</p>
+                        <p className="text-xs tb-muted">{member.username}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className="text-xs tb-btn-secondary shrink-0"
+                        disabled={revoking === member.username}
+                        onClick={() => void handleRevoke(member)}
+                      >
+                        {revoking === member.username ? t('common.saving') : t('common.remove')}
+                      </button>
                     </div>
-                    <button
-                      type="button"
-                      className="text-xs tb-btn-secondary shrink-0"
-                      disabled={revoking === member.username}
-                      onClick={() => void handleRevoke(member)}
-                    >
-                      {revoking === member.username ? t('common.saving') : t('common.remove')}
-                    </button>
+                    <label className="flex items-center gap-2 text-xs tb-text cursor-pointer">
+                      <input
+                        type="checkbox"
+                        className="rounded border-[#dadce0]"
+                        checked={quotationEditors.has(member.username)}
+                        disabled={
+                          !quotationEditReady || togglingQuotationEdit === member.username
+                        }
+                        onChange={(e) => void handleQuotationEditToggle(member, e.target.checked)}
+                      />
+                      {t('invoices.quotationEditToggle')}
+                    </label>
                   </li>
                 ))}
               </ul>

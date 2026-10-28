@@ -269,6 +269,7 @@ export const localStore = {
       task_name: input.task_name ?? 'New task',
       description: input.description ?? '',
       assignees: input.assignees ?? [...(parent?.assignees ?? [])],
+      notify_assign_emails: input.notify_assign_emails ?? true,
       priority: input.priority ?? parent?.priority ?? 'normal',
       deadline: input.deadline !== undefined ? input.deadline : (parent?.deadline ?? null),
       completed: false,

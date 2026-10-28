@@ -7,6 +7,7 @@ import {
   type InvoiceDocumentKind,
 } from '../../lib/invoices/constants';
 import { notifyInvoiceUpload } from '../../lib/invoices/notifyInvoiceUpload';
+import { QUOTATION_UPLOAD_ACCEPT } from '../../lib/invoices/invoiceUploadRules';
 import { uploadInvoicePdf, type InvoiceRecord } from '../../lib/invoices/invoiceService';
 import {
   fetchNotifyRecipients,
@@ -81,6 +82,8 @@ export default function UploadInvoiceDialog({
 
   if (!open) return null;
 
+  const isQuotation = documentKind === 'quotation';
+
   const toggleRecipient = (name: string) => {
     setSelectedUsernames((prev) =>
       prev.includes(name) ? prev.filter((u) => u !== name) : [...prev, name],
@@ -94,7 +97,9 @@ export default function UploadInvoiceDialog({
       return;
     }
     if (!file) {
-      setError(t('invoices.uploadFileRequired'));
+      setError(
+        isQuotation ? t('invoices.uploadFileRequired.quotation') : t('invoices.uploadFileRequired'),
+      );
       return;
     }
 
@@ -184,11 +189,13 @@ export default function UploadInvoiceDialog({
           </div>
 
           <div>
-            <label className="tb-field-label block mb-2">{t('invoices.uploadFileLabel')}</label>
+            <label className="tb-field-label block mb-2">
+              {isQuotation ? t('invoices.uploadFileLabel.quotation') : t('invoices.uploadFileLabel')}
+            </label>
             <input
               ref={fileInputRef}
               type="file"
-              accept="application/pdf,.pdf"
+              accept={isQuotation ? QUOTATION_UPLOAD_ACCEPT : 'application/pdf,.pdf'}
               className="sr-only"
               onChange={(e) => {
                 const picked = e.target.files?.[0] ?? null;
@@ -202,12 +209,14 @@ export default function UploadInvoiceDialog({
               onClick={() => fileInputRef.current?.click()}
             >
               <Upload size={16} aria-hidden />
-              {t('invoices.choosePdf')}
+              {isQuotation ? t('invoices.chooseFile.quotation') : t('invoices.choosePdf')}
             </button>
             {file ? (
               <p className="text-sm tb-text mt-2 truncate">{file.name}</p>
             ) : (
-              <p className="text-xs tb-muted mt-2">{t('invoices.uploadHint')}</p>
+              <p className="text-xs tb-muted mt-2">
+                {isQuotation ? t('invoices.uploadHint.quotation') : t('invoices.uploadHint')}
+              </p>
             )}
           </div>
 

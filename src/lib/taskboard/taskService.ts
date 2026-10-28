@@ -392,6 +392,7 @@ export async function createTask(
       task_name: input.task_name ?? 'New task',
       description: input.description ?? '',
       assignees: assignees ?? [],
+      notify_assign_emails: input.notify_assign_emails ?? true,
       priority: priority ?? 'normal',
       deadline: deadline ?? null,
       sort_order,
@@ -431,7 +432,11 @@ async function nextSortOrderForTaskRow(
 export async function updateTask(
   id: string,
   updates: TaskUpdate,
-  options?: { previousAssignees?: Assignee[]; skipBugSync?: boolean },
+  options?: {
+    previousAssignees?: Assignee[];
+    skipBugSync?: boolean;
+    skipAssignmentNotify?: boolean;
+  },
 ) {
   if (isLocalTaskboardMode()) {
     const updated = localStore.updateTask(id, updates);
@@ -510,7 +515,7 @@ export async function updateTask(
       if (subtaskError) throw subtaskError;
     }
 
-    if (updates.assignees !== undefined) {
+    if (updates.assignees !== undefined && !options?.skipAssignmentNotify) {
       notifyTaskAssignment(id, previousAssignees ?? []);
     }
     if (updates.completed !== undefined && !options?.skipBugSync) {
@@ -528,7 +533,7 @@ export async function updateTask(
 
   if (error) throw error;
   const task = normalizeTask(data);
-  if (updates.assignees !== undefined) {
+  if (updates.assignees !== undefined && !options?.skipAssignmentNotify) {
     notifyTaskAssignment(id, previousAssignees ?? []);
   }
   if (updates.completed !== undefined && !options?.skipBugSync) {

@@ -7,6 +7,7 @@ import {
 } from './auth.js';
 import { findMemberByUsername } from './members.js';
 import { getSupabaseAdmin } from './supabaseAdmin.js';
+import { revokeQuotationEditForUser } from './quotationEditAccess.js';
 
 const USERNAME_PATTERN = /^[a-z0-9][a-z0-9_-]{1,31}$/;
 
@@ -215,6 +216,8 @@ export async function handleRevokeInvoiceAccess(req, res) {
     console.error('Revoke invoice access failed:', error);
     return res.status(500).json({ error: 'Could not revoke invoice access.' });
   }
+
+  await revokeQuotationEditForUser(username);
 
   return res.status(200).json({ ok: true });
 }

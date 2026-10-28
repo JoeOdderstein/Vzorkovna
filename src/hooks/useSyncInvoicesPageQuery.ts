@@ -2,11 +2,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import type { InvoiceDocumentKind } from '../lib/invoices/constants';
 import {
+  INVOICE_BUDGET_QUERY_KEY,
   INVOICE_ID_QUERY_KEY,
   INVOICE_KIND_QUERY_KEY,
   parseInvoiceIdFromQuery,
   parseInvoiceKindFromQuery,
 } from '../lib/invoices/invoiceDocumentKindUrl';
+import { parseBudgetIdFromQuery } from '../lib/quotations/quotationBudgetUrl';
 
 /** Keeps ?kind= and ?id= in sync with the invoices page UI. */
 export function useSyncInvoicesPageQuery() {
@@ -16,12 +18,27 @@ export function useSyncInvoicesPageQuery() {
   );
 
   const urlInvoiceId = parseInvoiceIdFromQuery(searchParams.get(INVOICE_ID_QUERY_KEY));
+  const urlBudgetId = parseBudgetIdFromQuery(searchParams.get(INVOICE_BUDGET_QUERY_KEY));
 
   const setInvoiceIdInUrl = useCallback(
     (invoiceId: string | null) => {
       const next = new URLSearchParams(searchParams);
       if (invoiceId) next.set(INVOICE_ID_QUERY_KEY, invoiceId);
       else next.delete(INVOICE_ID_QUERY_KEY);
+      setSearchParams(next, { replace: true });
+    },
+    [searchParams, setSearchParams],
+  );
+
+  const setBudgetIdInUrl = useCallback(
+    (budgetId: string | null) => {
+      const next = new URLSearchParams(searchParams);
+      if (budgetId) {
+        next.set(INVOICE_KIND_QUERY_KEY, 'quotation');
+        next.set(INVOICE_BUDGET_QUERY_KEY, budgetId);
+      } else {
+        next.delete(INVOICE_BUDGET_QUERY_KEY);
+      }
       setSearchParams(next, { replace: true });
     },
     [searchParams, setSearchParams],
@@ -50,5 +67,12 @@ export function useSyncInvoicesPageQuery() {
     }
   }, [documentKind, searchParams, setSearchParams]);
 
-  return { documentKind, setDocumentKind, urlInvoiceId, setInvoiceIdInUrl };
+  return {
+    documentKind,
+    setDocumentKind,
+    urlInvoiceId,
+    setInvoiceIdInUrl,
+    urlBudgetId,
+    setBudgetIdInUrl,
+  };
 }

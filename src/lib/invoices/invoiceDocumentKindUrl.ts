@@ -3,6 +3,7 @@ import type { InvoiceDocumentKind } from './constants';
 
 export const INVOICE_KIND_QUERY_KEY = 'kind';
 export const INVOICE_ID_QUERY_KEY = 'id';
+export const INVOICE_BUDGET_QUERY_KEY = 'budget';
 
 export function parseInvoiceKindFromQuery(param: string | null): InvoiceDocumentKind {
   const raw = param?.trim().toLowerCase();

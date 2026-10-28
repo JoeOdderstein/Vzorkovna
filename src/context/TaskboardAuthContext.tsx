@@ -10,6 +10,7 @@ interface AuthContextValue {
   isAdmin: boolean;
   canAccessInvoices: boolean;
   canAccessMessages: boolean;
+  canEditQuotations: boolean;
   login: (username: string, password: string) => Promise<string | null>;
   logout: () => Promise<void>;
   refreshSession: () => Promise<void>;
@@ -25,6 +26,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
   const [isAdmin, setIsAdmin] = useState(false);
   const [canAccessInvoices, setCanAccessInvoices] = useState(false);
   const [canAccessMessages, setCanAccessMessages] = useState(false);
+  const [canEditQuotations, setCanEditQuotations] = useState(false);
   const authOpRef = useRef(0);
 
   const applySession = useCallback(
@@ -34,6 +36,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       sessionIsAdmin = false,
       sessionCanAccessInvoices = false,
       sessionCanAccessMessages = false,
+      sessionCanEditQuotations = false,
     ) => {
     authOpRef.current += 1;
 
@@ -47,6 +50,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
     setIsAdmin(sessionIsAdmin);
     setCanAccessInvoices(sessionIsAdmin || sessionCanAccessInvoices);
     setCanAccessMessages(sessionIsAdmin || sessionCanAccessMessages);
+    setCanEditQuotations(sessionIsAdmin || sessionCanEditQuotations);
     setLoading(false);
   },
   []);
@@ -65,6 +69,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setIsAdmin(false);
         setCanAccessInvoices(false);
         setCanAccessMessages(false);
+        setCanEditQuotations(false);
         if (isSupabaseConfigured()) await clearSupabaseSession();
         return;
       }
@@ -84,6 +89,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setIsAdmin(sessionIsAdmin);
         setCanAccessInvoices(sessionIsAdmin || Boolean(data.canAccessInvoices));
         setCanAccessMessages(sessionIsAdmin || Boolean(data.canAccessMessages));
+        setCanEditQuotations(sessionIsAdmin || Boolean(data.canEditQuotations));
       } else {
         setAuthenticated(false);
         setSessionReady(false);
@@ -91,6 +97,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
         setIsAdmin(false);
         setCanAccessInvoices(false);
         setCanAccessMessages(false);
+        setCanEditQuotations(false);
       }
     } catch {
       if (opId !== authOpRef.current) return;
@@ -100,6 +107,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setIsAdmin(false);
       setCanAccessInvoices(false);
       setCanAccessMessages(false);
+      setCanEditQuotations(false);
     } finally {
       if (opId === authOpRef.current) setLoading(false);
     }
@@ -132,6 +140,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
             Boolean(data.isAdmin),
             Boolean(data.canAccessInvoices),
             Boolean(data.canAccessMessages),
+            Boolean(data.canEditQuotations),
           );
         }
         return null;
@@ -160,6 +169,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       setIsAdmin(false);
       setCanAccessInvoices(false);
       setCanAccessMessages(false);
+      setCanEditQuotations(false);
       setLoading(false);
     }
   }, []);
@@ -173,6 +183,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       isAdmin,
       canAccessInvoices,
       canAccessMessages,
+      canEditQuotations,
       login,
       logout,
       refreshSession: checkSession,
@@ -185,6 +196,7 @@ export function TaskboardAuthProvider({ children }: { children: React.ReactNode 
       isAdmin,
       canAccessInvoices,
       canAccessMessages,
+      canEditQuotations,
       login,
       logout,
       checkSession,

@@ -1,0 +1,622 @@
+{
+  "template_id": "vr_installation_budget",
+  "title_placeholder": "Budget \u2014 project title",
+  "subtitle": "All amounts in euros, excl. VAT. Blue = input, editable. Yellow = key assumption. Black = formula.",
+  "source_title": "Budget VR experience (J\u00e4germeister) \u2014 permanent installation",
+  "day_rate": 350.0,
+  "contingency_rate": 0.075,
+  "currency": "EUR",
+  "lines": [
+    {
+      "kind": "section",
+      "label": "LABOUR \u2014 3D artist (animation, 4 min stereo 360\u00b0)",
+      "section_category": "labour",
+      "sort_order": 0
+    },
+    {
+      "kind": "line",
+      "label": "Previs & 360\u00b0 layout",
+      "notes": "Camera positions, scale, blocking per storyboard shot",
+      "unit_price": 350.0,
+      "quantity": 2.0,
+      "total": 700.0,
+      "section_category": "labour",
+      "sort_order": 1
+    },
+    {
+      "kind": "line",
+      "label": "Asset sourcing, kitbashing, texturing",
+      "notes": "Semi-realistic is only feasible with purchased assets",
+      "unit_price": 350.0,
+      "quantity": 3.0,
+      "total": 1050.0,
+      "section_category": "labour",
+      "sort_order": 2
+    },
+    {
+      "kind": "line",
+      "label": "Animation",
+      "notes": "Environment/objects; no realistic humans (major cost driver)",
+      "unit_price": 350.0,
+      "quantity": 5.0,
+      "total": 1750.0,
+      "section_category": "labour",
+      "sort_order": 3
+    },
+    {
+      "kind": "line",
+      "label": "Lighting & look",
+      "notes": null,
+      "unit_price": 350.0,
+      "quantity": 2.0,
+      "total": 700.0,
+      "section_category": "labour",
+      "sort_order": 4
+    },
+    {
+      "kind": "line",
+      "label": "Rendering + stereo QC",
+      "notes": "Render stereo 360, check seams/eye separation on the Quest",
+      "unit_price": 350.0,
+      "quantity": 1.25,
+      "total": 437.5,
+      "section_category": "labour",
+      "sort_order": 5
+    },
+    {
+      "kind": "line",
+      "label": "Revisions",
+      "notes": "2 revision rounds with J\u00e4germeister",
+      "unit_price": 350.0,
+      "quantity": 2.0,
+      "total": 700.0,
+      "section_category": "labour",
+      "sort_order": 6
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal 3D artist",
+      "notes": null,
+      "section_category": "labour",
+      "sort_order": 7
+    },
+    {
+      "kind": "section",
+      "label": "LABOUR \u2014 (VR integration, haptics, tech, project management)",
+      "section_category": "labour",
+      "sort_order": 8
+    },
+    {
+      "kind": "line",
+      "label": "Quest tech test",
+      "notes": "Test codec/resolution/bitrate before the artist starts rendering",
+      "unit_price": 350.0,
+      "quantity": 1.0,
+      "total": 350.0,
+      "section_category": "labour",
+      "sort_order": 9
+    },
+    {
+      "kind": "line",
+      "label": "Quest player app",
+      "notes": "Unity app: playback, kiosk/auto-start, timecode to mini PC",
+      "unit_price": 350.0,
+      "quantity": 2.0,
+      "total": 700.0,
+      "section_category": "labour",
+      "sort_order": 10
+    },
+    {
+      "kind": "line",
+      "label": "TouchDesigner trigger timeline",
+      "notes": "Triggers on timecode, Arduino link, start button",
+      "unit_price": 350.0,
+      "quantity": 2.0,
+      "total": 700.0,
+      "section_category": "labour",
+      "sort_order": 11
+    },
+    {
+      "kind": "line",
+      "label": "Hardware build",
+      "notes": "Seating/platform, scent modules, cabling, electronics enclosure",
+      "unit_price": 350.0,
+      "quantity": 3.0,
+      "total": 1050.0,
+      "section_category": "labour",
+      "sort_order": 12
+    },
+    {
+      "kind": "line",
+      "label": "Timing pass",
+      "notes": "Tune triggers to final video + sound; compensate scent delay",
+      "unit_price": 350.0,
+      "quantity": 1.0,
+      "total": 350.0,
+      "section_category": "labour",
+      "sort_order": 13
+    },
+    {
+      "kind": "line",
+      "label": "On-site installation + testing",
+      "notes": null,
+      "unit_price": 350.0,
+      "quantity": 2.0,
+      "total": 700.0,
+      "section_category": "labour",
+      "sort_order": 14
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal Gus",
+      "notes": null,
+      "section_category": "labour",
+      "sort_order": 15
+    },
+    {
+      "kind": "section",
+      "label": "LABOUR \u2014 Sound designer + Composer",
+      "section_category": "labour",
+      "sort_order": 16
+    },
+    {
+      "kind": "line",
+      "label": "Composition",
+      "notes": "4 minutes of music",
+      "unit_price": 350.0,
+      "quantity": 3.0,
+      "total": 1050.0,
+      "section_category": "labour",
+      "sort_order": 17
+    },
+    {
+      "kind": "line",
+      "label": "Sound design",
+      "notes": "Effects/foley to picture",
+      "unit_price": 350.0,
+      "quantity": 1.5,
+      "total": 525.0,
+      "section_category": "labour",
+      "sort_order": 18
+    },
+    {
+      "kind": "line",
+      "label": "Binaural audio mix",
+      "notes": "Spatial binaural mix for the headset",
+      "unit_price": 350.0,
+      "quantity": 1.0,
+      "total": 350.0,
+      "section_category": "labour",
+      "sort_order": 19
+    },
+    {
+      "kind": "line",
+      "label": "Bass suit track",
+      "notes": "Separate low-frequency track for the bass suit, synced with action points",
+      "unit_price": 350.0,
+      "quantity": 1.0,
+      "total": 350.0,
+      "section_category": "labour",
+      "sort_order": 20
+    },
+    {
+      "kind": "line",
+      "label": "Revisions",
+      "notes": null,
+      "unit_price": 350.0,
+      "quantity": 1.0,
+      "total": 350.0,
+      "section_category": "labour",
+      "sort_order": 21
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal sound designer",
+      "notes": null,
+      "section_category": "labour",
+      "sort_order": 22
+    },
+    {
+      "kind": "section",
+      "label": "MATERIALS \u2014 VR",
+      "section_category": "materials",
+      "sort_order": 23
+    },
+    {
+      "kind": "line",
+      "label": "Meta Quest 3 512GB",
+      "notes": "Incl. spare headset (permanent installation, daily use)",
+      "unit_price": 512.0,
+      "quantity": 2.0,
+      "total": 1024.0,
+      "section_category": "materials",
+      "sort_order": 24
+    },
+    {
+      "kind": "line",
+      "label": "Comfort strap + washable PU face interface",
+      "notes": "Per headset",
+      "unit_price": 75.0,
+      "quantity": 2.0,
+      "total": 150.0,
+      "section_category": "materials",
+      "sort_order": 25
+    },
+    {
+      "kind": "line",
+      "label": "Power + cable suspension",
+      "notes": "Long USB-C, 45W charger, ceiling suspension for headset and headphone cables",
+      "unit_price": 80.0,
+      "quantity": 1.0,
+      "total": 80.0,
+      "section_category": "materials",
+      "sort_order": 26
+    },
+    {
+      "kind": "line",
+      "label": "Closed-back headphones",
+      "notes": "Beyerdynamic DT 700 PRO X closed-back studio headphones",
+      "unit_price": 215.0,
+      "quantity": 1.0,
+      "total": 215.0,
+      "section_category": "materials",
+      "sort_order": 27
+    },
+    {
+      "kind": "line",
+      "label": "Hygiene starter stock",
+      "notes": "Disposable covers, wipes",
+      "unit_price": 40.0,
+      "quantity": 1.0,
+      "total": 40.0,
+      "section_category": "materials",
+      "sort_order": 28
+    },
+    {
+      "kind": "line",
+      "label": "Bass suit",
+      "notes": "BASSpak wearable haptic bass suit",
+      "unit_price": 300.0,
+      "quantity": 1.0,
+      "total": 300.0,
+      "section_category": "materials",
+      "sort_order": 29
+    },
+    {
+      "kind": "line",
+      "label": "Audio interface and jack cables",
+      "notes": "3 outputs: headphones + separate bass channel",
+      "unit_price": 200.0,
+      "quantity": 1.0,
+      "total": 200.0,
+      "section_category": "materials",
+      "sort_order": 30
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal VR",
+      "notes": null,
+      "section_category": "materials",
+      "sort_order": 31
+    },
+    {
+      "kind": "section",
+      "label": "MATERIALS \u2014 Control",
+      "section_category": "materials",
+      "sort_order": 32
+    },
+    {
+      "kind": "line",
+      "label": "Mini PC",
+      "notes": "Ryzen 7 / 32GB; renders nothing, only runs the timeline",
+      "unit_price": 1000.0,
+      "quantity": 1.0,
+      "total": 1000.0,
+      "section_category": "materials",
+      "sort_order": 33
+    },
+    {
+      "kind": "line",
+      "label": "TouchDesigner Commercial licence",
+      "notes": "Required for paid work. One licence: develop directly on the installation PC",
+      "unit_price": 520.0,
+      "quantity": 1.0,
+      "total": 520.0,
+      "section_category": "materials",
+      "sort_order": 34
+    },
+    {
+      "kind": "line",
+      "label": "Dedicated Wi-Fi router",
+      "notes": "Offline network Quest \u2194 mini PC, independent of venue Wi-Fi",
+      "unit_price": 50.0,
+      "quantity": 1.0,
+      "total": 50.0,
+      "section_category": "materials",
+      "sort_order": 35
+    },
+    {
+      "kind": "line",
+      "label": "Arduino Mega + relay board + MOSFETs + power supply",
+      "notes": "Switches scent and airflow; reads start button",
+      "unit_price": 80.0,
+      "quantity": 1.0,
+      "total": 80.0,
+      "section_category": "materials",
+      "sort_order": 36
+    },
+    {
+      "kind": "line",
+      "label": "Start button",
+      "notes": "Illuminated mushroom button + housing",
+      "unit_price": 40.0,
+      "quantity": 1.0,
+      "total": 40.0,
+      "section_category": "materials",
+      "sort_order": 37
+    },
+    {
+      "kind": "line",
+      "label": "UPS",
+      "notes": "Prevents corrupted boot after a power dip",
+      "unit_price": 90.0,
+      "quantity": 1.0,
+      "total": 90.0,
+      "section_category": "materials",
+      "sort_order": 38
+    },
+    {
+      "kind": "line",
+      "label": "Electronics enclosure, cables, connectors, mounting",
+      "notes": null,
+      "unit_price": 180.0,
+      "quantity": 1.0,
+      "total": 180.0,
+      "section_category": "materials",
+      "sort_order": 39
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal control",
+      "notes": null,
+      "section_category": "materials",
+      "sort_order": 40
+    },
+    {
+      "kind": "section",
+      "label": "MATERIALS \u2014 Haptics",
+      "section_category": "materials",
+      "sort_order": 41
+    },
+    {
+      "kind": "line",
+      "label": "Swivel chair",
+      "notes": null,
+      "unit_price": 180.0,
+      "quantity": 1.0,
+      "total": 180.0,
+      "section_category": "materials",
+      "sort_order": 42
+    },
+    {
+      "kind": "line",
+      "label": "Platform 1\u00d71 m + rubber isolation feet",
+      "notes": null,
+      "unit_price": 100.0,
+      "quantity": 1.0,
+      "total": 100.0,
+      "section_category": "materials",
+      "sort_order": 43
+    },
+    {
+      "kind": "line",
+      "label": "Dayton Audio BST-1 bass shaker",
+      "notes": null,
+      "unit_price": 90.0,
+      "quantity": 2.0,
+      "total": 180.0,
+      "section_category": "materials",
+      "sort_order": 44
+    },
+    {
+      "kind": "line",
+      "label": "Amplifier",
+      "notes": null,
+      "unit_price": 90.0,
+      "quantity": 1.0,
+      "total": 90.0,
+      "section_category": "materials",
+      "sort_order": 45
+    },
+    {
+      "kind": "line",
+      "label": "Fan/blower with PWM",
+      "notes": null,
+      "unit_price": 50.0,
+      "quantity": 2.0,
+      "total": 100.0,
+      "section_category": "materials",
+      "sort_order": 46
+    },
+    {
+      "kind": "line",
+      "label": "Scent module (nebuliser)",
+      "notes": "On/off via relay; one module per scent",
+      "unit_price": 100.0,
+      "quantity": 2.0,
+      "total": 200.0,
+      "section_category": "materials",
+      "sort_order": 47
+    },
+    {
+      "kind": "line",
+      "label": "Scent oils starter stock",
+      "notes": null,
+      "unit_price": 60.0,
+      "quantity": 1.0,
+      "total": 60.0,
+      "section_category": "materials",
+      "sort_order": 48
+    },
+    {
+      "kind": "line",
+      "label": "Extraction fan",
+      "notes": "Otherwise scent lingers in a permanent space",
+      "unit_price": 80.0,
+      "quantity": 1.0,
+      "total": 80.0,
+      "section_category": "materials",
+      "sort_order": 49
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal haptics",
+      "notes": null,
+      "section_category": "materials",
+      "sort_order": 50
+    },
+    {
+      "kind": "section",
+      "label": "MATERIALS \u2014 Content & other",
+      "section_category": "materials",
+      "sort_order": 51
+    },
+    {
+      "kind": "line",
+      "label": "3D assets (Fab/Kitbash, per pack)",
+      "notes": null,
+      "unit_price": 150.0,
+      "quantity": 2.0,
+      "total": 300.0,
+      "section_category": "materials",
+      "sort_order": 52
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal content & other",
+      "notes": null,
+      "section_category": "materials",
+      "sort_order": 53
+    },
+    {
+      "kind": "section",
+      "label": "PROPOSED ADDITIONS \u2014 Art direction, light & heat",
+      "section_category": "proposed",
+      "sort_order": 54
+    },
+    {
+      "kind": "line",
+      "label": "Forest interior (art direction)",
+      "notes": "Branches and leaves, fire-retardant (artificial or treated)",
+      "unit_price": 1000.0,
+      "quantity": 1.0,
+      "total": 1000.0,
+      "section_category": "proposed",
+      "sort_order": 55
+    },
+    {
+      "kind": "line",
+      "label": "Light effect + see-through transition",
+      "notes": "Atmospheric light at start/end; passthrough fade in the Quest app",
+      "unit_price": 850.0,
+      "quantity": 1.0,
+      "total": 850.0,
+      "section_category": "proposed",
+      "sort_order": 56
+    },
+    {
+      "kind": "line",
+      "label": "Infrared heater (optional)",
+      "notes": "Warms the booth during the underworld scene",
+      "unit_price": 150.0,
+      "quantity": 1.0,
+      "total": 150.0,
+      "section_category": "proposed",
+      "sort_order": 57
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal proposed additions",
+      "notes": null,
+      "section_category": "proposed",
+      "sort_order": 58
+    },
+    {
+      "kind": "summary",
+      "label": "Total labour",
+      "summary_key": "total_labour",
+      "sort_order": 59
+    },
+    {
+      "kind": "summary",
+      "label": "Total materials",
+      "summary_key": "total_materials",
+      "sort_order": 60
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal",
+      "notes": null,
+      "section_category": "proposed",
+      "sort_order": 61
+    },
+    {
+      "kind": "summary",
+      "label": "Contingency",
+      "summary_key": "contingency",
+      "sort_order": 62
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal incl. contingency",
+      "notes": null,
+      "section_category": "proposed",
+      "sort_order": 63
+    },
+    {
+      "kind": "section",
+      "label": "ALLOWANCES (provisional, no contingency)",
+      "section_category": "allowance",
+      "sort_order": 64
+    },
+    {
+      "kind": "line",
+      "label": "Travel + stay",
+      "notes": "Provisional",
+      "unit_price": 750.0,
+      "quantity": 1.0,
+      "total": 750.0,
+      "section_category": "allowance",
+      "sort_order": 65
+    },
+    {
+      "kind": "line",
+      "label": "Booth, branding and electrical installation",
+      "notes": "Provisional allowance as requested by Pasha; arranged by Pasha",
+      "unit_price": 2000.0,
+      "quantity": 1.0,
+      "total": 2000.0,
+      "section_category": "allowance",
+      "sort_order": 66
+    },
+    {
+      "kind": "subtotal",
+      "label": "Subtotal allowances",
+      "notes": null,
+      "section_category": "allowance",
+      "sort_order": 67
+    },
+    {
+      "kind": "summary",
+      "label": "TOTAL excl. VAT",
+      "summary_key": "grand_total",
+      "sort_order": 68
+    },
+    {
+      "kind": "summary",
+      "label": "Total person-days",
+      "summary_key": "total_person_days",
+      "sort_order": 69
+    }
+  ]
+}

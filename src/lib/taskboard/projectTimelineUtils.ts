@@ -1,11 +1,13 @@
 import {
   htmlMessageHasContent,
+  messageBodyToPlainText,
   normalizeOutgoingMessageBody,
 } from '../messages/messageRichText';
 import { addCalendarDays, startOfWeekMonday } from './calendarEventLayout';
 import { formatDateKey } from './deadlineUtils';
 
-/** Monday-based weeks from the current week through ~3 years ahead. */
+/** Monday-based week columns: ~3 years before and ~3 years after the current week. */
+export const PROJECT_TIMELINE_WEEKS_BEHIND = 52 * 3;
 export const PROJECT_TIMELINE_WEEKS_AHEAD = 52 * 3;
 
 export type TimelineWeekSlot = {
@@ -14,6 +16,90 @@ export type TimelineWeekSlot = {
   weekStartKey: string;
   label: string;
 };
+
+/** Horizontal month header band over consecutive week columns (Monday’s month). */
+export type TimelineMonthBand = {
+  key: string;
+  year: number;
+  month: number;
+  startIndex: number;
+  span: number;
+  label: string;
+};
+
+function timelineWeekMonthKey(slot: TimelineWeekSlot): string {
+  const d = slot.weekStart;
+  return `${d.getFullYear()}-${String(d.getMonth()).padStart(2, '0')}`;
+}
+
+export function buildTimelineMonthBands(weekSlots: TimelineWeekSlot[]): TimelineMonthBand[] {
+  if (weekSlots.length === 0) return [];
+
+  const bands: TimelineMonthBand[] = [];
+  let i = 0;
+  while (i < weekSlots.length) {
+    const key = timelineWeekMonthKey(weekSlots[i]);
+    const startIndex = i;
+    while (i < weekSlots.length && timelineWeekMonthKey(weekSlots[i]) === key) {
+      i += 1;
+    }
+    const [yearStr, monthStr] = key.split('-');
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    const label = new Date(year, month, 1).toLocaleDateString(undefined, {
+      month: 'long',
+      year: 'numeric',
+    });
+    bands.push({
+      key,
+      year,
+      month,
+      startIndex,
+      span: i - startIndex,
+      label,
+    });
+  }
+  return bands;
+}
+
+/** Month header band for a calendar month (matches band year/month from week Mondays). */
+export function timelineMonthBandForCalendarMonth(
+  bands: TimelineMonthBand[],
+  date = new Date()
+): TimelineMonthBand | null {
+  const year = date.getFullYear();
+  const month = date.getMonth();
+  return bands.find((b) => b.year === year && b.month === month) ?? null;
+}
+
+export function timelineMonthBandContainingWeekIndex(
+  bands: TimelineMonthBand[],
+  weekIndex: number
+): TimelineMonthBand | null {
+  return (
+    bands.find((b) => weekIndex >= b.startIndex && weekIndex < b.startIndex + b.span) ?? null
+  );
+}
+
+/** Week column index to align at the left when opening the timeline (start of current month band). */
+export function timelineInitialScrollWeekIndex(
+  bands: TimelineMonthBand[],
+  weekSlots: TimelineWeekSlot[],
+  date = new Date()
+): number {
+  const calendarBand = timelineMonthBandForCalendarMonth(bands, date);
+  if (calendarBand) return calendarBand.startIndex;
+
+  const probe = new Date(date);
+  probe.setHours(0, 0, 0, 0);
+  const weekIdx = weekSlots.findIndex((s) => s.weekStart <= probe && s.weekEnd >= probe);
+  if (weekIdx >= 0) {
+    const band = timelineMonthBandContainingWeekIndex(bands, weekIdx);
+    if (band) return band.startIndex;
+    return weekIdx;
+  }
+  return 0;
+}
 
 export function formatTimelineWeekLabel(weekStart: Date, weekEnd: Date): string {
   const sameWeek = formatDateKey(weekStart) === formatDateKey(weekEnd);
@@ -42,13 +128,16 @@ export function formatTimelineWeekLabel(weekStart: Date, weekEnd: Date): string 
 
 export function buildTimelineWeekSlots(
   weeksAhead = PROJECT_TIMELINE_WEEKS_AHEAD,
-  anchor = new Date()
+  anchor = new Date(),
+  weeksBehind = PROJECT_TIMELINE_WEEKS_BEHIND
 ): TimelineWeekSlot[] {
-  const firstWeekStart = startOfWeekMonday(anchor);
-  firstWeekStart.setHours(0, 0, 0, 0);
+  const anchorWeekStart = startOfWeekMonday(anchor);
+  anchorWeekStart.setHours(0, 0, 0, 0);
+  const firstWeekStart = addCalendarDays(anchorWeekStart, -weeksBehind * 7);
 
   const slots: TimelineWeekSlot[] = [];
-  for (let w = 0; w < weeksAhead; w += 1) {
+  const totalWeeks = weeksBehind + weeksAhead;
+  for (let w = 0; w < totalWeeks; w += 1) {
     const weekStart = addCalendarDays(firstWeekStart, w * 7);
     const weekEnd = addCalendarDays(weekStart, 6);
     slots.push({
@@ -137,6 +226,28 @@ export function sortTimelineBlocks(blocks: TimelineBlockInput[]): TimelineBlockI
 
 function weekIndex(key: string, allowedWeekKeys: string[]): number {
   return allowedWeekKeys.indexOf(key);
+}
+
+/** Grid placement for a block on the week axis (0-based week column index + span). */
+export function timelineBlockWeekSpan(
+  weekStartKey: string,
+  weekEndKey: string,
+  allowedWeekKeys: string[]
+): { startIndex: number; span: number } | null {
+  let start = weekStartKey;
+  let end = weekEndKey;
+  if (end < start) {
+    [start, end] = [end, start];
+  }
+  const startIndex = weekIndex(start, allowedWeekKeys);
+  const endIndex = weekIndex(end, allowedWeekKeys);
+  if (startIndex < 0 || endIndex < 0) return null;
+  return { startIndex, span: Math.max(endIndex, startIndex) - startIndex + 1 };
+}
+
+export function timelineBlockPlainLabel(html: string): string {
+  const plain = messageBodyToPlainText(html).trim();
+  return plain || '—';
 }
 
 /** Returns an i18n message key if blocks overlap or fall outside allowed week keys. */

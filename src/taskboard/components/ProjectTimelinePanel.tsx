@@ -3,11 +3,14 @@ import { Link2, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useTaskboardFilter } from '../../context/TaskboardFilterContext';
 import { useTaskboardRefresh } from '../../context/TaskboardRefreshContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { formatMessage, type MessageKey } from '../../lib/taskboard/i18n/messages';
 import { calendarProjectTimelineUrl } from '../../lib/taskboard/calendarProjectUrl';
 import {
   fetchProjectTimeline,
+  fetchProjectTimelinesBatch,
   saveProjectTimeline,
   type ProjectTimelineBlockInput,
+  type ProjectTimelineState,
 } from '../../lib/taskboard/projectTimelineService';
 import {
   buildTimelineWeekSlots,
@@ -15,6 +18,7 @@ import {
   isoWeekNumber,
   normalizeTimelineBlocksForSave,
   PROJECT_TIMELINE_WEEKS_AHEAD,
+  PROJECT_TIMELINE_WEEKS_BEHIND,
   sortTimelineBlocks,
   timelineBlockHasContent,
   timelineSlotsInBlockRange,
@@ -22,7 +26,10 @@ import {
 } from '../../lib/taskboard/projectTimelineUtils';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import MessageRichTextEditor from '../../components/messages/MessageRichTextEditor';
-import ProjectTimelineRichText from './ProjectTimelineRichText';
+import ProjectTimelineGrid from './ProjectTimelineGrid';
+import ProjectTimelineBlockDetailDialog, {
+  type TimelineBlockDetail,
+} from './ProjectTimelineBlockDetailDialog';
 
 function newEmptyBlock(firstWeekKey: string): ProjectTimelineBlockInput {
   return {
@@ -60,8 +67,15 @@ export default function ProjectTimelinePanel() {
   const [timelineCompleted, setTimelineCompleted] = useState(false);
   const [draftCompleted, setDraftCompleted] = useState(false);
   const [draftBlocks, setDraftBlocks] = useState<ProjectTimelineBlockInput[]>([]);
+  const [timelinesByProject, setTimelinesByProject] = useState<Map<string, ProjectTimelineState>>(
+    () => new Map()
+  );
+  const [blockDetail, setBlockDetail] = useState<TimelineBlockDetail | null>(null);
 
-  const weekSlots = useMemo(() => buildTimelineWeekSlots(PROJECT_TIMELINE_WEEKS_AHEAD), []);
+  const weekSlots = useMemo(
+    () => buildTimelineWeekSlots(PROJECT_TIMELINE_WEEKS_AHEAD, new Date(), PROJECT_TIMELINE_WEEKS_BEHIND),
+    []
+  );
   const weekKeys = useMemo(() => weekSlots.map((s) => s.weekStartKey), [weekSlots]);
 
   const selectedProject = useMemo(
@@ -69,37 +83,62 @@ export default function ProjectTimelinePanel() {
     [filterProjects, projectFilter]
   );
 
-  const displayBlocks = useMemo(
-    () => sortTimelineBlocks(draftBlocks.filter(timelineBlockHasContent)),
-    [draftBlocks]
-  );
+  const timetableHasBlocks = useMemo(() => {
+    for (const project of filterProjects) {
+      const entries = timelinesByProject.get(project.id)?.entries ?? [];
+      if (entries.some((entry) => timelineBlockHasContent(entry))) return true;
+    }
+    return false;
+  }, [filterProjects, timelinesByProject]);
 
-  const loadTimeline = useCallback(async () => {
+  const loadAllTimelines = useCallback(async () => {
+    if (filterProjects.length === 0) {
+      setTimelinesByProject(new Map());
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      const batch = await fetchProjectTimelinesBatch(filterProjects.map((p) => p.id));
+      setTimelinesByProject(batch);
+    } catch {
+      setError(t('calendar.projectTimelineLoadError'));
+      setTimelinesByProject(new Map());
+    } finally {
+      setLoading(false);
+    }
+  }, [filterProjects, t]);
+
+  const loadSelectedTimeline = useCallback(async () => {
     if (projectFilter === 'all' || !selectedProject) {
       setTimelineCompleted(false);
       setDraftBlocks([]);
-      setEditing(false);
       return;
     }
 
-    setLoading(true);
-    setError('');
     try {
       const state = await fetchProjectTimeline(projectFilter);
       setTimelineCompleted(state.timelineCompleted);
       setDraftCompleted(state.timelineCompleted);
       setDraftBlocks(entriesToBlocks(state.entries));
+      setTimelinesByProject((prev) => {
+        const next = new Map(prev);
+        next.set(projectFilter, state);
+        return next;
+      });
     } catch {
       setError(t('calendar.projectTimelineLoadError'));
       setDraftBlocks([]);
-    } finally {
-      setLoading(false);
     }
   }, [projectFilter, selectedProject, t]);
 
   useEffect(() => {
-    void loadTimeline();
-  }, [loadTimeline]);
+    void loadAllTimelines();
+  }, [loadAllTimelines]);
+
+  useEffect(() => {
+    if (editing) void loadSelectedTimeline();
+  }, [editing, loadSelectedTimeline]);
 
   useEffect(() => {
     setEditing(false);
@@ -107,17 +146,22 @@ export default function ProjectTimelinePanel() {
   }, [projectFilter]);
 
   const startEdit = () => {
+    if (projectFilter === 'all') return;
     setDraftCompleted(timelineCompleted);
     setEditing(true);
     setError('');
-    if (draftBlocks.length === 0 && weekKeys[0]) {
-      setDraftBlocks([newEmptyBlock(weekKeys[0])]);
-    }
+    void loadSelectedTimeline().then(() => {
+      setDraftBlocks((prev) => {
+        if (prev.length > 0 || !weekKeys[0]) return prev;
+        return [newEmptyBlock(weekKeys[0])];
+      });
+    });
   };
 
   const cancelEdit = () => {
     setEditing(false);
-    void loadTimeline();
+    void loadSelectedTimeline();
+    void loadAllTimelines();
   };
 
   const saveTimeline = async () => {
@@ -126,7 +170,7 @@ export default function ProjectTimelinePanel() {
     const normalized = normalizeTimelineBlocksForSave(draftBlocks, weekKeys);
     const validationKey = validateTimelineBlocks(normalized, weekKeys);
     if (validationKey) {
-      setError(t(validationKey));
+      setError(t(validationKey as MessageKey));
       return;
     }
 
@@ -137,6 +181,11 @@ export default function ProjectTimelinePanel() {
       setTimelineCompleted(state.timelineCompleted);
       setDraftCompleted(state.timelineCompleted);
       setDraftBlocks(entriesToBlocks(state.entries));
+      setTimelinesByProject((prev) => {
+        const next = new Map(prev);
+        next.set(projectFilter, state);
+        return next;
+      });
       setEditing(false);
       refreshProjects();
     } catch (err) {
@@ -158,10 +207,7 @@ export default function ProjectTimelinePanel() {
     }
   };
 
-  const updateBlock = (
-    index: number,
-    patch: Partial<ProjectTimelineBlockInput>
-  ) => {
+  const updateBlock = (index: number, patch: Partial<ProjectTimelineBlockInput>) => {
     setDraftBlocks((prev) =>
       prev.map((block, i) => (i === index ? { ...block, ...patch } : block))
     );
@@ -176,17 +222,14 @@ export default function ProjectTimelinePanel() {
     setDraftBlocks((prev) => [...prev, newEmptyBlock(key)]);
   };
 
-  const showTable =
-    projectFilter !== 'all' && !loading && (!timelineCompleted || editing);
-
   const renderWeekLines = (block: ProjectTimelineBlockInput) => {
     const slots = timelineSlotsInBlockRange(block.week_start, block.week_end, weekSlots);
     return (
       <ul className="space-y-1.5 list-none p-0 m-0">
         {slots.map((slot) => (
           <li key={slot.weekStartKey} className="text-xs tb-muted leading-snug">
-            {t('calendar.projectTimelineWeekLine', {
-              number: isoWeekNumber(slot.weekStart),
+            {formatMessage(t('calendar.projectTimelineWeekLine'), {
+              number: String(isoWeekNumber(slot.weekStart)),
               date: formatTimelineWeekStartDate(slot.weekStart),
             })}
           </li>
@@ -195,109 +238,109 @@ export default function ProjectTimelinePanel() {
     );
   };
 
-  const renderWeekCell = (block: ProjectTimelineBlockInput, index: number) => {
-    if (editing) {
-      return (
-        <div className="flex flex-col gap-3 min-w-[10rem]">
-          <div className="flex flex-col gap-2">
-            <label className="text-[10px] uppercase tracking-wide tb-muted">
-              {t('calendar.projectTimelineWeekFrom')}
-            </label>
-            <select
-              className="field-input text-sm"
-              value={block.week_start}
-              disabled={saving}
-              onChange={(e) => updateBlock(index, { week_start: e.target.value })}
-            >
-              {weekSlots.map((slot) => (
-                <option key={slot.weekStartKey} value={slot.weekStartKey}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-            <label className="text-[10px] uppercase tracking-wide tb-muted">
-              {t('calendar.projectTimelineWeekTo')}
-            </label>
-            <select
-              className="field-input text-sm"
-              value={block.week_end}
-              disabled={saving}
-              onChange={(e) => updateBlock(index, { week_end: e.target.value })}
-            >
-              {weekSlots.map((slot) => (
-                <option key={slot.weekStartKey} value={slot.weekStartKey}>
-                  {slot.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          {renderWeekLines(block)}
-        </div>
-      );
-    }
-
-    return renderWeekLines(block);
-  };
-
-  const blocksToRender = editing ? draftBlocks : displayBlocks;
+  const renderWeekCell = (block: ProjectTimelineBlockInput, index: number) => (
+    <div className="flex flex-col gap-3 min-w-[10rem]">
+      <div className="flex flex-col gap-2">
+        <label className="text-[10px] uppercase tracking-wide tb-muted">
+          {t('calendar.projectTimelineWeekFrom')}
+        </label>
+        <select
+          className="field-input text-sm"
+          value={block.week_start}
+          disabled={saving}
+          onChange={(e) => updateBlock(index, { week_start: e.target.value })}
+        >
+          {weekSlots.map((slot) => (
+            <option key={slot.weekStartKey} value={slot.weekStartKey}>
+              {slot.label}
+            </option>
+          ))}
+        </select>
+        <label className="text-[10px] uppercase tracking-wide tb-muted">
+          {t('calendar.projectTimelineWeekTo')}
+        </label>
+        <select
+          className="field-input text-sm"
+          value={block.week_end}
+          disabled={saving}
+          onChange={(e) => updateBlock(index, { week_end: e.target.value })}
+        >
+          {weekSlots.map((slot) => (
+            <option key={slot.weekStartKey} value={slot.weekStartKey}>
+              {slot.label}
+            </option>
+          ))}
+        </select>
+      </div>
+      {renderWeekLines(block)}
+    </div>
+  );
 
   return (
     <section className="tb-remote-inst-card p-6 md:p-8 mb-6">
       <div className="flex items-start justify-between gap-3 mb-1">
         <div className="min-w-0">
           <h2 className="tb-heading text-lg">{t('calendar.projectTimelineHeading')}</h2>
-          {selectedProject ? (
-            <p className="text-sm tb-muted mt-1">{selectedProject.name}</p>
-          ) : (
-            <p className="text-sm tb-muted mt-1">{t('calendar.projectTimelineSelectProject')}</p>
-          )}
+          {editing && selectedProject ? (
+            <p className="text-sm tb-muted mt-1">
+              {formatMessage(t('calendar.projectTimelineEditingProject'), {
+                name: selectedProject.name,
+              })}
+            </p>
+          ) : null}
         </div>
-        {projectFilter !== 'all' && !loading && !editing ? (
+        {!loading && !editing ? (
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              className="tb-btn-secondary p-2"
-              onClick={() => void copyShareUrl()}
-              aria-label={t('calendar.projectTimelineShare')}
-              title={t('calendar.projectTimelineShare')}
-            >
-              <Link2 size={18} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="tb-btn-secondary p-2"
-              onClick={startEdit}
-              aria-label={t('calendar.projectTimelineEdit')}
-              title={t('calendar.projectTimelineEdit')}
-            >
-              <Pencil size={18} aria-hidden />
-            </button>
+            {selectedProject ? (
+              <>
+                <button
+                  type="button"
+                  className="tb-btn-secondary p-2"
+                  onClick={() => void copyShareUrl()}
+                  aria-label={t('calendar.projectTimelineShare')}
+                  title={t('calendar.projectTimelineShare')}
+                >
+                  <Link2 size={18} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className="tb-btn-secondary p-2"
+                  onClick={startEdit}
+                  disabled={projectFilter === 'all'}
+                  aria-label={t('calendar.projectTimelineEdit')}
+                  title={
+                    projectFilter === 'all'
+                      ? t('calendar.projectTimelinePickProject')
+                      : t('calendar.projectTimelineEdit')
+                  }
+                >
+                  <Pencil size={18} aria-hidden />
+                </button>
+              </>
+            ) : null}
           </div>
         ) : null}
       </div>
 
-      {projectFilter === 'all' ? (
-        <p className="text-sm tb-muted mt-3">{t('calendar.projectTimelinePickProject')}</p>
-      ) : null}
-
-      {projectFilter !== 'all' && loading ? (
-        <p className="text-sm tb-muted mt-3">{t('common.loading')}</p>
-      ) : null}
-
-      {projectFilter !== 'all' && !loading && timelineCompleted && !editing ? (
-        <p className="text-sm font-medium text-[var(--tb-text)] mt-3">
-          {t('calendar.projectTimelineCompleted')}
-        </p>
-      ) : null}
+      {loading ? <p className="text-sm tb-muted mt-3">{t('common.loading')}</p> : null}
 
       {error ? <p className="text-sm text-red-600 mt-3">{error}</p> : null}
       {shareNotice ? <p className="text-sm text-[var(--tb-accent)] mt-3">{shareNotice}</p> : null}
 
-      {showTable && blocksToRender.length === 0 && !editing ? (
+      {!loading && !editing ? (
+        <ProjectTimelineGrid
+          projects={filterProjects}
+          timelines={timelinesByProject}
+          weekSlots={weekSlots}
+          onSelectBlock={setBlockDetail}
+        />
+      ) : null}
+
+      {!loading && !editing && filterProjects.length > 0 && !timetableHasBlocks ? (
         <p className="text-sm tb-muted mt-3">{t('calendar.projectTimelineNoBlocks')}</p>
       ) : null}
 
-      {showTable && (blocksToRender.length > 0 || editing) ? (
+      {editing && projectFilter !== 'all' ? (
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[32rem] text-sm border-collapse">
             <thead>
@@ -311,118 +354,103 @@ export default function ProjectTimelinePanel() {
                 <th className="py-2 font-semibold text-xs uppercase tracking-wide tb-muted">
                   {t('calendar.projectTimelineColDescription')}
                 </th>
-                {editing ? <th className="w-10" aria-hidden /> : null}
+                <th className="w-10" aria-hidden />
               </tr>
             </thead>
             <tbody>
-              {blocksToRender.map((block, index) => {
-                const name = block.name;
-                const description = block.description;
-
-                return (
-                  <tr
-                    key={`${block.week_start}-${block.week_end}-${index}`}
-                    className="border-b border-[var(--tb-border)] align-top"
-                  >
-                    <td className="py-3 pr-3">{renderWeekCell(block, index)}</td>
-                    <td className="py-3 pr-3 min-w-[10rem]">
-                      {editing ? (
-                        <MessageRichTextEditor
-                          key={`name-${index}-${block.week_start}-${block.week_end}`}
-                          username={username ?? ''}
-                          value={name}
-                          onChange={(html) => updateBlock(index, { name: html })}
-                          disabled={saving}
-                          minHeightClassName="min-h-[2.75rem]"
-                          maxHeightClassName="max-h-[10rem]"
-                          aria-label={t('calendar.projectTimelineColName')}
-                        />
-                      ) : (
-                        <ProjectTimelineRichText body={name} />
-                      )}
-                    </td>
-                    <td className="py-3 min-w-[14rem]">
-                      {editing ? (
-                        <MessageRichTextEditor
-                          key={`desc-${index}-${block.week_start}-${block.week_end}`}
-                          username={username ?? ''}
-                          value={description}
-                          onChange={(html) => updateBlock(index, { description: html })}
-                          disabled={saving}
-                          minHeightClassName="min-h-[4rem]"
-                          maxHeightClassName="max-h-[14rem]"
-                          aria-label={t('calendar.projectTimelineColDescription')}
-                        />
-                      ) : (
-                        <ProjectTimelineRichText body={description} />
-                      )}
-                    </td>
-                    {editing ? (
-                      <td className="py-3 pl-2">
-                        <button
-                          type="button"
-                          className="p-2 text-[var(--tb-text-muted)] hover:text-red-600"
-                          disabled={saving}
-                          aria-label={t('calendar.projectTimelineRemoveBlock')}
-                          onClick={() => removeBlock(index)}
-                        >
-                          <Trash2 size={16} aria-hidden />
-                        </button>
-                      </td>
-                    ) : null}
-                  </tr>
-                );
-              })}
+              {draftBlocks.map((block, index) => (
+                <tr
+                  key={`${block.week_start}-${block.week_end}-${index}`}
+                  className="border-b border-[var(--tb-border)] align-top"
+                >
+                  <td className="py-3 pr-3">{renderWeekCell(block, index)}</td>
+                  <td className="py-3 pr-3 min-w-[10rem]">
+                    <MessageRichTextEditor
+                      key={`name-${index}-${block.week_start}-${block.week_end}`}
+                      username={username ?? ''}
+                      value={block.name}
+                      onChange={(html) => updateBlock(index, { name: html })}
+                      disabled={saving}
+                      minHeightClassName="min-h-[2.75rem]"
+                      maxHeightClassName="max-h-[10rem]"
+                      aria-label={t('calendar.projectTimelineColName')}
+                    />
+                  </td>
+                  <td className="py-3 min-w-[14rem]">
+                    <MessageRichTextEditor
+                      key={`desc-${index}-${block.week_start}-${block.week_end}`}
+                      username={username ?? ''}
+                      value={block.description}
+                      onChange={(html) => updateBlock(index, { description: html })}
+                      disabled={saving}
+                      minHeightClassName="min-h-[4rem]"
+                      maxHeightClassName="max-h-[14rem]"
+                      aria-label={t('calendar.projectTimelineColDescription')}
+                    />
+                  </td>
+                  <td className="py-3 pl-2">
+                    <button
+                      type="button"
+                      className="p-2 text-[var(--tb-text-muted)] hover:text-red-600"
+                      disabled={saving}
+                      aria-label={t('calendar.projectTimelineRemoveBlock')}
+                      onClick={() => removeBlock(index)}
+                    >
+                      <Trash2 size={16} aria-hidden />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-        </div>
-      ) : null}
 
-      {projectFilter !== 'all' && !loading && editing ? (
-        <div className="mt-5 space-y-4 border-t border-[var(--tb-border)] pt-4">
-          <button
-            type="button"
-            className="tb-btn-secondary text-sm inline-flex items-center gap-2"
-            disabled={saving}
-            onClick={addBlock}
-          >
-            <Plus size={16} aria-hidden />
-            {t('calendar.projectTimelineAddBlock')}
-          </button>
-          <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-            <input
-              type="checkbox"
-              className="rounded border-[var(--tb-border)]"
-              checked={draftCompleted}
-              disabled={saving}
-              onChange={(e) => setDraftCompleted(e.target.checked)}
-            />
-            <span>{t('calendar.projectTimelineMarkCompleted')}</span>
-          </label>
-          <div className="flex flex-wrap justify-end gap-2">
+          <div className="mt-5 space-y-4 border-t border-[var(--tb-border)] pt-4">
             <button
               type="button"
-              className="tb-btn-secondary text-sm"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-2"
               disabled={saving}
-              onClick={cancelEdit}
+              onClick={addBlock}
             >
-              {t('common.cancel')}
+              <Plus size={16} aria-hidden />
+              {t('calendar.projectTimelineAddBlock')}
             </button>
-            <button
-              type="button"
-              className="tb-btn-primary text-sm disabled:opacity-50"
-              disabled={saving}
-              onClick={() => void saveTimeline()}
-            >
-              {saving ? t('comments.saving') : t('common.save')}
-            </button>
+            <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="rounded border-[var(--tb-border)]"
+                checked={draftCompleted}
+                disabled={saving}
+                onChange={(e) => setDraftCompleted(e.target.checked)}
+              />
+              <span>{t('calendar.projectTimelineMarkCompleted')}</span>
+            </label>
+            <div className="flex flex-wrap justify-end gap-2">
+              <button
+                type="button"
+                className="tb-btn-secondary text-sm"
+                disabled={saving}
+                onClick={cancelEdit}
+              >
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                className="tb-btn-primary text-sm disabled:opacity-50"
+                disabled={saving}
+                onClick={() => void saveTimeline()}
+              >
+                {saving ? t('comments.saving') : t('common.save')}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
 
-      {projectFilter !== 'all' && !loading && !timelineCompleted && !editing ? (
-        <p className="text-xs tb-muted mt-3">{t('calendar.projectTimelineEditHint')}</p>
-      ) : null}
+      <ProjectTimelineBlockDetailDialog
+        detail={blockDetail}
+        weekSlots={weekSlots}
+        onClose={() => setBlockDetail(null)}
+      />
     </section>
   );
 }

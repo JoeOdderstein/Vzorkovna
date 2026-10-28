@@ -6,6 +6,7 @@ import {
 } from '../auth.js';
 import { userCanAccessInvoices } from '../invoiceAccess.js';
 import { userCanAccessMessages } from '../messageAccess.js';
+import { userCanEditQuotations } from '../quotationEditAccess.js';
 import { authenticateUser } from '../authenticate.js';
 
 export default async function handler(req, res) {
@@ -37,6 +38,7 @@ export default async function handler(req, res) {
     const isAdmin = isAdminUsername(normalizedUsername);
     const canAccessInvoices = await userCanAccessInvoices(normalizedUsername, isAdmin);
     const canAccessMessages = await userCanAccessMessages(normalizedUsername, isAdmin);
+    const canEditQuotations = await userCanEditQuotations(normalizedUsername, isAdmin);
 
     return res.status(200).json({
       ok: true,
@@ -45,6 +47,7 @@ export default async function handler(req, res) {
       isAdmin,
       canAccessInvoices,
       canAccessMessages,
+      canEditQuotations,
     });
   } catch (err) {
     console.error('Login error:', err);

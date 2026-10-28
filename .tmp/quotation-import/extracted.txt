@@ -1,0 +1,277 @@
+===== .tmp/quotation-import/1792146642192-Infinity-Room-Quotation_2026034.1.pdf pages=2 =====
+
+
+C. of C. 74194143VAT NL002351592b78IBAN NL46 BUNQ 2088 1867 19
+Gnasher Film
+Gnasher Film
+74-21, Eykmanlaan
+3571 JV Utrecht
+Nederland
+0624355224
+Quotation 2026034.1
+Date sent14-09-2026
+Valid until14-10-2026
+ReferenceINFINITY ROOM
+ 
+Old Square Bar 1401 s.r.o
+Attn. Pavel Gachkivskyi
+Melantrichova 970/17
+Praha 1 Stare Mestow
+Czech Republic
+ICO: 08713375
+DIC: CZ08713375
+VAT reverse-charged
+VAT number: CZ08713375
+DescriptionQuantityAmountTotal
+Dig-Octa Power-72€ 70,00€ 140,00
+QuinLED Dig-Octa Brainboard-32-8L2€ 80,00€ 160,00
+LED Strings1€ 1.500,00€ 1.500,00
+Case1€ 100,00€ 100,00
+Meanwell LRS-600-122€ 120,00€ 240,00
+230 v distributor1€ 90,00€ 90,00
+Mini PC1€ 1.000,00€ 1.000,00
+Extra Materials (Cabling, Shrinkshoe, etc)1€ 250,00€ 250,00
+Extra Microcontroller + Extra materials needed1€ 120,00€ 120,00
+TD Licentie1€ 600,00€ 600,00
+Switch1€ 60,00€ 60,00
+Gus - Manhours Designing, Programming, Testing, 
+writing the narrative, and building the system
+8€ 350,00€ 2.800,00
+Gus - Man hours installing5€ 350,00€ 1.750,00
+Tereza - Woman Hours Installing5€ 125,00€ 625,00
+Joost - Man Hours Music & Sound Design1€ 4.050,00€ 4.050,00
+Joost - Audio materials1€ 2.232,12€ 2.232,12
+
+C. of C. 74194143VAT NL002351592b78IBAN NL46 BUNQ 2088 1867 19
+Total€ 15.717,12
+With pleasure, our obligation-free quotation of work according to your specifications. If you are in agreement 
+with this quotation, please respond affirmatively. If you have any questions or comments, don't hesitate to 
+contact us.
+===== .tmp/quotation-import/1792666002806-Krakow-Feed-the-Dragon-Quotation-proposal.docx-1-.pdf pages=5 =====
+
+
+Feed the Dragon — Quotation Outline
+ 
+Krakow: Feed the Dragon
+ 
+Quotation outline 
+Thank you for your detailed feedback. We're delighted to hear that you and your team are excited 
+about the proposed direction for Krakow Ribs and are ready to move the project into the next phase. 
+Regarding the budget estimates, we completely understand the importance of receiving individual 
+cost ranges for each component. This will allow you to prioritize the elements that deliver the 
+greatest impact while keeping the project aligned with your budget. We understand that the current 
+proposal represents a significant investment. If the proposed scope exceeds the available budget, we 
+would be happy to revisit the concept together and prepare an alternative quotation with a reduced 
+scope. 
+Our proposed approach is as follows: 
+The largest cost variable is the dragon itself. A full-scale animatronic dragon would be prohibitively 
+expensive, so we've developed a more cost-effective concept that still delivers a highly memorable 
+finale. 
+Instead of a full-body dragon, we propose having only a big dragon's head emerge through the 
+ceiling. This significantly reduces the mechanical complexity while retaining a powerful visual impact. 
+The animatronics would be limited to essential movements, opening and closing the mouth, 
+animated eyes, and dramatic red illumination, supported by a high-quality surround sound system 
+that brings the creature convincingly to life. Since the dragon's head is an art direction decision, we 
+also suggest that Ksusha review the construction process and material choices to explore 
+opportunities for a more cost-effective approach. For now, we have included a budget estimate for 
+the art pieces as a placeholder, which can be refined once the final design and production approach 
+have been determined. 
+The dragon would be visible from both the ground floor and the first floor, appearing to sleep 
+peacefully throughout most of the guest experience. This central feature would serve two key 
+moments within the restaurant: the presentation of the ribs upon arrival and the climactic ending of 
+the dining experience. 
+For the introduction, staff members would simply press a button to trigger the sequence. The dragon 
+would come to life with subtle lighting and ambient sound before speaking in a sleepy voice: 
+"Feed me... feed me..." 
+As guests reach the climax of the rib-eating experience, the dragon suddenly awakens. Its eyes begin 
+to glow an intense red, its mouth slowly opens, and a carefully synchronized combination of lighting, 
+high-output smoke, and immersive sound creates the illusion that it is breathing fire. Powerful roars 
+and dramatic effects transform the restaurant into a theatrical finale, delivering a memorable 
+experience while keeping production costs under control. 
+Page 1 of 5
+ 
+
+Feed the Dragon — Quotation Outline
+ 
+For the presentation plates, we have intentionally kept the design more minimalistic. They will 
+feature custom 3D-printed casings, but we recommend avoiding integrated electronics. This keeps 
+the plates durable, easy to maintain, and significantly more cost-effective without compromising 
+their visual appeal. 
+Each dining table will feature a small interactive dragon head. We have now developed a cost 
+estimate for a system in which every dragon head contains its own electronics, including a built-in 
+scale connected to a points system. Each dragon head would also include LED lighting, a compact 
+speaker, and smoke effects. As guests progress through the experience, the points collected at the 
+table would also communicate with the main dragon, creating a sense that every table contributes to 
+awakening the creature. 
+This interactive system provides a strong foundation for the overall experience. It creates a clear 
+connection between the individual table interactions and the restaurant-wide finale, making guests 
+feel that they are collectively building toward the dragon's awakening. The modular nature of the 
+system also makes it scalable, allowing features to be added or refined over time while keeping the 
+initial implementation flexible and budget-conscious. 
+ 
+Here is already a rough estimate of what we believe the ballpark would be:  
+1. Show Control System with main dragon head 
+Main System & lights:  
+Item Cost exc. 
+Raspberry Pi 4 model B - 4GB 
+€ 99,2 
+Power supply and storage 
+€ 41,3 
+4x LED Lights in dragon head 
+€ 124 
+Smoke Geyser 
+€454,50 
+2x Pistons for moving dragonhead 
+€ 165,3 
+Unexpected costs 
+€ 165,3 
+Subtotal 
+€ 1049,6 
+Audio:  
+Item Cost 
+4x speakers: JBL 305P MKII 
+€393.40 
+1x Subwoofer: Devine RX-10SA 
+€205.79 
+Page 2 of 5
+ 
+
+Feed the Dragon — Quotation Outline
+ 
+Item Cost 
+1x Focusrite Clarett+ 2Pre  
+€255.37 
+4x speaker mounts 
+€56.38 
+5x XLR cables 
+approx. €85.00 
+5x Power cables 
+approx. €80.00 
+Unforeseen 
+€100.00 
+Subtotal: 
+€1,175.94 
+Dragon head design: f 
+Item Cost 
+Budget for designing how the main dragon looks 
+€2000 
+Subtotal: 
+€2000 
+ 
+Manhours:  
+Item Cost 
+Creative hours designing sounds effects dragon 
+€500 
+5 days Installing in Krakow Gus & Joost 
+€3500 
+Project Development & Research Fee 
+€1000 
+Subtotal: 
+€5000 
+Total: €9225.00 
+2. Rib Presentation Pieces (20 units) 
+Gear 
+Item Unit price  
+3D printing costs 
+€11  €220 
+Assembling 3d prints (€350 per day) 
+ 
+ €700 
+Subtotal : 
+ 
+€920 
+Manhours:  
+Page 3 of 5
+ 
+
+Feed the Dragon — Quotation Outline
+ 
+Item Cost 
+Creative hours designing rib presentation tray 
+€500 
+Subtotal: 
+€500 
+Total: €1420 
+3. Small Dragon Heads (10 units) 
+Gear: 
+Item Unit price Total 
+Raspberry Pi 4 model B - 1GB: 
+€ 33 € 330,6 
+Raspberry pi supplies  
+€ 41,30 € 413,22 
+Weight sensor system 
+€ 33 € 330,6 
+LED Lights 
+€41,3 €413,22 
+Sound Speaker 
+€ 24,7 € 247,9 
+Small smoke system 
+€ 12,3 € 123,9 
+3D Printing materials 
+€ 24,7 € 247,9 
+Unforeseen 
+€10,00 € 100,00 
+Subtotal 
+ 
+€2206,34 
+Manhours:  
+Item Cost 
+Designing sounds 
+€1000 
+Designing 3D model small Dragon Heads 
+€1000 
+Ensembling technology parts (5 days) 
+€1750 
+Subtotal 
+€3750.00 
+ 
+Total: €5957.00
+ 
+Page 4 of 5
+ 
+
+Feed the Dragon — Quotation Outline
+ 
+4. Total costs estimate  
+Total 
+Item Amount (excl. VAT) 
+1. Show Control System & Dragon Head 
+€9225 
+2. Rib Presentation Pieces 
+€1420 
+3. Small dragon heads 
+€5957 
+Total estimate:  
+€16602 
+5. Additional expansion options: 
+LED score screens 
+Please note that the current proposal does not include a live scoring and leaderboard system. One option 
+we have been considering is a digital display that shows the total weight of ribs consumed at each table, 
+alongside a central leaderboard that allows guests to compare their scores with other tables. This would 
+introduce an additional competitive element to the dining experience, encourage interaction between 
+guests, and reinforce the connection between the table experience and the final dragon activation. 
+If this is something you would like to explore, we would be happy to further develop the concept and 
+provide a dedicated implementation plan. 
+The most cost-effective solution would be to add a small LED display at each table, allowing guests to see 
+their current score in real time. This would increase the total project cost to approximately €17402 
+For a more immersive experience, we could also install a large display within the restaurant that presents 
+a live leaderboard, showing the scores of all tables, guest rankings, and progress towards shared goals. 
+This would create a stronger sense of competition and encourage interaction throughout the restaurant. 
+Including both the table displays and the central leaderboard would increase the total project cost to 
+approximately €18102. 
+Custom loopable soundtrack 
+The sound design will be developed to complement, rather than replace, the restaurant's existing 
+atmosphere. The venue's own music playlist remains the primary soundtrack, while immersive audio, 
+voice, and sound effects are introduced at carefully choreographed moments to maximize their 
+dramatic impact. If desired, we can also develop a custom musical score or themed soundtrack 
+specifically for the dragon experience, similar to the tank shot experience. This can be included as an 
+additional option in the quotation if preferred!  
+We would also like to provide some context on our response time. Preparing these budgets is a detailed 
+process that requires extensive research into materials, production methods, logistics, and technical 
+integration. Every installation we design is custom-made and developed from the ground up, from the 
+hardware and fabrication to the interfaces that bring the concept to life. Because of this, creating accurate 
+budget estimates takes time, and we appreciate your patience throughout the process. 
+ 
+Please note: As we are currently still negotiating the rights, they have not been included in this quotation. 
+Page 5 of 5
+ 

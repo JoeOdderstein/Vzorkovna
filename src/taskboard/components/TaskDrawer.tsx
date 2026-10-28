@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import type { Task } from '../../lib/taskboard/types';
@@ -8,7 +8,8 @@ import { useAssigneeNames } from '../../hooks/useAssigneeNames';
 import type { CategoryOption, Project } from '../../lib/taskboard/types';
 import CategorySelect from './CategorySelect';
 import { toggleAssignee } from '../../lib/taskboard/assigneeUtils';
-import { notifyTaskAttachment } from '../../lib/taskboard/notifyAssignment';
+import { notifyTaskAssignment, notifyTaskAttachment } from '../../lib/taskboard/notifyAssignment';
+import { isSupabaseConfigured } from '../../lib/taskboard/config';
 import {
   getAttachmentUrl,
   updateTask,
@@ -80,6 +81,13 @@ export default function TaskDrawer({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const assigneesAtOpenRef = useRef<Assignee[]>([]);
+  const saveInFlightRef = useRef<Promise<void> | null>(null);
+
+  useEffect(() => {
+    if (!task) return;
+    assigneesAtOpenRef.current = [...(task.assignees ?? [])];
+  }, [task?.id]);
 
   const commentAuthor = {
     username,
@@ -127,10 +135,28 @@ export default function TaskDrawer({
     if (task) setForm(task);
   }, [task]);
 
+  const flushAssignmentEmails = useCallback(() => {
+    if (!task || !isSupabaseConfigured()) return;
+    if (form.notify_assign_emails === false) return;
+    notifyTaskAssignment(task.id, assigneesAtOpenRef.current);
+  }, [task, form.notify_assign_emails]);
+
+  const handleClose = useCallback(async () => {
+    if (saveInFlightRef.current) {
+      try {
+        await saveInFlightRef.current;
+      } catch {
+        // save() already surfaced errors in the drawer
+      }
+    }
+    flushAssignmentEmails();
+    onClose();
+  }, [flushAssignmentEmails, onClose]);
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        void handleClose();
         return;
       }
 
@@ -144,12 +170,12 @@ export default function TaskDrawer({
       if (target instanceof HTMLElement && 'blur' in target) {
         target.blur();
       }
-      onClose();
+      void handleClose();
     };
 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  }, [handleClose]);
 
   useEffect(() => {
     if (!task) return;
@@ -158,12 +184,12 @@ export default function TaskDrawer({
       const target = event.target as Element;
       if (target.closest('[data-task-drawer]')) return;
       if (target.closest('[data-taskboard-interactive]')) return;
-      onClose();
+      void handleClose();
     };
 
     document.addEventListener('pointerdown', onPointerDown);
     return () => document.removeEventListener('pointerdown', onPointerDown);
-  }, [task, onClose]);
+  }, [task, handleClose]);
 
   if (!task) return null;
 
@@ -173,15 +199,24 @@ export default function TaskDrawer({
   ) => {
     if (!options?.quiet) setSaving(true);
     setError('');
-    try {
-      await updateTask(task.id, updates, {
-        previousAssignees: options?.previousAssignees,
-      });
-      onSaved();
-    } catch {
-      setError('Could not save changes.');
-    } finally {
-      if (!options?.quiet) setSaving(false);
+    const run = async () => {
+      try {
+        await updateTask(task.id, updates, {
+          previousAssignees: options?.previousAssignees,
+          skipAssignmentNotify: true,
+        });
+        onSaved();
+      } catch {
+        setError('Could not save changes.');
+      } finally {
+        if (!options?.quiet) setSaving(false);
+      }
+    };
+    const promise = run();
+    saveInFlightRef.current = promise;
+    await promise;
+    if (saveInFlightRef.current === promise) {
+      saveInFlightRef.current = null;
     }
   };
 
@@ -264,7 +299,7 @@ export default function TaskDrawer({
         <div className="tb-drawer-edge" aria-hidden="true" />
         <div className="sticky top-0 tb-drawer-header px-6 py-4 flex items-center justify-between">
           <span className="tb-label">{isParent ? t('task.task') : t('task.subtask')}</span>
-          <button onClick={onClose} className="text-[#80868b] hover:text-[#202124] transition-colors" aria-label={t('common.close')}>
+          <button onClick={() => void handleClose()} className="text-[#80868b] hover:text-[#202124] transition-colors" aria-label={t('common.close')}>
             <X size={20} />
           </button>
         </div>
@@ -340,6 +375,22 @@ export default function TaskDrawer({
                 );
               })}
             </div>
+            <label className="mt-3 flex items-start gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.notify_assign_emails !== false}
+                onChange={(e) => {
+                  const notify_assign_emails = e.target.checked;
+                  setForm({ ...form, notify_assign_emails });
+                  save({ notify_assign_emails }, { quiet: true });
+                }}
+                className="mt-0.5 accent-[#1a73e8]"
+              />
+              <span className="text-sm tb-text-secondary leading-snug">
+                {t('task.notifyAssignEmails')}
+                <span className="block text-xs tb-muted mt-0.5">{t('task.notifyAssignEmailsHint')}</span>
+              </span>
+            </label>
           </Field>
 
           <Field label={t('task.priority')}>
@@ -434,13 +485,23 @@ export default function TaskDrawer({
                 onChange={(e) => {
                   const completed = e.target.checked;
                   if (completed && onComplete) {
-                    onComplete(task.id);
-                    onClose();
+                    void (async () => {
+                      if (saveInFlightRef.current) {
+                        try {
+                          await saveInFlightRef.current;
+                        } catch {
+                          /* save surfaced error */
+                        }
+                      }
+                      flushAssignmentEmails();
+                      onComplete(task.id);
+                      onClose();
+                    })();
                     return;
                   }
                   setForm({ ...form, completed });
                   save({ completed });
-                  if (completed) onClose();
+                  if (completed) void handleClose();
                 }}
                 className="accent-[#1a73e8]"
               />

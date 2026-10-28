@@ -15,7 +15,8 @@ export function normalizeAssignees(value: unknown): Assignee[] {
 export function normalizeTask<T extends Record<string, unknown>>(row: T): Task {
   const assignees = normalizeAssignees(row.assignees ?? row.assigned_to);
   const { assigned_to: _legacy, ...rest } = row;
-  return { ...rest, assignees } as unknown as Task;
+  const notify_assign_emails = row.notify_assign_emails === false ? false : true;
+  return { ...rest, assignees, notify_assign_emails } as unknown as Task;
 }
 
 export function taskHasAssignee(task: Task, assignee: Assignee): boolean {

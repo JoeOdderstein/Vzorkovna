@@ -1382,6 +1382,63 @@ body {
   white-space: normal;
 }
 
+/* Project timeline timetable — compact phase blocks (not full-width calendar chips) */
+.taskboard .tb-project-timeline-phase {
+  box-sizing: border-box;
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.2rem 0.35rem;
+  overflow: hidden;
+  border-radius: 4px;
+  border: 1px solid color-mix(in srgb, var(--tb-cal-proj-accent, var(--tb-accent)) 35%, var(--tb-border));
+  background: color-mix(in srgb, var(--tb-cal-proj-accent, var(--tb-accent)) 14%, var(--tb-surface));
+  color: color-mix(in srgb, var(--tb-cal-proj-accent, var(--tb-accent)) 75%, var(--tb-text));
+  font-size: 0.625rem;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--tb-text) 8%, transparent);
+  transition: filter 0.15s ease, border-color 0.15s ease;
+}
+
+.taskboard .tb-project-timeline-phase:hover {
+  filter: brightness(0.97);
+}
+
+.taskboard .tb-project-timeline-phase:focus-visible {
+  outline: 2px solid var(--tb-accent);
+  outline-offset: 1px;
+}
+
+.taskboard .tb-project-timeline-phase__label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.taskboard .tb-project-timeline-month-band--a {
+  background: color-mix(in srgb, var(--tb-text) 4%, var(--tb-surface));
+}
+
+.taskboard .tb-project-timeline-month-band--b {
+  background: color-mix(in srgb, var(--tb-text) 8%, var(--tb-surface));
+}
+
+[data-theme='dark'].taskboard .tb-project-timeline-month-band--a {
+  background: color-mix(in srgb, var(--tb-text) 6%, var(--tb-surface));
+}
+
+[data-theme='dark'].taskboard .tb-project-timeline-month-band--b {
+  background: color-mix(in srgb, var(--tb-text) 11%, var(--tb-surface));
+}
+
 @media (max-width: 1100px) {
   .taskboard .tb-calendar-week-columns {
     grid-template-columns: repeat(7, minmax(8.5rem, 1fr));
@@ -1469,7 +1526,8 @@ body {
 /* Calendar task chips: color by project (--tb-cal-proj-accent set per tb-cal-project-N) */
 .taskboard .tb-calendar-task[class*='tb-cal-project-'],
 .taskboard .tb-calendar-week-task[class*='tb-cal-project-'],
-.taskboard .tb-calendar-agenda-task[class*='tb-cal-project-'] {
+.taskboard .tb-calendar-agenda-task[class*='tb-cal-project-'],
+.taskboard .tb-project-timeline-phase[class*='tb-cal-project-'] {
   background: color-mix(in srgb, var(--tb-cal-proj-accent) 17%, var(--tb-bg));
   color: color-mix(in srgb, var(--tb-cal-proj-accent) 72%, var(--tb-text));
   border: 1px solid color-mix(in srgb, var(--tb-cal-proj-accent) 38%, var(--tb-border));
@@ -1479,7 +1537,8 @@ body {
 
 .taskboard .tb-calendar-task[class*='tb-cal-project-']:hover,
 .taskboard .tb-calendar-week-task[class*='tb-cal-project-']:hover,
-.taskboard .tb-calendar-agenda-task[class*='tb-cal-project-']:hover {
+.taskboard .tb-calendar-agenda-task[class*='tb-cal-project-']:hover,
+.taskboard .tb-project-timeline-phase[class*='tb-cal-project-']:hover {
   background: color-mix(in srgb, var(--tb-cal-proj-accent) 24%, var(--tb-bg));
   border-color: color-mix(in srgb, var(--tb-cal-proj-accent) 48%, var(--tb-border));
   border-left-color: var(--tb-cal-proj-accent);
@@ -1487,7 +1546,8 @@ body {
 
 [data-theme='dark'].taskboard .tb-calendar-task[class*='tb-cal-project-'],
 [data-theme='dark'].taskboard .tb-calendar-week-task[class*='tb-cal-project-'],
-[data-theme='dark'].taskboard .tb-calendar-agenda-task[class*='tb-cal-project-'] {
+[data-theme='dark'].taskboard .tb-calendar-agenda-task[class*='tb-cal-project-'],
+[data-theme='dark'].taskboard .tb-project-timeline-phase[class*='tb-cal-project-'] {
   background: color-mix(in srgb, var(--tb-cal-proj-accent) 26%, var(--tb-surface));
   color: color-mix(in srgb, var(--tb-cal-proj-accent) 58%, var(--tb-text));
   border-color: color-mix(in srgb, var(--tb-cal-proj-accent) 42%, var(--tb-border));
@@ -1495,7 +1555,8 @@ body {
 
 [data-theme='dark'].taskboard .tb-calendar-task[class*='tb-cal-project-']:hover,
 [data-theme='dark'].taskboard .tb-calendar-week-task[class*='tb-cal-project-']:hover,
-[data-theme='dark'].taskboard .tb-calendar-agenda-task[class*='tb-cal-project-']:hover {
+[data-theme='dark'].taskboard .tb-calendar-agenda-task[class*='tb-cal-project-']:hover,
+[data-theme='dark'].taskboard .tb-project-timeline-phase[class*='tb-cal-project-']:hover {
   background: color-mix(in srgb, var(--tb-cal-proj-accent) 34%, var(--tb-surface));
 }
 

@@ -33,6 +33,8 @@ export interface Task {
   task_name: string;
   description: string;
   assignees: Assignee[];
+  /** When false, skip assignment and attachment emails for this task. */
+  notify_assign_emails: boolean;
   priority: Priority;
   deadline: string | null;
   completed: boolean;
@@ -54,6 +56,7 @@ export type TaskInsert = Pick<Task, 'project_id' | 'category'> &
       | 'task_name'
       | 'description'
       | 'assignees'
+      | 'notify_assign_emails'
       | 'priority'
       | 'deadline'
       | 'sort_order'
@@ -68,6 +71,7 @@ export type TaskUpdate = Partial<
     | 'task_name'
     | 'description'
     | 'assignees'
+    | 'notify_assign_emails'
     | 'priority'
     | 'deadline'
     | 'completed'

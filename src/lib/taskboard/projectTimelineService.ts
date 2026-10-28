@@ -292,3 +292,67 @@ export async function saveProjectTimeline(
 
   return fetchProjectTimeline(projectId);
 }
+
+/** Load timeline state for many projects (calendar timetable view). */
+export async function fetchProjectTimelinesBatch(
+  projectIds: string[]
+): Promise<Map<string, ProjectTimelineState>> {
+  const result = new Map<string, ProjectTimelineState>();
+  const ids = [...new Set(projectIds.filter(Boolean))];
+  if (ids.length === 0) return result;
+
+  for (const id of ids) {
+    result.set(id, { timelineCompleted: false, entries: [] });
+  }
+
+  if (isLocalTaskboardMode()) {
+    const store = loadLocal();
+    for (const id of ids) {
+      result.set(id, store[id] ?? { timelineCompleted: false, entries: [] });
+    }
+    return result;
+  }
+
+  if (!isSupabaseConfigured()) return result;
+
+  const supabase = await db();
+
+  const { data: projectRows, error: projectError } = await supabase
+    .from('projects')
+    .select('id, timeline_completed')
+    .in('id', ids);
+
+  if (projectError && !/timeline_completed|column|schema cache/i.test(projectError.message)) {
+    throw projectError;
+  }
+
+  for (const row of projectRows ?? []) {
+    const id = String(row.id);
+    result.set(id, {
+      timelineCompleted: Boolean(row.timeline_completed),
+      entries: result.get(id)?.entries ?? [],
+    });
+  }
+
+  const { data: entryRows, error: entryError } = await supabase
+    .from('project_timeline_entries')
+    .select('*')
+    .in('project_id', ids)
+    .order('week_start', { ascending: true });
+
+  if (entryError) {
+    if (/project_timeline_entries|relation|schema cache/i.test(entryError.message)) {
+      return result;
+    }
+    throw entryError;
+  }
+
+  for (const row of entryRows ?? []) {
+    const entry = mapEntry(row as Record<string, unknown>);
+    const bucket = result.get(entry.project_id);
+    if (!bucket) continue;
+    bucket.entries.push(entry);
+  }
+
+  return result;
+}

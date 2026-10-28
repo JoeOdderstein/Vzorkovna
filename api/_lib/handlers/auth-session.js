@@ -5,6 +5,7 @@ import {
 } from '../auth.js';
 import { userCanAccessInvoices } from '../invoiceAccess.js';
 import { userCanAccessMessages } from '../messageAccess.js';
+import { userCanEditQuotations } from '../quotationEditAccess.js';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
     const isAdmin = isAdminUsername(username);
     const canAccessInvoices = await userCanAccessInvoices(username, isAdmin);
     const canAccessMessages = await userCanAccessMessages(username, isAdmin);
+    const canEditQuotations = await userCanEditQuotations(username, isAdmin);
     return res.status(200).json({
       authenticated: true,
       accessToken: token,
@@ -29,6 +31,7 @@ export default async function handler(req, res) {
       isAdmin,
       canAccessInvoices,
       canAccessMessages,
+      canEditQuotations,
     });
   } catch {
     return res.status(401).json({ authenticated: false });

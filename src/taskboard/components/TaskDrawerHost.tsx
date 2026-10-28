@@ -149,14 +149,18 @@ export default function TaskDrawerHost() {
       const parent = tasks.find((t) => t.id === parentId);
       if (!parent) return;
 
-      const sub = await createTask({
-        project_id: selected.projectId,
-        category: parent.category,
-        parent_task_id: parentId,
-        assignees: [...parent.assignees],
-        priority: parent.priority,
-        deadline: parent.deadline,
-      });
+      const sub = await createTask(
+        {
+          project_id: selected.projectId,
+          category: parent.category,
+          parent_task_id: parentId,
+          assignees: [...parent.assignees],
+          notify_assign_emails: parent.notify_assign_emails,
+          priority: parent.priority,
+          deadline: parent.deadline,
+        },
+        { skipAssignmentNotify: true }
+      );
       openTask(sub, selected.projectId);
       notifyTaskChange();
     },
