@@ -1655,7 +1655,63 @@ body {
   font: inherit;
 }
 
+.taskboard .quotation-budget-table .quotation-budget-total-col {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  background-color: var(--tb-bg);
+  box-shadow: -8px 0 12px -10px color-mix(in srgb, var(--tb-text) 18%, transparent);
+  min-width: 4.75rem;
+}
+
+.taskboard .quotation-budget-table thead .quotation-budget-total-col {
+  z-index: 4;
+}
+
+.taskboard .quotation-budget-table .quotation-budget-total-col--section {
+  background-color: color-mix(in srgb, var(--tb-text) 5%, var(--tb-surface));
+}
+
+@media (max-width: 1023px) {
+  .taskboard .quotation-budget-table {
+    table-layout: fixed;
+  }
+
+  .taskboard .quotation-budget-table .quotation-budget-unit-col,
+  .taskboard .quotation-budget-table .quotation-budget-qty-col {
+    min-width: 3.25rem;
+    width: 14%;
+  }
+
+  .taskboard .quotation-budget-table .quotation-budget-section-row + .quotation-budget-line-row td,
+  .taskboard .quotation-budget-table .quotation-budget-subtotal-row + .quotation-budget-section-row td {
+    padding-top: 0.15rem;
+  }
+
+  .taskboard .quotation-budget-table .quotation-budget-section-cell {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+}
+
 @media (max-width: 767px) {
+  /* Phones only: hide phase first; iPad (768px+) keeps phase visible. */
+  .taskboard .quotation-budget-table .quotation-budget-phase-col {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    overflow: hidden;
+    visibility: hidden;
+    border: 0 !important;
+  }
+
+  .taskboard .quotation-budget-table .field-input {
+    padding: 0.35rem 0.45rem;
+    font-size: 0.75rem;
+  }
+
   .taskboard {
     --tb-messages-compose-mobile-height: min(92dvh, 40rem);
   }

@@ -22,7 +22,7 @@ export function SectionDropRow({
   return (
     <tr
       ref={setNodeRef}
-      className={`bg-[color-mix(in_srgb,var(--tb-text)_5%,var(--tb-surface))] ${
+      className={`quotation-budget-section-row bg-[color-mix(in_srgb,var(--tb-text)_5%,var(--tb-surface))] ${
         isOver ? 'ring-2 ring-inset ring-[var(--tb-accent)]' : ''
       }`}
     >
@@ -59,9 +59,9 @@ export function DraggableLineRow({
     <tr
       ref={setNodeRef}
       style={style}
-      className={`border-b border-[var(--tb-border)]/60 ${isDragging ? 'bg-[var(--tb-surface)]' : ''}`}
+      className={`quotation-budget-line-row border-b border-[var(--tb-border)]/60 ${isDragging ? 'bg-[var(--tb-surface)]' : ''}`}
     >
-      <td className="py-1 pr-1 align-top w-8">
+      <td className="py-0.5 md:py-1 pr-0.5 md:pr-1 align-top w-7 lg:w-8">
         <button
           type="button"
           className="p-1 rounded tb-muted hover:tb-text cursor-grab active:cursor-grabbing touch-none"
@@ -73,7 +73,7 @@ export function DraggableLineRow({
         </button>
       </td>
       {children}
-      <td className="py-1 align-top w-32">
+      <td className="quotation-budget-total-col py-0.5 md:py-1 align-top w-[4.5rem] lg:w-32">
         <div className="flex items-start justify-end gap-1">
           <span className="tabular-nums text-right flex-1 pt-1.5">{formatQuotationMoney(total, currency)}</span>
           <button
@@ -106,18 +106,24 @@ export function LineRowCells({ line, index, phaseOptions, onPatch, t, readOnly =
   if (readOnly) {
     return (
       <>
-        <td className="py-1 pr-2 align-top w-44 text-xs tb-muted">{phaseLabel}</td>
-        <td className="py-1 pr-2 align-top text-xs">{line.label ?? ''}</td>
-        <td className="py-1 pr-2 align-top w-[28%] text-xs tb-muted">{line.notes ?? ''}</td>
-        <td className="py-1 pr-2 align-top w-24 text-xs text-right tabular-nums">{line.unit_price ?? ''}</td>
-        <td className="py-1 pr-2 align-top w-20 text-xs text-right tabular-nums">{line.quantity ?? ''}</td>
+        <td className="quotation-budget-phase-col py-0.5 md:py-1 pr-1 md:pr-2 align-top w-28 lg:w-44 text-xs tb-muted">
+          {phaseLabel}
+        </td>
+        <td className="py-0.5 md:py-1 pr-1 md:pr-2 align-top text-xs min-w-[5rem]">{line.label ?? ''}</td>
+        <td className="py-0.5 md:py-1 pr-1 md:pr-2 align-top w-[18%] lg:w-[28%] text-xs tb-muted">{line.notes ?? ''}</td>
+        <td className="quotation-budget-unit-col py-0.5 md:py-1 pr-1 md:pr-2 align-top w-16 lg:w-24 text-xs text-right tabular-nums">
+          {line.unit_price ?? ''}
+        </td>
+        <td className="quotation-budget-qty-col py-0.5 md:py-1 pr-1 md:pr-2 align-top w-14 lg:w-20 text-xs text-right tabular-nums">
+          {line.quantity ?? ''}
+        </td>
       </>
     );
   }
 
   return (
     <>
-      <td className="py-1 pr-2 align-top w-44">
+      <td className="quotation-budget-phase-col py-0.5 md:py-1 pr-1 md:pr-2 align-top w-28 lg:w-44">
         <select
           value={line.timeline_entry_id ?? ''}
           onChange={(e) =>
@@ -135,21 +141,21 @@ export function LineRowCells({ line, index, phaseOptions, onPatch, t, readOnly =
           ))}
         </select>
       </td>
-      <td className="py-1 pr-2 align-top">
+      <td className="py-0.5 md:py-1 pr-1 md:pr-2 align-top min-w-[5rem]">
         <input
           value={line.label ?? ''}
           onChange={(e) => onPatch(index, { label: e.target.value })}
           className="field-input text-xs w-full"
         />
       </td>
-      <td className="py-1 pr-2 align-top w-[28%]">
+      <td className="py-0.5 md:py-1 pr-1 md:pr-2 align-top w-[18%] lg:w-[28%]">
         <input
           value={line.notes ?? ''}
           onChange={(e) => onPatch(index, { notes: e.target.value })}
           className="field-input text-xs w-full"
         />
       </td>
-      <td className="py-1 pr-2 align-top w-24">
+      <td className="quotation-budget-unit-col py-0.5 md:py-1 pr-1 md:pr-2 align-top w-16 lg:w-24">
         <input
           type="number"
           step="0.01"
@@ -162,7 +168,7 @@ export function LineRowCells({ line, index, phaseOptions, onPatch, t, readOnly =
           className="field-input text-xs w-full text-right"
         />
       </td>
-      <td className="py-1 pr-2 align-top w-20">
+      <td className="quotation-budget-qty-col py-0.5 md:py-1 pr-1 md:pr-2 align-top w-14 lg:w-20">
         <input
           type="number"
           step="0.01"

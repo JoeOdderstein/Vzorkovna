@@ -451,6 +451,8 @@ const en = {
   'quotations.removeLine': 'Remove line',
   'quotations.viewBudget': 'View',
   'quotations.viewOnlyBadge': 'View only',
+  'quotations.downloadPdf': 'Download PDF',
+  'quotations.downloadPdfError': 'Could not create PDF. Try again.',
   'quotations.budgetShare': 'Copy link to this budget',
   'quotations.budgetShareCopied': 'Link copied. Anyone with invoice access can open it after signing in.',
   'quotations.budgetDuplicate': 'Duplicate',
@@ -1059,6 +1061,8 @@ const uk: Record<MessageKey, string> = {
   'quotations.removeLine': 'Видалити рядок',
   'quotations.viewBudget': 'Переглянути',
   'quotations.viewOnlyBadge': 'Лише перегляд',
+  'quotations.downloadPdf': 'Завантажити PDF',
+  'quotations.downloadPdfError': 'Не вдалося створити PDF. Спробуйте ще раз.',
   'quotations.budgetShare': 'Копіювати посилання на бюджет',
   'quotations.budgetShareCopied':
     'Посилання скопійовано. Усі з доступом до рахунків зможуть відкрити його після входу.',

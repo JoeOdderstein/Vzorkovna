@@ -1,8 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Archive, ArchiveRestore, Copy, Eye, FileSpreadsheet, Link2, Pencil, Plus, Trash2 } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  Copy,
+  Eye,
+  FileDown,
+  FileSpreadsheet,
+  Link2,
+  Pencil,
+  Plus,
+  Trash2,
+} from 'lucide-react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { fetchProjectTimeline } from '../../lib/taskboard/projectTimelineService';
+import { timelineBlockPlainLabel } from '../../lib/taskboard/projectTimelineUtils';
 import { fetchVisibleProjects } from '../../lib/taskboard/taskService';
+import { downloadQuotationBudgetPdf } from '../../lib/quotations/downloadQuotationBudgetPdf';
 import type { Project } from '../../lib/taskboard/types';
 import { parseBudgetXlsxToDraft } from '../../lib/quotations/parseBudgetXlsx';
 import { draftEmptyQuotation } from '../../lib/quotations/emptyQuotationDraft';
@@ -250,6 +264,35 @@ export default function QuotationBudgetSection({
     }
   };
 
+  const downloadBudgetPdf = async (row: ProjectQuotation) => {
+    setBusyId(row.id);
+    setError('');
+    try {
+      const full = row.lines?.length ? row : await fetchProjectQuotation(row.id);
+      const timeline = await fetchProjectTimeline(full.project_id);
+      const phaseById = new Map(
+        timeline.entries.map((entry) => [
+          entry.id,
+          timelineBlockPlainLabel(entry.name) || t('quotations.phaseNone'),
+        ]),
+      );
+      await downloadQuotationBudgetPdf({
+        title: full.title,
+        subtitle: full.subtitle,
+        projectName: full.project?.name ?? projects.find((p) => p.id === full.project_id)?.name ?? '—',
+        currency: full.currency || 'EUR',
+        dayRate: full.day_rate,
+        contingencyRate: full.contingency_rate,
+        lines: full.lines ?? [],
+        phaseLabelFor: (id) => (id ? phaseById.get(id) ?? t('quotations.phaseNone') : t('quotations.phaseNone')),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t('quotations.downloadPdfError'));
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const copyBudgetLink = async (row: ProjectQuotation) => {
     setShareNotice('');
     const url = quotationBudgetShareUrl(row.id);
@@ -304,6 +347,16 @@ export default function QuotationBudgetSection({
             title={t('quotations.budgetShare')}
           >
             <Link2 size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            className="tb-btn-secondary p-2"
+            disabled={busy}
+            onClick={() => void downloadBudgetPdf(row)}
+            aria-label={t('quotations.downloadPdf')}
+            title={t('quotations.downloadPdf')}
+          >
+            <FileDown size={16} aria-hidden />
           </button>
           {canEditQuotations && !isArchived ? (
             <>
