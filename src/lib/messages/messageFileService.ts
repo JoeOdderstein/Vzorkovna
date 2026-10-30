@@ -1,3 +1,4 @@
+import { sanitizeInvoiceFileName } from '../invoices/invoiceUploadRules';
 import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { isLocalTaskboardMode } from '../taskboard/taskService';
 import { getAttachmentUrl } from '../taskboard/taskService';
@@ -9,11 +10,6 @@ const BLOCKED_EXTENSIONS = new Set(['exe', 'bat', 'cmd', 'sh', 'msi', 'scr', 'co
 function safeUsernameSegment(username: string): string {
   const cleaned = username.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
   return cleaned || 'user';
-}
-
-function safeFileBaseName(name: string): string {
-  const base = name.replace(/[/\\?%*:|"<>]/g, '_').trim();
-  return base.slice(0, 120) || 'file';
 }
 
 function extensionFromFileName(name: string): string {
@@ -46,7 +42,7 @@ export async function uploadMessageFile(
   }
 
   const segment = safeUsernameSegment(username);
-  const safeName = safeFileBaseName(file.name);
+  const safeName = sanitizeInvoiceFileName(file.name, 'attachment');
   const path = `messages/${segment}/${crypto.randomUUID()}-${safeName}`;
 
   const { error: uploadError } = await (await db())
