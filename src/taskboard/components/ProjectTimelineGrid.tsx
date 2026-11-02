@@ -8,6 +8,9 @@ import {
   timelineBlockPlainLabel,
   timelineBlockWeekSpan,
   timelineInitialScrollWeekIndex,
+  PROJECT_TIMELINE_ROW_MIN_PX,
+  isTimelinePhase,
+  isTimelineVisit,
   type TimelineWeekSlot,
 } from '../../lib/taskboard/projectTimelineUtils';
 import type { ProjectTimelineEntry } from '../../lib/taskboard/projectTimelineService';
@@ -17,13 +20,18 @@ import {
 } from '../../lib/taskboard/calendarProjectColors';
 import type { TimelineBlockDetail } from './ProjectTimelineBlockDetailDialog';
 
-const WEEK_COL_PX = 38;
+const WEEK_COL_PX_DEFAULT = 38;
+const WEEK_COL_PX_COMPACT = 52;
 const LABEL_COL_WIDTH = '9rem';
+/** Visit blocks may extend past week column borders for readability. */
+const VISIT_WEEK_BLEED_PX = 6;
+const PHASE_BLOCK_INSET_PX = 2;
 
 interface ProjectTimelineGridProps {
   projects: Project[];
   timelines: Map<string, ProjectTimelineState>;
   weekSlots: TimelineWeekSlot[];
+  compactViewport?: boolean;
   onSelectBlock: (detail: TimelineBlockDetail) => void;
 }
 
@@ -31,8 +39,10 @@ export default function ProjectTimelineGrid({
   projects,
   timelines,
   weekSlots,
+  compactViewport = false,
   onSelectBlock,
 }: ProjectTimelineGridProps) {
+  const weekColPx = compactViewport ? WEEK_COL_PX_COMPACT : WEEK_COL_PX_DEFAULT;
   const weekKeys = useMemo(() => weekSlots.map((s) => s.weekStartKey), [weekSlots]);
   const monthBands = useMemo(() => buildTimelineMonthBands(weekSlots), [weekSlots]);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -46,33 +56,48 @@ export default function ProjectTimelineGrid({
   }, [weekSlots, weekKeys]);
 
   useEffect(() => {
+    didInitialScroll.current = false;
+  }, [weekSlots]);
+
+  useEffect(() => {
     if (didInitialScroll.current || monthBands.length === 0) return;
     const el = scrollRef.current;
     if (!el) return;
-    const weekIndex = timelineInitialScrollWeekIndex(monthBands, weekSlots);
-    el.scrollLeft = Math.max(0, weekIndex * WEEK_COL_PX);
+    if (compactViewport) {
+      const weekIndex = timelineInitialScrollWeekIndex(weekSlots);
+      el.scrollLeft = weekIndex * weekColPx;
+    } else {
+      el.scrollLeft = 0;
+    }
     didInitialScroll.current = true;
-  }, [monthBands, weekSlots]);
+  }, [monthBands, weekSlots, weekColPx, compactViewport]);
 
   const colorIndexByProject = useMemo(() => buildProjectCalendarColorIndex(projects), [projects]);
 
   const rows = useMemo(() => {
     return projects.map((project) => {
       const state = timelines.get(project.id);
-      const blocks = (state?.entries ?? [])
-        .filter((e) => timelineBlockHasContent({ name: e.name, description: e.description }))
-        .sort((a, b) => {
-          const byStart = a.week_start.localeCompare(b.week_start);
-          if (byStart !== 0) return byStart;
-          return a.week_end.localeCompare(b.week_end);
-        })
-        .map((entry: ProjectTimelineEntry) => ({
-          entry,
-          span: timelineBlockWeekSpan(entry.week_start, entry.week_end, weekKeys),
-        }));
+      const withContent = (state?.entries ?? []).filter((e) =>
+        timelineBlockHasContent({ name: e.name, description: e.description }),
+      );
 
-      return { project, blocks, completed: state?.timelineCompleted ?? false };
-    }).filter((row) => row.blocks.length > 0);
+      const mapBlocks = (entries: ProjectTimelineEntry[]) =>
+        entries
+          .sort((a, b) => {
+            const byStart = a.week_start.localeCompare(b.week_start);
+            if (byStart !== 0) return byStart;
+            return a.week_end.localeCompare(b.week_end);
+          })
+          .map((entry) => ({
+            entry,
+            span: timelineBlockWeekSpan(entry.week_start, entry.week_end, weekSlots),
+          }));
+
+      const phases = mapBlocks(withContent.filter((e) => isTimelinePhase(e)));
+      const visits = mapBlocks(withContent.filter((e) => isTimelineVisit(e)));
+
+      return { project, phases, visits, completed: state?.timelineCompleted ?? false };
+    }).filter((row) => row.phases.length > 0 || row.visits.length > 0);
   }, [projects, timelines, weekKeys]);
 
   if (rows.length === 0) return null;
@@ -97,7 +122,7 @@ export default function ProjectTimelineGrid({
           />
           <div
             className="flex shrink-0 border-b border-[var(--tb-border)]"
-            style={{ gridColumn: 2, gridRow: 1, width: weekSlots.length * WEEK_COL_PX }}
+            style={{ gridColumn: 2, gridRow: 1, width: weekSlots.length * weekColPx }}
           >
             {monthBands.map((band, bandIndex) => (
               <div
@@ -107,7 +132,7 @@ export default function ProjectTimelineGrid({
                     ? 'tb-project-timeline-month-band--a'
                     : 'tb-project-timeline-month-band--b'
                 }`}
-                style={{ width: band.span * WEEK_COL_PX }}
+                style={{ width: band.span * weekColPx }}
                 title={band.label}
               >
                 <span className="text-[11px] font-semibold tb-text leading-tight tracking-tight">
@@ -118,7 +143,7 @@ export default function ProjectTimelineGrid({
           </div>
           <div
             className="flex shrink-0"
-            style={{ gridColumn: 2, gridRow: 2, width: weekSlots.length * WEEK_COL_PX }}
+            style={{ gridColumn: 2, gridRow: 2, width: weekSlots.length * weekColPx }}
           >
             {weekSlots.map((slot) => {
               const isCurrent = slot.weekStartKey === todayKey;
@@ -128,7 +153,7 @@ export default function ProjectTimelineGrid({
                   className={`shrink-0 px-0.5 py-1 text-center border-r border-[var(--tb-border)] last:border-r-0 ${
                     isCurrent ? 'bg-[color-mix(in_srgb,var(--tb-accent)_12%,transparent)]' : ''
                   }`}
-                  style={{ width: WEEK_COL_PX }}
+                  style={{ width: weekColPx }}
                   title={slot.label}
                 >
                   <span className="block text-[10px] font-semibold tb-text leading-none">
@@ -146,14 +171,65 @@ export default function ProjectTimelineGrid({
           </div>
         </div>
 
-        {rows.map(({ project, blocks, completed }) => {
+        {rows.map(({ project, phases, visits, completed }) => {
           const colorClass = projectCalendarColorClassForId(project.id, colorIndexByProject);
-          const trackWidth = weekSlots.length * WEEK_COL_PX;
+          const trackWidth = weekSlots.length * weekColPx;
+
+          const renderBlock = (
+            entry: ProjectTimelineEntry,
+            span: NonNullable<ReturnType<typeof timelineBlockWeekSpan>>,
+            variant: 'phase' | 'visit',
+          ) => {
+            const label = timelineBlockPlainLabel(entry.name);
+            const className =
+              variant === 'phase'
+                ? `tb-project-timeline-phase ${colorClass}`
+                : `tb-project-timeline-visit ${colorClass}`;
+            const blockLeft =
+              variant === 'visit'
+                ? span.startIndex * weekColPx - VISIT_WEEK_BLEED_PX
+                : span.startIndex * weekColPx + PHASE_BLOCK_INSET_PX;
+            const blockWidth =
+              variant === 'visit'
+                ? span.span * weekColPx + VISIT_WEEK_BLEED_PX * 2
+                : span.span * weekColPx - PHASE_BLOCK_INSET_PX * 2;
+
+            return (
+              <button
+                key={entry.id}
+                type="button"
+                className={`${className} absolute`}
+                style={{
+                  left: blockLeft,
+                  width: blockWidth,
+                  maxWidth: variant === 'phase' ? blockWidth : undefined,
+                }}
+                title={label}
+                onClick={() =>
+                  onSelectBlock({
+                    projectName: project.name,
+                    entry,
+                  })
+                }
+              >
+                <span
+                  className={
+                    variant === 'phase'
+                      ? 'tb-project-timeline-phase__label'
+                      : 'tb-project-timeline-visit__label'
+                  }
+                >
+                  {label}
+                </span>
+              </button>
+            );
+          };
 
           return (
             <div
               key={project.id}
-              className="flex border-b border-[var(--tb-border)] last:border-b-0 min-h-[2.75rem]"
+              className="flex border-b border-[var(--tb-border)] last:border-b-0 tb-project-timeline-row"
+              style={{ minHeight: PROJECT_TIMELINE_ROW_MIN_PX }}
             >
               <div
                 className={`sticky left-0 z-10 flex shrink-0 items-center px-2 py-1.5 text-xs font-bold border-r border-[var(--tb-border)] bg-[var(--tb-surface)] ${
@@ -162,12 +238,12 @@ export default function ProjectTimelineGrid({
                 style={{ width: LABEL_COL_WIDTH }}
                 title={project.name}
               >
-                <span className="line-clamp-2 leading-snug">{project.name}</span>
+                <span className="line-clamp-3 leading-snug">{project.name}</span>
               </div>
 
               <div
-                className="relative shrink-0 min-h-[2.75rem]"
-                style={{ width: trackWidth }}
+                className="relative shrink-0 tb-project-timeline-track"
+                style={{ width: trackWidth, minHeight: PROJECT_TIMELINE_ROW_MIN_PX }}
               >
                 <div className="absolute inset-0 flex pointer-events-none">
                   {weekSlots.map((slot) => (
@@ -178,36 +254,13 @@ export default function ProjectTimelineGrid({
                           ? 'bg-[color-mix(in_srgb,var(--tb-accent)_6%,transparent)]'
                           : ''
                       }`}
-                      style={{ width: WEEK_COL_PX }}
+                      style={{ width: weekColPx }}
                     />
                   ))}
                 </div>
 
-                {blocks.map(({ entry, span }) => {
-                  if (!span) return null;
-                  const label = timelineBlockPlainLabel(entry.name);
-                  return (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      className={`tb-project-timeline-phase absolute top-1 bottom-1 ${colorClass}`}
-                      style={{
-                        left: span.startIndex * WEEK_COL_PX + 2,
-                        width: span.span * WEEK_COL_PX - 4,
-                        maxWidth: span.span * WEEK_COL_PX - 4,
-                      }}
-                      title={label}
-                      onClick={() =>
-                        onSelectBlock({
-                          projectName: project.name,
-                          entry,
-                        })
-                      }
-                    >
-                      <span className="tb-project-timeline-phase__label">{label}</span>
-                    </button>
-                  );
-                })}
+                {phases.map(({ entry, span }) => (span ? renderBlock(entry, span, 'phase') : null))}
+                {visits.map(({ entry, span }) => (span ? renderBlock(entry, span, 'visit') : null))}
               </div>
             </div>
           );

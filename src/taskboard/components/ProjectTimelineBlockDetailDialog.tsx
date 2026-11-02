@@ -10,12 +10,10 @@ import {
 } from '../../lib/quotations/quotationBudgetService';
 import { quotationBudgetPath } from '../../lib/quotations/quotationBudgetUrl';
 import type { ProjectTimelineEntry } from '../../lib/taskboard/projectTimelineService';
+import { formatDateRange } from '../../lib/taskboard/deadlineUtils';
 import {
-  formatTimelineWeekStartDate,
-  isoWeekNumber,
+  timelineBlockDateRange,
   timelineBlockPlainLabel,
-  timelineSlotsInBlockRange,
-  type TimelineWeekSlot,
 } from '../../lib/taskboard/projectTimelineUtils';
 import ProjectTimelineRichText from './ProjectTimelineRichText';
 
@@ -26,13 +24,11 @@ export type TimelineBlockDetail = {
 
 interface ProjectTimelineBlockDetailDialogProps {
   detail: TimelineBlockDetail | null;
-  weekSlots: TimelineWeekSlot[];
   onClose: () => void;
 }
 
 export default function ProjectTimelineBlockDetailDialog({
   detail,
-  weekSlots,
   onClose,
 }: ProjectTimelineBlockDetailDialogProps) {
   const { t } = useTaskboardI18n();
@@ -66,6 +62,13 @@ export default function ProjectTimelineBlockDetailDialog({
       return;
     }
 
+    if (detail.entry.entry_kind === 'visit') {
+      setQuotationGroups([]);
+      setQuotationError('');
+      setQuotationLoading(false);
+      return;
+    }
+
     let cancelled = false;
     setQuotationLoading(true);
     setQuotationError('');
@@ -90,23 +93,8 @@ export default function ProjectTimelineBlockDetailDialog({
 
   if (!detail) return null;
 
-  const slots = timelineSlotsInBlockRange(
-    detail.entry.week_start,
-    detail.entry.week_end,
-    weekSlots
-  );
-  const weekLabel =
-    slots.length === 1
-      ? formatMessage(t('calendar.projectTimelineWeekLine'), {
-          number: String(isoWeekNumber(slots[0].weekStart)),
-          date: formatTimelineWeekStartDate(slots[0].weekStart),
-        })
-      : slots.length > 1
-        ? `${formatMessage(t('calendar.projectTimelineWeekLine'), {
-            number: String(isoWeekNumber(slots[0].weekStart)),
-            date: formatTimelineWeekStartDate(slots[0].weekStart),
-          })} – ${formatTimelineWeekStartDate(slots[slots.length - 1].weekStart)}`
-        : '';
+  const range = timelineBlockDateRange(detail.entry);
+  const weekLabel = formatDateRange(range.start, range.end);
 
   const phasePlainName = timelineBlockPlainLabel(detail.entry.name).trim() || '—';
   const quotationHeading = `${t('calendar.projectTimelinePhaseQuotation')} · ${phasePlainName} · ${detail.projectName}`;

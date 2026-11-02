@@ -66,6 +66,8 @@ export interface Installation {
   taskboard_project_id: string | null;
   /** Supabase storage path for project header banner image. */
   header_image_path: string | null;
+  /** Vertical crop anchor for header image (0 top … 100 bottom). */
+  header_image_focus_y: number;
   sort_order: number;
   created_at: string;
   updated_at: string;

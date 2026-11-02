@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, ImageIcon, Trash2, Upload } from 'lucide-react';
+import { Camera, ChevronDown, ChevronUp, ImageIcon, Trash2, Upload } from 'lucide-react';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import {
   clearInstallationHeaderImage,
   getInstallationHeaderImageUrl,
+  updateInstallationHeaderImageFocusY,
   uploadInstallationHeaderImage,
 } from '../../lib/installations/installationHeaderImageService';
+import { clampHeaderImageFocusY } from '../../lib/installations/installationService';
 
 interface InstallationProjectHeaderProps {
   installationId: string;
   headerImagePath: string | null;
+  headerImageFocusY?: number;
   projectName: string;
   variant: 'detail' | 'card';
   /** Overview card: image fills the entire block behind the title. */
@@ -22,6 +25,7 @@ interface InstallationProjectHeaderProps {
 export default function InstallationProjectHeader({
   installationId,
   headerImagePath,
+  headerImageFocusY = 50,
   projectName,
   variant,
   cover = false,
@@ -29,10 +33,16 @@ export default function InstallationProjectHeader({
   isAdmin = false,
 }: InstallationProjectHeaderProps) {
   const { t } = useTaskboardI18n();
+  const canManageHeaderPhoto = isAdmin && variant === 'detail';
   const inputRef = useRef<HTMLInputElement>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [focusY, setFocusY] = useState(() => clampHeaderImageFocusY(headerImageFocusY));
+  const saveFocusTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingFocusSaveRef = useRef<number | null>(null);
+
+  const imageVariant = variant === 'card' ? 'card' : 'detail';
 
   useEffect(() => {
     let cancelled = false;
@@ -40,17 +50,28 @@ export default function InstallationProjectHeader({
       setImageUrl(null);
       return;
     }
-    void getInstallationHeaderImageUrl(headerImagePath).then((url) => {
+    void getInstallationHeaderImageUrl(headerImagePath, imageVariant).then((url) => {
       if (!cancelled) setImageUrl(url);
     });
     return () => {
       cancelled = true;
     };
-  }, [headerImagePath]);
+  }, [headerImagePath, imageVariant]);
 
-  const showPlaceholder = isAdmin && !imageUrl && !uploading;
+  useEffect(() => {
+    setFocusY(clampHeaderImageFocusY(headerImageFocusY));
+  }, [installationId, headerImagePath]);
 
-  if (!cover && !integrated && !isAdmin && !imageUrl) return null;
+  useEffect(
+    () => () => {
+      if (saveFocusTimerRef.current) clearTimeout(saveFocusTimerRef.current);
+    },
+    [],
+  );
+
+  const showPlaceholder = canManageHeaderPhoto && !imageUrl && !uploading;
+
+  if (!cover && !integrated && !canManageHeaderPhoto && !imageUrl) return null;
 
   const handleFiles = async (files: FileList | null) => {
     const file = files?.[0];
@@ -91,6 +112,26 @@ export default function InstallationProjectHeader({
     inputRef.current?.click();
   };
 
+  const adjustFocus = (delta: number, event: React.MouseEvent) => {
+    event.preventDefault();
+    event.stopPropagation();
+    const next = clampHeaderImageFocusY(focusY + delta);
+    if (next === focusY) return;
+    setFocusY(next);
+    setError('');
+    pendingFocusSaveRef.current = next;
+    if (saveFocusTimerRef.current) clearTimeout(saveFocusTimerRef.current);
+    saveFocusTimerRef.current = setTimeout(() => {
+      const toSave = pendingFocusSaveRef.current;
+      if (toSave == null) return;
+      void updateInstallationHeaderImageFocusY(installationId, toSave).catch((err) => {
+        setError(err instanceof Error ? err.message : t('projects.header.positionFailed'));
+      });
+    }, 350);
+  };
+
+  const focusPosition = `center ${focusY}%`;
+
   const frameClass =
     variant === 'detail'
       ? [
@@ -106,8 +147,10 @@ export default function InstallationProjectHeader({
           .filter(Boolean)
           .join(' ');
 
+  const awaitingImage = Boolean(headerImagePath) && !imageUrl && !uploading;
+
   return (
-    <div className={frameClass}>
+    <div className={`${frameClass}${awaitingImage ? ' tb-installation-header--loading' : ''}`}>
       <input
         ref={inputRef}
         type="file"
@@ -122,10 +165,36 @@ export default function InstallationProjectHeader({
             src={imageUrl}
             alt=""
             className="tb-installation-header__img"
-            loading={variant === 'card' ? 'lazy' : 'eager'}
+            style={{ objectPosition: focusPosition }}
+            loading={integrated || variant !== 'card' ? 'eager' : 'lazy'}
+            decoding="async"
+            fetchPriority={integrated ? 'high' : variant === 'card' ? 'low' : 'high'}
           />
-          {isAdmin ? (
-            <div className="tb-installation-header__admin">
+          {canManageHeaderPhoto ? (
+            <>
+              <div className="tb-installation-header__position">
+                <button
+                  type="button"
+                  className="tb-installation-header__admin-btn"
+                  disabled={uploading || focusY <= 0}
+                  onClick={(e) => adjustFocus(-5, e)}
+                  aria-label={t('projects.header.moveUp')}
+                  title={t('projects.header.moveUp')}
+                >
+                  <ChevronUp size={14} aria-hidden />
+                </button>
+                <button
+                  type="button"
+                  className="tb-installation-header__admin-btn"
+                  disabled={uploading || focusY >= 100}
+                  onClick={(e) => adjustFocus(5, e)}
+                  aria-label={t('projects.header.moveDown')}
+                  title={t('projects.header.moveDown')}
+                >
+                  <ChevronDown size={14} aria-hidden />
+                </button>
+              </div>
+              <div className="tb-installation-header__admin">
               <button
                 type="button"
                 className="tb-installation-header__admin-btn"
@@ -151,6 +220,7 @@ export default function InstallationProjectHeader({
                 <span className={variant === 'card' ? 'sr-only' : undefined}>{t('common.remove')}</span>
               </button>
             </div>
+            </>
           ) : null}
         </>
       ) : showPlaceholder ? (

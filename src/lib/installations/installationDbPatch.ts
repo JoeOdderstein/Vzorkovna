@@ -5,6 +5,7 @@ const OPTIONAL_INSTALLATION_COLUMNS = [
   'lifecycle_status_manual_override',
   'taskboard_project_id',
   'header_image_path',
+  'header_image_focus_y',
 ] as const;
 
 function isMissingColumnError(message: string, column: string): boolean {

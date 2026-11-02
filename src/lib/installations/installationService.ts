@@ -41,6 +41,12 @@ function sortByOrder<T extends { sort_order: number }>(rows: T[]) {
   return [...rows].sort((a, b) => a.sort_order - b.sort_order);
 }
 
+export function clampHeaderImageFocusY(value: unknown): number {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 50;
+  return Math.max(0, Math.min(100, Math.round(n)));
+}
+
 function normalizeInstallation(row: Record<string, unknown>): InstallationRecord {
   return {
     id: String(row.id),
@@ -57,6 +63,7 @@ function normalizeInstallation(row: Record<string, unknown>): InstallationRecord
       ? String(row.taskboard_project_id)
       : null,
     header_image_path: row.header_image_path ? String(row.header_image_path) : null,
+    header_image_focus_y: clampHeaderImageFocusY(row.header_image_focus_y),
     location: (row.location as InstallationRecord['location']) ?? 'vzorkovna',
     sort_order: Number(row.sort_order ?? 0),
     created_at: String(row.created_at ?? ''),
@@ -212,6 +219,7 @@ export type InstallationUpdatePatch = Partial<
     | 'remote_url'
     | 'taskboard_project_id'
     | 'header_image_path'
+    | 'header_image_focus_y'
   >
 >;
 
@@ -229,6 +237,9 @@ export async function updateInstallationFields(
   if (cleaned.taskboard_project_id === '') cleaned.taskboard_project_id = null;
   if (cleaned.last_inspection_date === '') cleaned.last_inspection_date = null;
   if (cleaned.next_maintenance_date === '') cleaned.next_maintenance_date = null;
+  if (cleaned.header_image_focus_y !== undefined) {
+    cleaned.header_image_focus_y = clampHeaderImageFocusY(cleaned.header_image_focus_y);
+  }
 
   const localPatch: Record<string, unknown> = { ...cleaned };
   if (cleaned.lifecycle_status !== undefined) {
@@ -540,6 +551,7 @@ export async function createInstallation(
     remote_url: null,
     taskboard_project_id: null,
     header_image_path: null,
+    header_image_focus_y: 50,
     sort_order,
     created_at: now,
     updated_at: now,

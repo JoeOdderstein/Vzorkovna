@@ -1,12 +1,32 @@
-import { isSupabaseConfigured } from '../taskboard/config';
 import { getSupabase, ensureSupabaseSession } from '../supabase';
-import { notifyInstallationsUpdated } from './localInstallationOverrides';
+import {
+  mergeLocalInstallationPatch,
+  notifyInstallationsUpdated,
+} from './localInstallationOverrides';
 import { isPhotoFile } from './installationDocumentService';
-import { getAttachmentUrl } from '../taskboard/taskService';
+import {
+  getAttachmentUrl,
+  prefetchAttachmentUrls,
+  type AttachmentUrlTransform,
+} from '../taskboard/taskService';
+import { isSupabaseConfigured } from '../taskboard/config';
+import { clampHeaderImageFocusY } from './installationService';
 import { patchInstallationRow } from './installationDbPatch';
 import type { InstallationRecord } from './types';
 
 const MAX_HEADER_IMAGE_BYTES = 8 * 1024 * 1024;
+
+export type InstallationHeaderImageVariant = 'card' | 'detail';
+
+const HEADER_IMAGE_TRANSFORMS: Record<
+  InstallationHeaderImageVariant,
+  AttachmentUrlTransform | undefined
+> = {
+  /** Overview cards: smaller file, enough for ~400px-wide tiles @2x. */
+  card: { width: 800, height: 520, resize: 'cover', quality: 80 },
+  /** Original file from storage — no resize/crop (banner framing is CSS only). */
+  detail: undefined,
+};
 
 function sanitizeStem(name: string) {
   const stem = name.replace(/\.[^.]+$/, '').trim() || 'header';
@@ -15,10 +35,41 @@ function sanitizeStem(name: string) {
 
 export async function getInstallationHeaderImageUrl(
   storagePath: string | null | undefined,
+  variant: InstallationHeaderImageVariant = 'detail',
 ): Promise<string | null> {
   if (!storagePath) return null;
   if (storagePath.startsWith('data:')) return storagePath;
-  return getAttachmentUrl(storagePath);
+
+  if (variant === 'detail') {
+    return getAttachmentUrl(storagePath);
+  }
+
+  const transform = HEADER_IMAGE_TRANSFORMS.card;
+  try {
+    return await getAttachmentUrl(storagePath, { transform });
+  } catch {
+    return getAttachmentUrl(storagePath);
+  }
+}
+
+export async function updateInstallationHeaderImageFocusY(
+  installationId: string,
+  focusY: number,
+): Promise<void> {
+  const header_image_focus_y = clampHeaderImageFocusY(focusY);
+  if (isSupabaseConfigured()) {
+    await patchInstallationRow(installationId, { header_image_focus_y });
+  }
+  mergeLocalInstallationPatch(installationId, { header_image_focus_y });
+  /* No global refresh — avoids banner/layout flicker; position is already live in the UI. */
+}
+
+export function prefetchInstallationHeaderImageUrls(
+  storagePaths: Iterable<string | null | undefined>,
+  variant: InstallationHeaderImageVariant = 'card',
+): void {
+  const transform = HEADER_IMAGE_TRANSFORMS[variant];
+  prefetchAttachmentUrls(storagePaths, transform);
 }
 
 export async function uploadInstallationHeaderImage(

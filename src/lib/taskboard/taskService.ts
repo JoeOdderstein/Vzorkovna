@@ -18,6 +18,10 @@ import {
 import { seedDefaultCategoriesForProject } from './categoryService';
 import { notifyTaskAssignment } from './notifyAssignment';
 import { syncBugFromTaskCompletion } from '../installations/bugReportTaskSync';
+import {
+  resolveAttachmentUrl,
+  type AttachmentUrlTransform,
+} from './attachmentUrlCache';
 
 export function isLocalTaskboardMode() {
   return !isSupabaseConfigured();
@@ -713,17 +717,15 @@ export async function uploadAttachment(file: File, taskId: string) {
   return { path, name: file.name };
 }
 
-export async function getAttachmentUrl(path: string) {
-  if (isLocalTaskboardMode()) throw new Error('Attachments require Supabase.');
-
-  const { data, error } = await (await db())
-    .storage
-    .from('task-attachments')
-    .createSignedUrl(path, 3600);
-
-  if (error) throw error;
-  return data.signedUrl;
+export async function getAttachmentUrl(
+  path: string,
+  options?: { transform?: AttachmentUrlTransform },
+) {
+  return resolveAttachmentUrl(path, options?.transform);
 }
+
+export type { AttachmentUrlTransform } from './attachmentUrlCache';
+export { prefetchAttachmentUrls } from './attachmentUrlCache';
 
 export function subscribeToProjectTasks(projectId: string, onChange: () => void) {
   if (isLocalTaskboardMode()) return localStore.subscribe(projectId, onChange);

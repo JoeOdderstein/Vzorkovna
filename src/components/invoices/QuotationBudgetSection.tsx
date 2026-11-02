@@ -63,9 +63,9 @@ export default function QuotationBudgetSection({
   }, []);
 
   const loadArchived = useCallback(() => {
-    if (!isAdmin) return Promise.resolve([] as ProjectQuotation[]);
+    if (!canEditQuotations) return Promise.resolve([] as ProjectQuotation[]);
     return listProjectQuotations({ archived: true });
-  }, [isAdmin]);
+  }, [canEditQuotations]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -214,7 +214,7 @@ export default function QuotationBudgetSection({
   };
 
   const handleArchive = async (row: ProjectQuotation) => {
-    if (!isAdmin) return;
+    if (!canEditQuotations) return;
     if (!window.confirm(t('quotations.budgetArchiveConfirm'))) return;
     setBusyId(row.id);
     setError('');
@@ -232,7 +232,7 @@ export default function QuotationBudgetSection({
   };
 
   const handleRestore = async (row: ProjectQuotation) => {
-    if (!isAdmin) return;
+    if (!canEditQuotations) return;
     setBusyId(row.id);
     setError('');
     try {
@@ -391,7 +391,7 @@ export default function QuotationBudgetSection({
               {t('quotations.viewBudget')}
             </button>
           )}
-          {isAdmin && !isArchived ? (
+          {canEditQuotations && !isArchived ? (
             <button
               type="button"
               className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
@@ -403,7 +403,7 @@ export default function QuotationBudgetSection({
               {t('quotations.budgetArchive')}
             </button>
           ) : null}
-          {isAdmin && isArchived ? (
+          {canEditQuotations && isArchived ? (
             <button
               type="button"
               className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
@@ -498,7 +498,7 @@ export default function QuotationBudgetSection({
           <ul className="space-y-2">{budgets.map((row) => renderBudgetRow(row, 'active'))}</ul>
         ) : null}
 
-        {isAdmin && !loading ? (
+        {canEditQuotations && !loading ? (
           <div className="mt-8 pt-6 border-t border-[var(--tb-border)]">
             <button
               type="button"

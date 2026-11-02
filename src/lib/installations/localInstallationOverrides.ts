@@ -21,6 +21,7 @@ export type InstallationLocalPatch = Partial<
     | 'remote_url'
     | 'taskboard_project_id'
     | 'header_image_path'
+    | 'header_image_focus_y'
   >
 >;
 

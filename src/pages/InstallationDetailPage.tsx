@@ -191,6 +191,7 @@ export default function InstallationDetailPage() {
           <InstallationProjectHeader
             installationId={installationId}
             headerImagePath={installation.header_image_path}
+            headerImageFocusY={installation.header_image_focus_y}
             projectName={installation.name}
             variant="detail"
             integrated

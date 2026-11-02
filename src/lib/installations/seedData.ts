@@ -35,6 +35,7 @@ function buildRecord(def: SeedDef): InstallationRecord {
     remote_url: def.remote_url ?? null,
     taskboard_project_id: null,
     header_image_path: null,
+    header_image_focus_y: 50,
     sort_order: def.sort_order,
     created_at: now,
     updated_at: now,

@@ -75,7 +75,7 @@ function InstallationCard({
           />
           <span className="text-xs tb-text-secondary truncate">{statusLabel}</span>
         </div>
-        {linkToDetail || installation.remote_url ? (
+        {!linkToDetail && installation.remote_url ? (
           <span className="inline-flex items-center gap-1 text-xs tb-muted shrink-0">
             {t('projects.open')}
             <ExternalLink size={12} aria-hidden />
@@ -99,10 +99,11 @@ function InstallationCard({
     <InstallationProjectHeader
       installationId={installation.id}
       headerImagePath={installation.header_image_path}
+      headerImageFocusY={installation.header_image_focus_y}
       projectName={installation.name}
       variant="card"
       cover={useCoverHeader}
-      isAdmin={linkToDetail && isAdmin}
+      isAdmin={isAdmin}
     />
   );
 

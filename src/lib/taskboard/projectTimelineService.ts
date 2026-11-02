@@ -2,8 +2,11 @@ import { ensureSupabaseSession, getSupabase } from '../supabase';
 import { isSupabaseConfigured } from './config';
 import {
   isActiveProjectTimeline,
+  isTimelinePhase,
+  isTimelineVisit,
   normalizeTimelineRichField,
   type TimelineBlockInput,
+  type TimelineEntryKind,
 } from './projectTimelineUtils';
 import { isLocalTaskboardMode } from './taskService';
 
@@ -14,6 +17,8 @@ export type ProjectTimelineEntry = {
   week_end: string;
   name: string;
   description: string;
+  entry_kind: TimelineEntryKind;
+  parent_entry_id: string | null;
 };
 
 export type ProjectTimelineState = {
@@ -21,7 +26,7 @@ export type ProjectTimelineState = {
   entries: ProjectTimelineEntry[];
 };
 
-const LOCAL_KEY = 'project_timeline_v2';
+const LOCAL_KEY = 'project_timeline_v3';
 
 type LocalStore = Record<
   string,
@@ -32,6 +37,22 @@ function loadLocal(): LocalStore {
   try {
     const raw = localStorage.getItem(LOCAL_KEY);
     if (raw) return JSON.parse(raw) as LocalStore;
+    const v2Raw = localStorage.getItem('project_timeline_v2');
+    if (v2Raw) {
+      const v2 = JSON.parse(v2Raw) as LocalStore;
+      const migrated: LocalStore = {};
+      for (const [projectId, bucket] of Object.entries(v2)) {
+        migrated[projectId] = {
+          timelineCompleted: bucket.timelineCompleted,
+          entries: bucket.entries.map((e) => ({
+            ...e,
+            entry_kind: e.entry_kind ?? 'phase',
+            parent_entry_id: e.parent_entry_id ?? null,
+          })),
+        };
+      }
+      return migrated;
+    }
     const legacyRaw = localStorage.getItem('project_timeline_v1');
     if (!legacyRaw) return {};
     const legacy = JSON.parse(legacyRaw) as Record<
@@ -45,6 +66,8 @@ function loadLocal(): LocalStore {
         entries: bucket.entries.map((e) => ({
           ...e,
           week_end: e.week_start,
+          entry_kind: 'phase' as const,
+          parent_entry_id: null,
         })),
       };
     }
@@ -61,6 +84,8 @@ function saveLocal(store: LocalStore) {
 function mapEntry(row: Record<string, unknown>): ProjectTimelineEntry {
   const week_start = String(row.week_start).slice(0, 10);
   const week_endRaw = row.week_end ? String(row.week_end).slice(0, 10) : week_start;
+  const kindRaw = String(row.entry_kind ?? 'phase');
+  const entry_kind: TimelineEntryKind = kindRaw === 'visit' ? 'visit' : 'phase';
   return {
     id: String(row.id),
     project_id: String(row.project_id),
@@ -68,6 +93,8 @@ function mapEntry(row: Record<string, unknown>): ProjectTimelineEntry {
     week_end: week_endRaw,
     name: String(row.name ?? ''),
     description: String(row.description ?? ''),
+    entry_kind,
+    parent_entry_id: row.parent_entry_id ? String(row.parent_entry_id) : null,
   };
 }
 
@@ -211,14 +238,38 @@ export async function saveProjectTimeline(
 
   if (isLocalTaskboardMode()) {
     const store = loadLocal();
-    const entries: ProjectTimelineEntry[] = blocks.map((block) => ({
-      id: crypto.randomUUID(),
-      project_id: projectId,
-      week_start: block.week_start,
-      week_end: block.week_end,
-      name: normalizeTimelineRichField(block.name),
-      description: normalizeTimelineRichField(block.description),
-    }));
+    const phaseBlocks = blocks.filter(isTimelinePhase);
+    const visitBlocks = blocks.filter(isTimelineVisit);
+    const entries: ProjectTimelineEntry[] = [];
+
+    for (const block of phaseBlocks) {
+      entries.push({
+        id: block.client_key,
+        project_id: projectId,
+        week_start: block.week_start,
+        week_end: block.week_end,
+        name: normalizeTimelineRichField(block.name),
+        description: normalizeTimelineRichField(block.description),
+        entry_kind: 'phase',
+        parent_entry_id: null,
+      });
+    }
+
+    const phaseIds = new Set(entries.map((e) => e.id));
+    for (const block of visitBlocks) {
+      const parentId = block.parent_client_key ?? block.parent_entry_id ?? null;
+      entries.push({
+        id: block.client_key,
+        project_id: projectId,
+        week_start: block.week_start,
+        week_end: block.week_end,
+        name: normalizeTimelineRichField(block.name),
+        description: normalizeTimelineRichField(block.description),
+        entry_kind: 'visit',
+        parent_entry_id: parentId && phaseIds.has(parentId) ? parentId : null,
+      });
+    }
+
     store[projectId] = { timelineCompleted, entries };
     saveLocal(store);
     return store[projectId];
@@ -258,35 +309,72 @@ export async function saveProjectTimeline(
     throw deleteError;
   }
 
-  const toInsert = blocks.map((block) => ({
+  const phaseBlocks = blocks.filter(isTimelinePhase);
+  const visitBlocks = blocks.filter(isTimelineVisit);
+
+  const phaseInserts = phaseBlocks.map((block) => ({
+    id: block.client_key,
     project_id: projectId,
     week_start: block.week_start,
     week_end: block.week_end,
     name: normalizeTimelineRichField(block.name),
     description: normalizeTimelineRichField(block.description),
+    entry_kind: 'phase' as const,
+    parent_entry_id: null,
   }));
 
-  if (toInsert.length > 0) {
-    let { error: insertError } = await supabase.from('project_timeline_entries').insert(toInsert);
+  if (phaseInserts.length > 0) {
+    let { error: phaseError } = await supabase.from('project_timeline_entries').insert(phaseInserts);
 
-    if (insertError && /week_end|column|schema cache/i.test(insertError.message)) {
-      ({ error: insertError } = await supabase.from('project_timeline_entries').insert(
-        toInsert.map((row) => ({
+    if (phaseError && /entry_kind|parent_entry|column|schema cache/i.test(phaseError.message)) {
+      ({ error: phaseError } = await supabase.from('project_timeline_entries').insert(
+        phaseInserts.map((row) => ({
+          id: row.id,
           project_id: row.project_id,
           week_start: row.week_start,
+          week_end: row.week_end,
           name: row.name,
           description: row.description,
-        }))
+        })),
       ));
     }
 
-    if (insertError) {
-      if (/week_end|column|schema cache/i.test(insertError.message)) {
+    if (phaseError) {
+      if (/week_end|column|schema cache/i.test(phaseError.message)) {
         throw new Error(
           'Multi-week timeline needs supabase/migrations/039_project_timeline_week_ranges.sql in Supabase.'
         );
       }
-      throw insertError;
+      throw phaseError;
+    }
+  }
+
+  const phaseIds = new Set(phaseInserts.map((row) => row.id));
+  const visitInserts = visitBlocks.map((block) => {
+    const parentId = block.parent_client_key ?? block.parent_entry_id ?? null;
+    return {
+      id: block.client_key,
+      project_id: projectId,
+      week_start: block.week_start,
+      week_end: block.week_end,
+      name: normalizeTimelineRichField(block.name),
+      description: normalizeTimelineRichField(block.description),
+      entry_kind: 'visit' as const,
+      parent_entry_id: parentId && phaseIds.has(parentId) ? parentId : null,
+    };
+  });
+
+  if (visitInserts.length > 0) {
+    let { error: visitError } = await supabase.from('project_timeline_entries').insert(visitInserts);
+
+    if (visitError && /entry_kind|parent_entry|column|schema cache/i.test(visitError.message)) {
+      throw new Error(
+        'Timeline visits need supabase/migrations/048_project_timeline_visits.sql in Supabase.'
+      );
+    }
+
+    if (visitError) {
+      throw visitError;
     }
   }
 
