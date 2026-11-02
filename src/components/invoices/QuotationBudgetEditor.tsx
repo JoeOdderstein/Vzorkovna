@@ -134,6 +134,23 @@ export default function QuotationBudgetEditor({
     setActiveDragKey(null);
   };
 
+  const handleAddSection = useCallback(() => {
+    setLines((prev) => attachDragKeys(addEmptySection(stripDragKeys(prev))));
+  }, []);
+
+  const handleAddLine = useCallback(() => {
+    setLines((prev) => {
+      const stripped = stripDragKeys(prev);
+      const lastLineIdx = stripped.reduce(
+        (acc, row, i) => (row.kind === 'line' ? i : acc),
+        -1,
+      );
+      const next =
+        lastLineIdx < 0 ? addEmptySection(stripped) : addEmptyLineAfter(stripped, lastLineIdx);
+      return attachDragKeys(next);
+    });
+  }, []);
+
   const activeLine = activeDragKey
     ? lines.find((line) => line.dragKey === activeDragKey && line.kind === 'line')
     : null;
@@ -363,37 +380,6 @@ export default function QuotationBudgetEditor({
       <div className="flex-1 min-h-0 min-w-0 overflow-auto px-3 md:px-8 py-3 md:py-4">
         {error ? <p className="text-sm text-red-600 mb-3">{error}</p> : null}
         {!readOnly ? <p className="text-xs tb-muted mb-2">{t('quotations.dragHint')}</p> : null}
-        {!readOnly ? (
-          <div className="flex flex-wrap gap-2 mb-3">
-            <button
-              type="button"
-              className="tb-btn-secondary text-xs"
-              onClick={() =>
-                setLines((prev) => attachDragKeys(addEmptySection(stripDragKeys(prev))))
-              }
-            >
-              {t('quotations.addSection')}
-            </button>
-            <button
-              type="button"
-              className="tb-btn-secondary text-xs"
-              onClick={() =>
-                setLines((prev) => {
-                  const stripped = stripDragKeys(prev);
-                  const lastLineIdx = stripped.reduce(
-                    (acc, row, i) => (row.kind === 'line' ? i : acc),
-                    -1,
-                  );
-                  const next =
-                    lastLineIdx < 0 ? addEmptySection(stripped) : addEmptyLineAfter(stripped, lastLineIdx);
-                  return attachDragKeys(next);
-                })
-              }
-            >
-              {t('quotations.addLine')}
-            </button>
-          </div>
-        ) : null}
 
         <div className="min-w-0 overflow-x-auto overscroll-x-contain">
           {readOnly ? (
@@ -551,6 +537,17 @@ export default function QuotationBudgetEditor({
           ) : null}
         </div>
       </div>
+
+      {!readOnly ? (
+        <div className="shrink-0 border-t border-[var(--tb-border)] bg-[var(--tb-surface)] px-3 md:px-8 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex flex-wrap items-center gap-2">
+          <button type="button" className="tb-btn-secondary text-sm" onClick={handleAddSection}>
+            {t('quotations.addSection')}
+          </button>
+          <button type="button" className="tb-btn-secondary text-sm" onClick={handleAddLine}>
+            {t('quotations.addLine')}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }
