@@ -25,6 +25,8 @@ interface MessageRichTextEditorProps {
   className?: string;
   minHeightClassName?: string;
   maxHeightClassName?: string;
+  /** Grow with parent flex column (e.g. full-screen message compose). */
+  fillAvailableHeight?: boolean;
   onEnterSubmit?: () => void;
   enterSubmits?: boolean;
   showFormattingToolbar?: boolean;
@@ -163,6 +165,7 @@ function MessageRichTextEditor({
   className = '',
   minHeightClassName = 'min-h-[6rem]',
   maxHeightClassName = 'max-h-[min(16rem,38vh)]',
+  fillAvailableHeight = false,
   onEnterSubmit,
   enterSubmits = false,
   showFormattingToolbar = true,
@@ -434,8 +437,14 @@ function MessageRichTextEditor({
 
   const showPlaceholder = !htmlMessageHasContent(value);
 
+  const editorHeightClasses = fillAvailableHeight
+    ? 'min-h-[12rem] flex-1 max-h-none h-full'
+    : `${minHeightClassName} ${maxHeightClassName}`;
+
   return (
-    <div className={`relative ${className}`}>
+    <div
+      className={`relative ${fillAvailableHeight ? 'flex flex-1 min-h-0 flex-col' : ''} ${className}`}
+    >
       {showPlaceholder && placeholder ? (
         <span
           className="pointer-events-none absolute left-3 top-2.5 text-sm text-[var(--tb-muted)] opacity-70"
@@ -465,7 +474,7 @@ function MessageRichTextEditor({
           isComposingRef.current = false;
           emitChange();
         }}
-        className={`field-input w-full overflow-y-auto overscroll-contain text-sm leading-relaxed outline-none ${minHeightClassName} ${maxHeightClassName} message-rich-text-editor ${showFormattingToolbar ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-60 pointer-events-none' : ''} ${uploadingImage ? 'opacity-80' : ''}`}
+        className={`field-input w-full overflow-y-auto overscroll-contain text-sm leading-relaxed outline-none ${editorHeightClasses} message-rich-text-editor ${showFormattingToolbar ? 'rounded-b-none border-b-0' : ''} ${disabled ? 'opacity-60 pointer-events-none' : ''} ${uploadingImage ? 'opacity-80' : ''}`}
       />
       {showFormattingToolbar ? (
         <div

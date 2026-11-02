@@ -1,4 +1,4 @@
-import { FormEvent, memo, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, memo, useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronUp, PenLine, X } from 'lucide-react';
 import { useTaskboardTheme } from '../../context/TaskboardThemeContext';
@@ -47,6 +47,10 @@ import {
   saveMessageComposeDraft,
   type MessageComposeDraft,
 } from '../../lib/messages/messageComposeDraftStorage';
+import {
+  applyMessageComposeDrawerLayout,
+  clearMessageComposeDrawerLayoutOverrides,
+} from '../../lib/messages/messageComposeDrawerLayout';
 
 const SUGGEST_DEBOUNCE_MS = 900;
 const DRAFT_SAVE_DEBOUNCE_MS = 650;
@@ -106,7 +110,14 @@ function MessageComposeForm({
 }: MessageComposeFormProps) {
   const { t } = useTaskboardI18n();
   const { theme } = useTaskboardTheme();
-  const { setDrawerOpen, notifyComposeWillOpen } = useMessagesCompose();
+  const {
+    setDrawerOpen,
+    notifyComposeWillOpen,
+    drawerWidth,
+    commitComposeDrawerResize,
+    drawerOverlaysFeed,
+  } =
+    useMessagesCompose();
   const { inputRef: titleInputRef, debouncedTitle, hasContent, getTitle, clearTitle, setTitle } =
     useDebouncedTitleInput(SUGGEST_DEBOUNCE_MS);
 
@@ -265,6 +276,39 @@ function MessageComposeForm({
     setDrawerOpen(false);
     setExpanded(false);
   }, [notifyComposeWillOpen, setDrawerOpen]);
+
+  const beginComposeResize = useCallback(
+    (event: React.MouseEvent) => {
+      event.preventDefault();
+      const startX = event.clientX;
+      const startWidth = drawerWidth;
+      const html = document.documentElement;
+      html.classList.add('tb-compose-resizing');
+
+      const onMove = (moveEvent: MouseEvent) => {
+        applyMessageComposeDrawerLayout(startWidth + (startX - moveEvent.clientX));
+      };
+      const onUp = (upEvent: MouseEvent) => {
+        commitComposeDrawerResize(startWidth + (startX - upEvent.clientX));
+        clearMessageComposeDrawerLayoutOverrides();
+        html.classList.remove('tb-compose-resizing');
+        window.removeEventListener('mousemove', onMove);
+        window.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      };
+
+      document.body.style.cursor = 'ew-resize';
+      document.body.style.userSelect = 'none';
+      window.addEventListener('mousemove', onMove);
+      window.addEventListener('mouseup', onUp);
+    },
+    [drawerWidth, commitComposeDrawerResize],
+  );
+
+  const composeDrawerStyle = (
+    drawerOverlaysFeed ? undefined : { ['--tb-drawer-width']: `${drawerWidth}px` }
+  ) as CSSProperties | undefined;
 
   useEffect(() => {
     if (!expanded) return;
@@ -584,7 +628,7 @@ function MessageComposeForm({
     Boolean(messageProjectId) &&
     Boolean(messageCategory);
 
-  const composeFields = (
+  const composeTitleFields = (
     <>
       <label className="block">
         <span className="tb-field-label mb-2 block">{t('messages.messageTitle')}</span>
@@ -600,22 +644,29 @@ function MessageComposeForm({
       </label>
 
       <p className="text-xs tb-muted -mt-2">{t('messages.suggestComposeHint')}</p>
+    </>
+  );
 
-      <div className="block">
-        <span id="message-compose-body-label" className="tb-field-label mb-2 block">
-          {t('task.description')}
-        </span>
-        <MessageRichTextEditor
-          username={username}
-          value={body}
-          onChange={setBody}
-          placeholder={t('messages.composePlaceholder')}
-          disabled={submitting}
-          maxHeightClassName="max-h-[min(16rem,32vh)] md:max-h-[min(14rem,28vh)]"
-          aria-labelledby="message-compose-body-label"
-        />
-      </div>
+  const composeBodyField = (fillHeight: boolean) => (
+    <div className={fillHeight ? 'flex flex-1 min-h-0 flex-col' : 'block'}>
+      <span id="message-compose-body-label" className="tb-field-label mb-2 block shrink-0">
+        {t('task.description')}
+      </span>
+      <MessageRichTextEditor
+        username={username}
+        value={body}
+        onChange={setBody}
+        placeholder={t('messages.composePlaceholder')}
+        disabled={submitting}
+        fillAvailableHeight={fillHeight}
+        maxHeightClassName="max-h-[min(16rem,32vh)] md:max-h-[min(14rem,28vh)]"
+        aria-labelledby="message-compose-body-label"
+      />
+    </div>
+  );
 
+  const composeFieldsAfterBody = (
+    <>
       <MessageComposeAttachments
         username={username}
         attachments={attachments}
@@ -662,6 +713,30 @@ function MessageComposeForm({
 
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
     </>
+  );
+
+  const composeFields = (
+    <>
+      {composeTitleFields}
+      {composeBodyField(false)}
+      {composeFieldsAfterBody}
+    </>
+  );
+
+  const composeFormBody = drawerOverlaysFeed ? (
+    <>
+      <div className="shrink-0 px-4 md:px-6 pt-4 pb-2 space-y-3">{composeTitleFields}</div>
+      <div className="flex-1 min-h-0 flex flex-col px-4 md:px-6 py-2">
+        {composeBodyField(true)}
+      </div>
+      <div className="shrink-0 max-h-[min(38vh,22rem)] overflow-y-auto overscroll-contain border-t border-[var(--tb-border)] px-4 md:px-6 py-4 space-y-3">
+        {composeFieldsAfterBody}
+      </div>
+    </>
+  ) : (
+    <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 md:px-6 py-4 space-y-3">
+      {composeFields}
+    </div>
   );
 
   const composeFooter = (
@@ -713,8 +788,11 @@ function MessageComposeForm({
       {expanded
         ? createPortal(
             <div
-              className="taskboard tb-drawer-shell tb-messages-compose-drawer fixed inset-x-0 bottom-0 z-[80] md:inset-auto md:z-40"
+              className={`taskboard tb-drawer-shell tb-messages-compose-drawer fixed inset-x-0 bottom-0 z-[80] md:inset-auto md:z-40${
+                drawerOverlaysFeed ? ' tb-messages-compose-drawer--overlay' : ''
+              }`}
               data-theme={theme}
+              style={composeDrawerStyle}
             >
               <aside
                 className="tb-drawer tb-drawer-panel tb-messages-compose-drawer__panel pointer-events-auto flex flex-col min-h-0"
@@ -723,6 +801,12 @@ function MessageComposeForm({
                 aria-label={t('messages.composeLabel')}
                 onClick={(e) => e.stopPropagation()}
               >
+                <button
+                  type="button"
+                  className="tb-drawer-resize-handle hidden md:block"
+                  aria-label={t('messages.composeResize')}
+                  onMouseDown={beginComposeResize}
+                />
                 <div className="tb-drawer-edge" aria-hidden="true" />
                 <div className="relative z-20 shrink-0 tb-drawer-header px-4 md:px-6 py-3 flex flex-col gap-2 overflow-visible">
                   <div className="flex items-start justify-between gap-3">
@@ -761,9 +845,7 @@ function MessageComposeForm({
                   className="flex flex-col flex-1 min-h-0"
                   aria-expanded
                 >
-                  <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-4 md:px-6 py-4 space-y-3">
-                    {composeFields}
-                  </div>
+                  {composeFormBody}
                   <div className="shrink-0 border-t border-[var(--tb-border)] bg-[var(--tb-bg)] px-4 md:px-6 py-3">
                     {composeFooter}
                   </div>

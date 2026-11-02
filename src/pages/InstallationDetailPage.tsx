@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { ArrowLeft, ExternalLink, Pencil } from 'lucide-react';
-import { Link, useParams } from 'react-router-dom';
+import { ExternalLink, Pencil } from 'lucide-react';
+import { useParams } from 'react-router-dom';
 import InstallationDocumentsPanel from '../components/installations/InstallationDocumentsPanel';
 import InstallationFieldEditDialog, {
   type InstallationEditableField,
@@ -21,7 +21,6 @@ import {
   type InstallationUpdatePatch,
 } from '../lib/installations/installationService';
 import type { InstallationDocumentKind, InstallationRecord } from '../lib/installations/types';
-import { PROJECTS_PATH } from '../lib/taskboard/driveConstants';
 import {
   translateInstallationLifecycle,
   translateInstallationLocation,
@@ -29,6 +28,7 @@ import {
 import { openRemotePopupWindow } from '../lib/taskboard/openRemotePopup';
 import { fetchProjects } from '../lib/taskboard/taskService';
 import type { Project } from '../lib/taskboard/types';
+import InstallationProjectHeader from '../components/installations/InstallationProjectHeader';
 import ReportBugDialog from '../components/installations/ReportBugDialog';
 import TranslatableText from '../taskboard/components/TranslatableText';
 
@@ -43,13 +43,15 @@ function DetailSection({
   title,
   adminAction,
   children,
+  className = '',
 }: {
   title: string;
   adminAction?: ReactNode;
   children: ReactNode;
+  className?: string;
 }) {
   return (
-    <section className="tb-remote-inst-card">
+    <section className={`tb-remote-inst-card ${className}`.trim()}>
       <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
         <h2 className="text-sm tb-label">{title}</h2>
         {adminAction}
@@ -156,13 +158,6 @@ export default function InstallationDetailPage() {
   if (!installation) {
     return (
       <div className="max-w-screen-2xl mx-auto px-6 md:px-10">
-        <Link
-          to={PROJECTS_PATH}
-          className="inline-flex items-center gap-2 text-sm tb-muted hover:text-[var(--tb-accent)] mb-6"
-        >
-          <ArrowLeft size={16} aria-hidden />
-          {t('projects.detail.back')}
-        </Link>
         <p className="text-sm tb-text">{error ?? t('projects.detail.notFound')}</p>
       </div>
     );
@@ -178,98 +173,103 @@ export default function InstallationDetailPage() {
     INSTALLATION_LIFECYCLE_LABELS[installation.lifecycle_status],
   );
 
+  const locationLabel = translateInstallationLocation(
+    locale,
+    installation.location,
+    INSTALLATION_LOCATION_LABELS[installation.location],
+  );
+
   const taskboardProjectLabel = installation.taskboard_project_id
     ? (taskboardProjects.find((p) => p.id === installation.taskboard_project_id)?.name ??
       '—')
     : t('projects.detail.taskboardProjectAuto');
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 md:px-10 pb-8">
-      <Link
-        to={PROJECTS_PATH}
-        className="inline-flex items-center gap-2 text-sm tb-muted hover:text-[var(--tb-accent)] mb-6"
-      >
-        <ArrowLeft size={16} aria-hidden />
-        {t('projects.detail.back')}
-      </Link>
+    <div className="max-w-screen-2xl mx-auto px-6 md:px-10 pb-8 pt-1">
+      <header className="tb-installation-detail-hero mb-8">
+        {installationId ? (
+          <InstallationProjectHeader
+            installationId={installationId}
+            headerImagePath={installation.header_image_path}
+            projectName={installation.name}
+            variant="detail"
+            integrated
+            isAdmin={isAdmin}
+          />
+        ) : null}
 
-      <div className="mb-6 md:hidden">
-        <button
-          type="button"
-          onClick={() => setBugDialogOpen(true)}
-          className="w-full px-8 py-4 text-base font-bold tracking-wide rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-md"
-        >
-          {t('projects.bug.reportButton')}
-        </button>
-      </div>
+        <div className="tb-installation-detail-hero__content">
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-start gap-3">
+              <h1 className="text-2xl font-medium tb-installation-detail-hero__title leading-snug">
+                <span className="tb-installation-detail-hero__location">{locationLabel}</span>
+                <span className="mx-2 font-normal opacity-70" aria-hidden>
+                  |
+                </span>
+                <TranslatableText text={installation.name} />
+              </h1>
+              {isAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setEditField('name')}
+                  className="text-xs tb-btn-secondary tb-installation-detail-hero__edit inline-flex items-center gap-1 shrink-0 mt-1"
+                >
+                  <Pencil size={12} />
+                  {t('projects.admin.edit')}
+                </button>
+              ) : null}
+            </div>
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <span
+                className={`tb-remote-inst-light ${lifecycleStatusLightClass(installation.lifecycle_status)}`}
+                aria-hidden
+              />
+              <span className="text-sm tb-installation-detail-hero__status">{lifecycleLabel}</span>
+            </div>
+          </div>
 
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between mb-8">
-        <div className="min-w-0 flex-1">
-          <span className="tb-label block mb-2">{t('projects.detail.installationLabel')}</span>
-          <div className="flex flex-wrap items-start gap-3">
-            <h1 className="text-2xl tb-text font-medium">
-              <TranslatableText text={installation.name} />
-            </h1>
-            {isAdmin ? (
-              <button
-                type="button"
-                onClick={() => setEditField('name')}
-                className="text-xs tb-btn-secondary inline-flex items-center gap-1 shrink-0 mt-1"
-              >
-                <Pencil size={12} />
-                {t('projects.admin.edit')}
-              </button>
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2 shrink-0 sm:justify-end w-full md:w-auto">
+            <button
+              type="button"
+              onClick={() => setBugDialogOpen(true)}
+              className="w-full sm:w-auto px-6 py-3 text-sm font-bold tracking-wide rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-md inline-flex items-center justify-center"
+            >
+              {t('projects.bug.reportButton')}
+            </button>
+            {installation.remote_url ? (
+              installation.id === PI_CONNECT_POPUP_INSTALLATION_ID ? (
+                <button
+                  type="button"
+                  className="tb-btn-secondary tb-installation-detail-hero__remote inline-flex items-center justify-center gap-2 w-full sm:w-auto"
+                  onClick={() =>
+                    openRemotePopupWindow(
+                      `/remote-inst/popup/${installation.id}`,
+                      `${installation.id}-remote`,
+                    )
+                  }
+                >
+                  {t('projects.detail.openRemote')}
+                  <ExternalLink size={14} aria-hidden />
+                </button>
+              ) : (
+                <a
+                  href={installation.remote_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="tb-btn-secondary tb-installation-detail-hero__remote inline-flex items-center justify-center gap-2 w-full sm:w-auto"
+                >
+                  {t('projects.detail.openRemote')}
+                  <ExternalLink size={14} aria-hidden />
+                </a>
+              )
             ) : null}
           </div>
-          <div className="mt-4 flex flex-wrap items-center gap-3">
-            <span
-              className={`tb-remote-inst-light ${lifecycleStatusLightClass(installation.lifecycle_status)}`}
-              aria-hidden
-            />
-            <span className="text-sm tb-text-secondary">{lifecycleLabel}</span>
-          </div>
         </div>
+      </header>
 
-        <div className="flex flex-wrap gap-2 shrink-0 md:justify-end">
-          <button
-            type="button"
-            onClick={() => setBugDialogOpen(true)}
-            className="hidden md:inline-flex px-6 py-3 text-sm font-bold tracking-wide rounded-lg bg-red-600 text-white hover:bg-red-700 transition-colors shadow-md items-center"
-          >
-            {t('projects.bug.reportButton')}
-          </button>
-          {installation.remote_url ? (
-            installation.id === PI_CONNECT_POPUP_INSTALLATION_ID ? (
-              <button
-                type="button"
-                className="tb-btn-secondary inline-flex items-center gap-2"
-                onClick={() =>
-                  openRemotePopupWindow(
-                    `/remote-inst/popup/${installation.id}`,
-                    `${installation.id}-remote`,
-                  )
-                }
-              >
-                {t('projects.detail.openRemote')}
-                <ExternalLink size={14} aria-hidden />
-              </button>
-            ) : (
-              <a
-                href={installation.remote_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="tb-btn-secondary inline-flex items-center gap-2"
-              >
-                {t('projects.detail.openRemote')}
-                <ExternalLink size={14} aria-hidden />
-              </a>
-            )
-          ) : null}
-        </div>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <DetailSection title={t('projects.detail.overview')}>
+      <div className="flex flex-col gap-6 mb-6 lg:flex-row lg:items-start">
+        <div className="flex min-w-0 flex-1 flex-col gap-6 order-1">
+          <DetailSection title={t('projects.detail.overview')}>
           <AdminMetaRow
             label={t('projects.detail.meta.location')}
             value={translateInstallationLocation(
@@ -334,9 +334,51 @@ export default function InstallationDetailPage() {
               onEdit={() => setEditField('taskboard_project_id')}
             />
           ) : null}
+          </DetailSection>
+
+          <DetailSection title={t('projects.detail.malfunction')} className="hidden lg:block">
+            {installationId ? (
+              <InstallationRepairsSection
+                installationId={installationId}
+                repairs={installation.repairs}
+                documents={installation.documents}
+                isAdmin={isAdmin}
+              />
+            ) : null}
+          </DetailSection>
+        </div>
+
+        <DetailSection title={t('projects.detail.technical')} className="order-2 min-w-0 flex-1">
+          {installationId ? (
+            <InstallationDocumentsPanel
+              installationId={installationId}
+              kind="technical"
+              documents={technicalDocs}
+              isAdmin={isAdmin}
+              emptyLabel={t('projects.tech.noDocs')}
+              uploadLabel={t('projects.tech.uploadPdfOrDocx')}
+              accept="application/pdf,.pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,.docx"
+              pdfKind
+              allowDocx
+              embedPdf
+            />
+          ) : null}
         </DetailSection>
 
-        <DetailSection title={t('projects.detail.photographs')}>
+        <DetailSection title={t('projects.detail.malfunction')} className="order-3 lg:hidden">
+          {installationId ? (
+            <InstallationRepairsSection
+              installationId={installationId}
+              repairs={installation.repairs}
+              documents={installation.documents}
+              isAdmin={isAdmin}
+            />
+          ) : null}
+        </DetailSection>
+      </div>
+
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <DetailSection title={t('projects.detail.photographs')} className="min-w-0 flex-1">
           {installationId ? (
             <InstallationDocumentsPanel
               installationId={installationId}
@@ -345,27 +387,13 @@ export default function InstallationDetailPage() {
               isAdmin={isAdmin}
               emptyLabel={t('projects.detail.noPhotos')}
               uploadLabel={t('projects.admin.upload')}
-              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              accept="*/*"
+              allowAnyDocuments
             />
           ) : null}
         </DetailSection>
 
-        <DetailSection title={t('projects.detail.technical')}>
-          {installationId ? (
-            <InstallationDocumentsPanel
-              installationId={installationId}
-              kind="technical"
-              documents={technicalDocs}
-              isAdmin={isAdmin}
-              emptyLabel={t('projects.tech.noDocs')}
-              uploadLabel={t('projects.tech.upload')}
-              accept="application/pdf,.pdf"
-              pdfKind
-            />
-          ) : null}
-        </DetailSection>
-
-        <DetailSection title={t('projects.detail.electrical')}>
+        <DetailSection title={t('projects.detail.electrical')} className="min-w-0 flex-1">
           {installationId ? (
             <InstallationDocumentsPanel
               installationId={installationId}
@@ -380,16 +408,6 @@ export default function InstallationDetailPage() {
           ) : null}
         </DetailSection>
 
-        <DetailSection title={t('projects.detail.malfunction')}>
-          {installationId ? (
-            <InstallationRepairsSection
-              installationId={installationId}
-              repairs={installation.repairs}
-              documents={installation.documents}
-              isAdmin={isAdmin}
-            />
-          ) : null}
-        </DetailSection>
       </div>
 
       <InstallationFieldEditDialog

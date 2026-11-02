@@ -4,6 +4,7 @@ import { ensureSupabaseSession, getSupabase } from '../supabase';
 const OPTIONAL_INSTALLATION_COLUMNS = [
   'lifecycle_status_manual_override',
   'taskboard_project_id',
+  'header_image_path',
 ] as const;
 
 function isMissingColumnError(message: string, column: string): boolean {

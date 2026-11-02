@@ -272,3 +272,67 @@ export async function duplicateProjectQuotation(
 
   return createProjectQuotation(draft, createdBy);
 }
+
+export type TimelinePhaseQuotationGroup = {
+  quotationId: string;
+  title: string;
+  currency: string;
+  lines: QuotationLineRecord[];
+  phaseTotal: number;
+};
+
+function lineMoneyTotal(line: QuotationLineRecord): number {
+  if (line.total != null && Number.isFinite(line.total)) return line.total;
+  const unit = Number(line.unit_price ?? 0);
+  const qty = Number(line.quantity ?? 0);
+  return Math.round(unit * qty * 100) / 100;
+}
+
+/** Active quotation line items linked to a timeline phase (calendar detail). */
+export async function fetchQuotationGroupsForTimelineEntry(
+  timelineEntryId: string,
+): Promise<TimelinePhaseQuotationGroup[]> {
+  if (!isSupabaseConfigured() || !timelineEntryId.trim()) return [];
+
+  const { data, error } = await (await db())
+    .from('project_quotation_lines')
+    .select('*, project_quotations!inner(id, title, currency, archived_at)')
+    .eq('timeline_entry_id', timelineEntryId.trim())
+    .eq('kind', 'line')
+    .order('sort_order', { ascending: true });
+
+  if (error) {
+    if (/project_quotation|relation|schema cache/i.test(error.message)) return [];
+    throw error;
+  }
+
+  const groups = new Map<string, TimelinePhaseQuotationGroup>();
+
+  for (const row of data ?? []) {
+    const record = row as Record<string, unknown>;
+    const head = record.project_quotations as Record<string, unknown> | null;
+    if (!head || head.archived_at) continue;
+
+    const quotationId = String(head.id);
+    const line = mapLine(record);
+    let group = groups.get(quotationId);
+    if (!group) {
+      group = {
+        quotationId,
+        title: String(head.title ?? '').trim() || 'Budget',
+        currency: String(head.currency ?? 'EUR'),
+        lines: [],
+        phaseTotal: 0,
+      };
+      groups.set(quotationId, group);
+    }
+    group.lines.push(line);
+    group.phaseTotal = Math.round((group.phaseTotal + lineMoneyTotal(line)) * 100) / 100;
+  }
+
+  for (const group of groups.values()) {
+    group.lines.sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title));
+}

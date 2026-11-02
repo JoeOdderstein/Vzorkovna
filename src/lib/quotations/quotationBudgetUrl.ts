@@ -12,15 +12,24 @@ export function parseBudgetIdFromQuery(param: string | null): string | null {
   return raw || null;
 }
 
+function quotationBudgetSearchParams(budgetId: string): URLSearchParams {
+  const params = new URLSearchParams();
+  params.set(INVOICE_KIND_QUERY_KEY, 'quotation');
+  params.set(INVOICE_BUDGET_QUERY_KEY, budgetId);
+  params.delete(INVOICE_ID_QUERY_KEY);
+  return params;
+}
+
+/** In-app path to open a budget on the Quotations tab. */
+export function quotationBudgetPath(budgetId: string): string {
+  return `${INVOICES_PATH}?${quotationBudgetSearchParams(budgetId).toString()}`;
+}
+
 /** Share link to a project budget on the Quotations tab. */
 export function quotationBudgetShareUrl(
   budgetId: string,
   origin = typeof window !== 'undefined' ? window.location.origin : '',
 ): string {
   const base = origin.replace(/\/$/, '');
-  const params = new URLSearchParams();
-  params.set(INVOICE_KIND_QUERY_KEY, 'quotation');
-  params.set(INVOICE_BUDGET_QUERY_KEY, budgetId);
-  params.delete(INVOICE_ID_QUERY_KEY);
-  return `${base}${INVOICES_PATH}?${params.toString()}`;
+  return `${base}${quotationBudgetPath(budgetId)}`;
 }

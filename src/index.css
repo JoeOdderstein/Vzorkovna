@@ -1655,6 +1655,323 @@ body {
   font: inherit;
 }
 
+.taskboard .tb-remote-inst-card--with-header {
+  padding: 0;
+}
+
+.taskboard .tb-remote-inst-overview-grid > li {
+  display: flex;
+  min-height: 0;
+}
+
+.taskboard .tb-remote-inst-card--overview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  height: 8.5rem;
+  min-height: 8.5rem;
+  max-height: 8.5rem;
+  padding: 0;
+  background: var(--tb-bg);
+}
+
+.taskboard .tb-remote-inst-card--overview:hover {
+  background: var(--tb-surface);
+}
+
+.taskboard .tb-remote-inst-card--overview:has(.tb-installation-header__img) {
+  background: transparent;
+}
+
+.taskboard .tb-remote-inst-card--overview:has(.tb-installation-header__img):hover {
+  background: transparent;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-remote-inst-card__body {
+  padding: 0.55rem 0.65rem 0.65rem;
+  flex-shrink: 0;
+}
+
+.taskboard .tb-installation-header--card-cover {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  max-height: none;
+  aspect-ratio: unset;
+  height: 100%;
+  min-height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-remote-inst-card__body--cover {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  margin-top: 0;
+  width: 100%;
+  background: transparent;
+  pointer-events: none;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-remote-inst-card__body--cover > * {
+  pointer-events: auto;
+}
+
+.taskboard
+  .tb-remote-inst-card--overview:has(.tb-installation-header__img)
+  .tb-remote-inst-card__body--cover::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    transparent 100%
+  );
+}
+
+.taskboard
+  .tb-remote-inst-card--overview:has(.tb-installation-header__img)
+  .tb-remote-inst-card__body--cover
+  .tb-text,
+.taskboard
+  .tb-remote-inst-card--overview:has(.tb-installation-header__img)
+  .tb-remote-inst-card__body--cover
+  .tb-text-secondary,
+.taskboard
+  .tb-remote-inst-card--overview:has(.tb-installation-header__img)
+  .tb-remote-inst-card__body--cover
+  .tb-muted {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.taskboard
+  .tb-remote-inst-card--overview:has(.tb-installation-header__img)
+  .tb-remote-inst-card__body--cover
+  .tb-text-secondary,
+.taskboard
+  .tb-remote-inst-card--overview:has(.tb-installation-header__img)
+  .tb-remote-inst-card__body--cover
+  .tb-muted {
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.taskboard .tb-installation-header:not(.tb-installation-header--card-cover) {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--tb-border) 35%, var(--tb-bg));
+}
+
+.taskboard .tb-installation-header--card-cover {
+  background: transparent;
+}
+
+.taskboard .tb-installation-header--detail {
+  aspect-ratio: 3 / 1;
+  max-height: 13.5rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.taskboard .tb-installation-header--detail.tb-installation-header--detail-integrated {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  aspect-ratio: unset;
+  max-height: none;
+  height: 100%;
+  min-height: 100%;
+  margin-bottom: 0;
+  border-radius: inherit;
+}
+
+.taskboard .tb-installation-header--detail-integrated .tb-installation-header__admin {
+  top: 0.65rem;
+  bottom: auto;
+  z-index: 2;
+}
+
+.taskboard .tb-installation-detail-hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--tb-border);
+  min-height: 12.5rem;
+  background: color-mix(in srgb, var(--tb-border) 35%, var(--tb-bg));
+}
+
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) {
+  background: transparent;
+}
+
+.taskboard .tb-installation-detail-hero__content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  justify-content: flex-end;
+  min-height: 12.5rem;
+  padding: 1.35rem 1.5rem 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .taskboard .tb-installation-detail-hero__content {
+    flex-direction: row;
+    align-items: flex-end;
+    justify-content: space-between;
+    padding: 1.75rem 1.75rem 1.85rem;
+  }
+}
+
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__content::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: inherit;
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0.5) 50%,
+    transparent 100%
+  );
+}
+
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__title,
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__status {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__location {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__edit,
+.taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__remote {
+  backdrop-filter: blur(6px);
+}
+
+.taskboard .tb-installation-header--card:not(.tb-installation-header--card-cover) {
+  aspect-ratio: 16 / 5;
+  max-height: 4.25rem;
+  border-radius: 8px 8px 0 0;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-installation-header__admin {
+  right: 0.35rem;
+  bottom: 0.35rem;
+  gap: 0.2rem;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-installation-header__admin-btn {
+  padding: 0.2rem 0.35rem;
+  font-size: 0;
+  gap: 0;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-installation-header__admin-btn svg {
+  width: 12px;
+  height: 12px;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-installation-header__placeholder {
+  gap: 0.15rem;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-installation-header__placeholder svg {
+  width: 16px;
+  height: 16px;
+}
+
+.taskboard .tb-remote-inst-card--overview .tb-installation-header__placeholder span {
+  font-size: 0.6875rem;
+}
+
+.taskboard .tb-installation-header__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+.taskboard .tb-installation-header--card-cover .tb-installation-header__img,
+.taskboard .tb-installation-header--detail-integrated .tb-installation-header__img {
+  position: absolute;
+  inset: 0;
+}
+
+.taskboard .tb-installation-header__placeholder {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  border: 0;
+  background: color-mix(in srgb, var(--tb-border) 28%, var(--tb-bg));
+  cursor: pointer;
+}
+
+.taskboard .tb-installation-header--detail .tb-installation-header__placeholder {
+  border: 2px dashed color-mix(in srgb, var(--tb-border) 80%, var(--tb-accent));
+  border-radius: 8px;
+}
+
+.taskboard .tb-installation-header__admin {
+  position: absolute;
+  right: 0.65rem;
+  bottom: 0.65rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.taskboard .tb-installation-header__admin-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: 6px;
+  border: 1px solid color-mix(in srgb, var(--tb-border) 70%, transparent);
+  background: color-mix(in srgb, var(--tb-bg) 88%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--tb-text);
+  backdrop-filter: blur(6px);
+}
+
+.taskboard .tb-installation-header__admin-btn:hover:not(:disabled) {
+  border-color: var(--tb-accent);
+}
+
+.taskboard .tb-installation-header__admin-btn--danger {
+  color: #b91c1c;
+}
+
+.taskboard .tb-installation-header__error {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--tb-bg) 92%, transparent);
+}
+
 .taskboard .quotation-budget-table .quotation-budget-total-col {
   position: sticky;
   right: 0;
@@ -1739,6 +2056,71 @@ body {
     flex-direction: column;
     height: 100%;
   }
+
+  .taskboard.tb-messages-compose-drawer .tb-drawer-resize-handle {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    z-index: 5;
+    width: 12px;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    cursor: ew-resize;
+    touch-action: none;
+  }
+
+  .taskboard.tb-messages-compose-drawer .tb-drawer-resize-handle:hover,
+  .taskboard.tb-messages-compose-drawer .tb-drawer-resize-handle:focus-visible {
+    background: color-mix(in srgb, var(--tb-accent) 18%, transparent);
+  }
+}
+
+html.tb-compose-resizing .tb-layout-push--open {
+  transition: none !important;
+}
+
+html.tb-compose-resizing .taskboard.tb-messages-compose-drawer {
+  transition: none !important;
+}
+
+@media (min-width: 768px) {
+  .taskboard.tb-messages-compose-drawer--overlay {
+    inset: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    z-index: 90;
+    pointer-events: auto;
+    background: var(--tb-bg);
+  }
+
+  .taskboard.tb-messages-compose-drawer--overlay .tb-messages-compose-drawer__panel {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    box-shadow: none;
+  }
+
+  .taskboard.tb-messages-compose-drawer--overlay .tb-drawer-edge {
+    display: none;
+  }
+
+  .taskboard.tb-messages-compose-drawer--overlay form {
+    min-height: 0;
+  }
+
+  .taskboard.tb-messages-compose-drawer--overlay .message-rich-text-editor {
+    min-height: 12rem;
+  }
+}
+
+.taskboard .installation-docx-preview-root .docx-wrapper {
+  margin: 0 auto;
+  background: #fff;
 }
 
 .taskboard .tb-messages-compose-collapsed {

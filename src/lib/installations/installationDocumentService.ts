@@ -6,6 +6,43 @@ import type { InstallationDocument, InstallationDocumentKind } from './types';
 
 const MAX_PDF_BYTES = 25 * 1024 * 1024;
 const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+const MAX_PHOTO_SECTION_FILE_BYTES = 25 * 1024 * 1024;
+
+function documentPathRef(doc: Pick<InstallationDocument, 'storage_path' | 'title'>) {
+  return (doc.storage_path || doc.title || '').toLowerCase();
+}
+
+export function isImageInstallationDocument(
+  doc: Pick<InstallationDocument, 'storage_path' | 'title'>,
+) {
+  return /\.(jpe?g|png|webp|gif|bmp|heic|heif|svg)$/i.test(documentPathRef(doc));
+}
+
+export function isPdfInstallationDocument(
+  doc: Pick<InstallationDocument, 'storage_path' | 'title'>,
+) {
+  return documentPathRef(doc).endsWith('.pdf');
+}
+
+export function isDocxInstallationDocument(
+  doc: Pick<InstallationDocument, 'storage_path' | 'title'>,
+) {
+  return documentPathRef(doc).endsWith('.docx');
+}
+
+export function isDocxFile(file: File) {
+  const lower = file.name.toLowerCase();
+  if (lower.endsWith('.docx')) return true;
+  const type = file.type.toLowerCase();
+  return (
+    type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+    type === 'application/vnd.ms-word.document.macroenabled.12'
+  );
+}
+
+export function isTechnicalDocumentationFile(file: File) {
+  return isPdfFile(file) || isDocxFile(file);
+}
 
 async function db() {
   await ensureSupabaseSession();
@@ -51,7 +88,22 @@ function sanitizeFileStem(name: string, fallback: string) {
 
 export async function getInstallationDocumentUrl(storagePath: string): Promise<string> {
   if (storagePath.startsWith('data:')) return storagePath;
-  return getAttachmentUrl(storagePath);
+
+  const timeoutMs = 30_000;
+  const urlPromise = getAttachmentUrl(storagePath);
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    window.setTimeout(() => reject(new Error('Document URL request timed out.')), timeoutMs);
+  });
+
+  return Promise.race([urlPromise, timeoutPromise]);
+}
+
+export function installationDocumentPreviewFormat(
+  doc: Pick<InstallationDocument, 'storage_path' | 'title'>,
+): 'pdf' | 'docx' | null {
+  if (isDocxInstallationDocument(doc)) return 'docx';
+  if (isPdfInstallationDocument(doc)) return 'pdf';
+  return null;
 }
 
 export async function uploadInstallationDocument(
@@ -69,11 +121,39 @@ export async function uploadInstallationDocument(
   let contentType = file.type || 'application/octet-stream';
 
   if (kind === 'photo') {
-    if (!isPhotoFile(file)) throw new Error('Please choose an image file (JPEG, PNG, or WebP).');
-    if (file.size > MAX_IMAGE_BYTES) throw new Error('Image must be 12 MB or smaller.');
-    title = sanitizeFileStem(file.name, 'photo');
-    const ext = file.name.match(/\.(\w+)$/)?.[1]?.toLowerCase() || 'jpg';
-    path = `installations/${installationId}/photo/${Date.now()}-${title}.${ext}`;
+    if (file.size > MAX_PHOTO_SECTION_FILE_BYTES) {
+      throw new Error('File must be 25 MB or smaller.');
+    }
+    if (isPhotoFile(file)) {
+      if (file.size > MAX_IMAGE_BYTES) throw new Error('Image must be 12 MB or smaller.');
+      title = sanitizeFileStem(file.name, 'photo');
+      const ext = file.name.match(/\.(\w+)$/)?.[1]?.toLowerCase() || 'jpg';
+      path = `installations/${installationId}/photo/${Date.now()}-${title}.${ext}`;
+    } else if (isPdfFile(file)) {
+      title = sanitizePdfFileName(file.name);
+      path = `installations/${installationId}/photo/${Date.now()}-${title}.pdf`;
+      contentType = 'application/pdf';
+    } else {
+      title = sanitizeFileStem(file.name, 'document');
+      const ext = file.name.match(/\.([\w.-]+)$/)?.[1]?.toLowerCase() || 'bin';
+      path = `installations/${installationId}/photo/${Date.now()}-${title}.${ext}`;
+      contentType = file.type || 'application/octet-stream';
+    }
+  } else if (kind === 'technical') {
+    if (!isTechnicalDocumentationFile(file)) {
+      throw new Error('Please choose a PDF or Word (.docx) file.');
+    }
+    if (file.size > MAX_PDF_BYTES) throw new Error('File must be 25 MB or smaller.');
+    if (isDocxFile(file)) {
+      title = sanitizeFileStem(file.name, 'document');
+      path = `installations/${installationId}/technical/${Date.now()}-${title}.docx`;
+      contentType =
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    } else {
+      title = sanitizePdfFileName(file.name);
+      path = `installations/${installationId}/technical/${Date.now()}-${title}.pdf`;
+      contentType = 'application/pdf';
+    }
   } else {
     if (!isPdfFile(file)) throw new Error('Please choose a PDF file.');
     if (file.size > MAX_PDF_BYTES) throw new Error('PDF must be 25 MB or smaller.');

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { User } from 'lucide-react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import Nav from '../components/Nav';
@@ -20,7 +20,11 @@ import {
 function RemoteInstShell() {
   const { authenticated, loading, sessionReady, canAccessMessages, isAdmin } = useTaskboardAuth();
   const { theme } = useTaskboardTheme();
-  const { drawerOpen: composeDrawerOpen } = useMessagesCompose();
+  const {
+    drawerOpen: composeDrawerOpen,
+    drawerWidth: composeDrawerWidth,
+    drawerOverlaysFeed: composeOverlaysFeed,
+  } = useMessagesCompose();
   const { loading: profileLoading } = useUserProfile();
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
@@ -48,10 +52,15 @@ function RemoteInstShell() {
   }
 
   const layoutPush =
-    isMessagesPage && composeDrawerOpen ? ' tb-layout-push--open' : '';
+    isMessagesPage && composeDrawerOpen && !composeOverlaysFeed ? ' tb-layout-push--open' : '';
+
+  const layoutPushStyle: CSSProperties | undefined =
+    isMessagesPage && composeDrawerOpen && !composeOverlaysFeed
+      ? ({ ['--tb-drawer-width' as string]: `${composeDrawerWidth}px` } as CSSProperties)
+      : undefined;
 
   return (
-    <div className={`tb-layout-push${layoutPush}`}>
+    <div className={`tb-layout-push${layoutPush}`} style={layoutPushStyle}>
       <Nav activeSection="login" />
       <div
         className={`taskboard flex flex-col ${
@@ -70,9 +79,6 @@ function RemoteInstShell() {
             {isMessagesPage ? (
               <header className="min-w-0 flex-1 pr-4">
                 <span className="tb-label block leading-tight">{t('nav.remoteInst')}</span>
-                <p className="text-sm tb-muted mt-1 max-w-2xl leading-snug">
-                  {t('messages.pageDescription')}
-                </p>
               </header>
             ) : (
               <span className="flex-1" aria-hidden />

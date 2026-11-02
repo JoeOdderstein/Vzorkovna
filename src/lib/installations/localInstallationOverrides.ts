@@ -20,6 +20,7 @@ export type InstallationLocalPatch = Partial<
     | 'revizni_zprava_available'
     | 'remote_url'
     | 'taskboard_project_id'
+    | 'header_image_path'
   >
 >;
 

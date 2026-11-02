@@ -34,6 +34,7 @@ function buildRecord(def: SeedDef): InstallationRecord {
     revizni_zprava_available: def.revizni_zprava_available ?? false,
     remote_url: def.remote_url ?? null,
     taskboard_project_id: null,
+    header_image_path: null,
     sort_order: def.sort_order,
     created_at: now,
     updated_at: now,

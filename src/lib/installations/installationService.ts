@@ -56,6 +56,7 @@ function normalizeInstallation(row: Record<string, unknown>): InstallationRecord
     taskboard_project_id: row.taskboard_project_id
       ? String(row.taskboard_project_id)
       : null,
+    header_image_path: row.header_image_path ? String(row.header_image_path) : null,
     location: (row.location as InstallationRecord['location']) ?? 'vzorkovna',
     sort_order: Number(row.sort_order ?? 0),
     created_at: String(row.created_at ?? ''),
@@ -210,6 +211,7 @@ export type InstallationUpdatePatch = Partial<
     | 'revizni_zprava_available'
     | 'remote_url'
     | 'taskboard_project_id'
+    | 'header_image_path'
   >
 >;
 
@@ -537,6 +539,7 @@ export async function createInstallation(
     revizni_zprava_available: false,
     remote_url: null,
     taskboard_project_id: null,
+    header_image_path: null,
     sort_order,
     created_at: now,
     updated_at: now,
@@ -555,6 +558,7 @@ export async function createInstallation(
       responsible_person: record.responsible_person,
       last_inspection_date: record.last_inspection_date,
       next_maintenance_date: record.next_maintenance_date,
+      header_image_path: record.header_image_path,
       revizni_zprava_available: record.revizni_zprava_available,
       remote_url: record.remote_url,
       sort_order: record.sort_order,

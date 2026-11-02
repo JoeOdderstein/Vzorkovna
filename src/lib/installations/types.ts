@@ -64,6 +64,8 @@ export interface Installation {
   remote_url: string | null;
   /** Taskboard project used when auto-creating tasks from bug reports. */
   taskboard_project_id: string | null;
+  /** Supabase storage path for project header banner image. */
+  header_image_path: string | null;
   sort_order: number;
   created_at: string;
   updated_at: string;

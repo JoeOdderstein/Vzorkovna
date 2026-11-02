@@ -16,6 +16,7 @@ import {
   translateInstallationLocation,
   translateInstallationOperational,
 } from '../../lib/taskboard/i18n/messages';
+import InstallationProjectHeader from '../../components/installations/InstallationProjectHeader';
 import AddInstallationDialog from './AddInstallationDialog';
 import InstallationStatusFilterBar from './InstallationStatusFilterBar';
 import TranslatableText from './TranslatableText';
@@ -41,9 +42,11 @@ interface RemoteInstallationOverviewProps {
 function InstallationCard({
   installation,
   linkToDetail,
+  isAdmin,
 }: {
   installation: InstallationRecord;
   linkToDetail: boolean;
+  isAdmin: boolean;
 }) {
   const { t, locale } = useTaskboardI18n();
 
@@ -57,10 +60,10 @@ function InstallationCard({
 
   const content = (
     <>
-      <h2 className="text-base tb-text font-medium">
+      <h2 className="text-sm tb-text font-medium leading-snug line-clamp-2">
         <TranslatableText text={installation.name} />
       </h2>
-      <div className="mt-4 flex items-center justify-between gap-3">
+      <div className="mt-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-3 min-w-0">
           <span
             className={`tb-remote-inst-light ${
@@ -70,7 +73,7 @@ function InstallationCard({
             }`}
             aria-hidden
           />
-          <span className="text-sm tb-text-secondary">{statusLabel}</span>
+          <span className="text-xs tb-text-secondary truncate">{statusLabel}</span>
         </div>
         {linkToDetail || installation.remote_url ? (
           <span className="inline-flex items-center gap-1 text-xs tb-muted shrink-0">
@@ -82,13 +85,40 @@ function InstallationCard({
     </>
   );
 
-  const cardClassName =
-    'tb-remote-inst-card tb-remote-inst-card--link block w-full text-left hover:border-[var(--tb-accent)] transition-colors';
+  const useCoverHeader = linkToDetail;
+
+  const cardShellClass = [
+    'tb-remote-inst-card tb-remote-inst-card--with-header block w-full h-full text-left overflow-hidden',
+    linkToDetail ? 'tb-remote-inst-card--overview tb-remote-inst-card--cover' : '',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  const linkClassName = `${cardShellClass} tb-remote-inst-card--link hover:border-[var(--tb-accent)] transition-colors`;
+
+  const header = (
+    <InstallationProjectHeader
+      installationId={installation.id}
+      headerImagePath={installation.header_image_path}
+      projectName={installation.name}
+      variant="card"
+      cover={useCoverHeader}
+      isAdmin={linkToDetail && isAdmin}
+    />
+  );
+
+  const body = (
+    <div
+      className={`tb-remote-inst-card__body${useCoverHeader ? ' tb-remote-inst-card__body--cover' : ''}`}
+    >
+      {content}
+    </div>
+  );
 
   if (linkToDetail) {
     return (
-      <Link to={installationDetailPath(installation.id)} className={cardClassName}>
-        {content}
+      <Link to={installationDetailPath(installation.id)} className={linkClassName}>
+        {header}
+        {body}
       </Link>
     );
   }
@@ -104,9 +134,10 @@ function InstallationCard({
               `${installation.id}-remote`,
             )
           }
-          className={cardClassName}
+          className={linkClassName}
         >
-          {content}
+          {header}
+          {body}
         </button>
       );
     }
@@ -116,16 +147,18 @@ function InstallationCard({
         href={installation.remote_url}
         target="_blank"
         rel="noopener noreferrer"
-        className={cardClassName}
+        className={linkClassName}
       >
-        {content}
+        {header}
+        {body}
       </a>
     );
   }
 
   return (
-    <Link to={installationDetailPath(installation.id)} className={cardClassName}>
-      {content}
+    <Link to={installationDetailPath(installation.id)} className={linkClassName}>
+      {header}
+      {body}
     </Link>
   );
 }
@@ -192,16 +225,20 @@ export default function RemoteInstallationOverview({
         groups.length === 0 ? (
           <p className="text-sm tb-muted">{t('projects.noMatch')}</p>
         ) : (
-          <div className="space-y-10">
+          <div className="space-y-8">
             {groups.map((group) => (
               <section key={group.location} aria-labelledby={`location-${group.location}`}>
-                <h2 id={`location-${group.location}`} className="tb-label block mb-4">
+                <h2 id={`location-${group.location}`} className="tb-label block mb-3">
                   {translateInstallationLocation(locale, group.location, group.label)}
                 </h2>
-                <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <ul className="tb-remote-inst-overview-grid grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                   {group.installations.map((installation) => (
                     <li key={installation.id}>
-                      <InstallationCard installation={installation} linkToDetail={linkToDetail} />
+                      <InstallationCard
+                        installation={installation}
+                        linkToDetail={linkToDetail}
+                        isAdmin={isAdmin}
+                      />
                     </li>
                   ))}
                 </ul>

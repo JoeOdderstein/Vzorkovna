@@ -328,12 +328,19 @@ export default function ProjectTimelinePanel() {
       {shareNotice ? <p className="text-sm text-[var(--tb-accent)] mt-3">{shareNotice}</p> : null}
 
       {!loading && !editing ? (
-        <ProjectTimelineGrid
-          projects={filterProjects}
-          timelines={timelinesByProject}
-          weekSlots={weekSlots}
-          onSelectBlock={setBlockDetail}
-        />
+        <>
+          <ProjectTimelineGrid
+            projects={filterProjects}
+            timelines={timelinesByProject}
+            weekSlots={weekSlots}
+            onSelectBlock={setBlockDetail}
+          />
+          <ProjectTimelineBlockDetailDialog
+            detail={blockDetail}
+            weekSlots={weekSlots}
+            onClose={() => setBlockDetail(null)}
+          />
+        </>
       ) : null}
 
       {!loading && !editing && filterProjects.length > 0 && !timetableHasBlocks ? (
@@ -445,12 +452,6 @@ export default function ProjectTimelinePanel() {
           </div>
         </div>
       ) : null}
-
-      <ProjectTimelineBlockDetailDialog
-        detail={blockDetail}
-        weekSlots={weekSlots}
-        onClose={() => setBlockDetail(null)}
-      />
     </section>
   );
 }
