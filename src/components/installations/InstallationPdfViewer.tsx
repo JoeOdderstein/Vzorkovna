@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import InstallationPdfEmbed from './InstallationPdfEmbed';
 
 interface InstallationPdfViewerProps {
   pdfUrl: string;
@@ -52,11 +53,12 @@ export default function InstallationPdfViewer({
         </button>
       </div>
 
-      <div className="relative z-10 flex flex-1 justify-center px-4 pb-6 min-h-0">
-        <iframe
+      <div className="relative z-10 flex flex-1 justify-center px-4 pb-6 min-h-0 w-full max-w-5xl mx-auto">
+        <InstallationPdfEmbed
+          pdfUrl={pdfUrl}
           title={title}
-          src={pdfUrl}
-          className="pointer-events-auto w-full max-w-5xl h-full min-h-[70vh] rounded-lg bg-white shadow-2xl border-0"
+          showMobileOpenLink={false}
+          className="pointer-events-auto w-full h-full min-h-[70vh] rounded-lg bg-white shadow-2xl border-0"
         />
       </div>
     </div>,

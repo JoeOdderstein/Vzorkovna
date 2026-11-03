@@ -2029,6 +2029,13 @@ body {
   max-height: none;
 }
 
+@media (max-width: 767px) {
+  .taskboard .tb-installation-pdf-embed iframe {
+    min-height: 55vh;
+    height: 55vh;
+  }
+}
+
 .taskboard .tb-installation-header__placeholder {
   display: flex;
   width: 100%;

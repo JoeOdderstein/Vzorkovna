@@ -18,6 +18,7 @@ import type { InstallationDocument, InstallationDocumentKind } from '../../lib/i
 import { formatMessage } from '../../lib/taskboard/i18n/messages';
 import TranslatableText from '../../taskboard/components/TranslatableText';
 import InstallationDocxPreview from './InstallationDocxPreview';
+import InstallationPdfEmbed from './InstallationPdfEmbed';
 import InstallationPdfViewer from './InstallationPdfViewer';
 import TaskPhotoLightbox from '../../taskboard/components/TaskPhotoLightbox';
 
@@ -286,7 +287,9 @@ export default function InstallationDocumentsPanel({
     }
   };
 
-  const canEmbedPdf = embedPdf && previewDocuments.some((doc) => doc.storage_path);
+  const canEmbedPdf =
+    embedPdf &&
+    previewDocuments.some((doc) => Boolean(doc.storage_path || doc.external_url));
 
   const photoLightboxDoc =
     photoLightboxIndex != null &&
@@ -504,11 +507,7 @@ export default function InstallationDocumentsPanel({
   const embeddedPdf = canEmbedPdf ? (
     <div className="rounded-lg border border-[var(--tb-border)] overflow-hidden bg-[var(--tb-bg)]">
       {embedded?.format === 'pdf' ? (
-        <iframe
-          title={embedded.title}
-          src={embedded.url}
-          className="w-full min-h-[min(72vh,40rem)] border-0 bg-white"
-        />
+        <InstallationPdfEmbed pdfUrl={embedded.url} title={embedded.title} />
       ) : embedded?.format === 'docx' ? (
         <InstallationDocxPreview documentUrl={embedded.url} />
       ) : (
