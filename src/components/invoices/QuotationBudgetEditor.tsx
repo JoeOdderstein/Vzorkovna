@@ -15,7 +15,7 @@ import { downloadQuotationBudgetPdf } from '../../lib/quotations/downloadQuotati
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import type { Project } from '../../lib/taskboard/types';
 import { fetchProjectTimeline } from '../../lib/taskboard/projectTimelineService';
-import { timelineBlockPlainLabel } from '../../lib/taskboard/projectTimelineUtils';
+import { isTimelinePhase, timelineBlockPlainLabel } from '../../lib/taskboard/projectTimelineUtils';
 import {
   formatQuotationMoney,
   recomputeQuotationLines,
@@ -97,10 +97,12 @@ export default function QuotationBudgetEditor({
       .then((state) => {
         if (cancelled) return;
         setPhaseOptions(
-          state.entries.map((entry) => ({
-            id: entry.id,
-            label: timelineBlockPlainLabel(entry.name) || 'Phase',
-          })),
+          state.entries
+            .filter((entry) => isTimelinePhase(entry))
+            .map((entry) => ({
+              id: entry.id,
+              label: timelineBlockPlainLabel(entry.name) || 'Phase',
+            })),
         );
       })
       .catch(() => {
