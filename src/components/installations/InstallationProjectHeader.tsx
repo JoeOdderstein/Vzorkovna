@@ -172,7 +172,7 @@ export default function InstallationProjectHeader({
           />
           {canManageHeaderPhoto ? (
             <>
-              <div className="tb-installation-header__position">
+              <div className="tb-installation-header__position tb-installation-header__admin-desktop-only">
                 <button
                   type="button"
                   className="tb-installation-header__admin-btn"
@@ -194,7 +194,7 @@ export default function InstallationProjectHeader({
                   <ChevronDown size={14} aria-hidden />
                 </button>
               </div>
-              <div className="tb-installation-header__admin">
+              <div className="tb-installation-header__admin tb-installation-header__admin-desktop-only">
               <button
                 type="button"
                 className="tb-installation-header__admin-btn"
@@ -224,21 +224,29 @@ export default function InstallationProjectHeader({
           ) : null}
         </>
       ) : showPlaceholder ? (
-        <button
-          type="button"
-          className="tb-installation-header__placeholder"
-          disabled={uploading}
-          onClick={openPicker}
-        >
-          {uploading ? (
-            <span className="text-sm tb-muted">{t('projects.header.uploading')}</span>
-          ) : (
-            <>
-              <Camera size={variant === 'card' ? 16 : 22} className="tb-muted" aria-hidden />
-              <span className="text-sm tb-muted">{t('projects.header.addPhoto')}</span>
-            </>
-          )}
-        </button>
+        <>
+          <button
+            type="button"
+            className="tb-installation-header__placeholder tb-installation-header__admin-desktop-only"
+            disabled={uploading}
+            onClick={openPicker}
+          >
+            {uploading ? (
+              <span className="text-sm tb-muted">{t('projects.header.uploading')}</span>
+            ) : (
+              <>
+                <Camera size={variant === 'card' ? 16 : 22} className="tb-muted" aria-hidden />
+                <span className="text-sm tb-muted">{t('projects.header.addPhoto')}</span>
+              </>
+            )}
+          </button>
+          <div
+            className="tb-installation-header__placeholder tb-installation-header__admin-mobile-empty"
+            aria-hidden
+          >
+            <ImageIcon size={20} className="tb-muted opacity-40" />
+          </div>
+        </>
       ) : uploading ? (
         <div className="tb-installation-header__placeholder" aria-busy>
           <span className="text-sm tb-muted">{t('projects.header.uploading')}</span>

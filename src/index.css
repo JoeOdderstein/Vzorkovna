@@ -2048,6 +2048,44 @@ body {
   border-radius: 8px;
 }
 
+@media (max-width: 767px) {
+  .taskboard .tb-installation-header__admin-desktop-only {
+    display: none !important;
+  }
+}
+
+.taskboard .tb-installation-header__admin-mobile-empty {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .taskboard .tb-installation-header--detail .tb-installation-header__admin-mobile-empty {
+    display: flex;
+  }
+
+  .taskboard .tb-installation-detail-hero__edit--banner-corner {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 5;
+    margin: 0;
+  }
+
+  .taskboard .tb-installation-detail-hero__edit--inline {
+    display: none;
+  }
+
+  .taskboard .tb-installation-detail-hero:has(.tb-installation-header__img) .tb-installation-detail-hero__edit--banner-corner {
+    backdrop-filter: blur(6px);
+  }
+}
+
+@media (min-width: 768px) {
+  .taskboard .tb-installation-detail-hero__edit--banner-corner {
+    display: none;
+  }
+}
+
 .taskboard .tb-installation-header__admin {
   position: absolute;
   right: 0.65rem;

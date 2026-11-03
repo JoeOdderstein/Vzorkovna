@@ -199,6 +199,17 @@ export default function InstallationDetailPage() {
           />
         ) : null}
 
+        {isAdmin ? (
+          <button
+            type="button"
+            onClick={() => setEditField('name')}
+            className="text-xs tb-btn-secondary tb-installation-detail-hero__edit tb-installation-detail-hero__edit--banner-corner inline-flex items-center gap-1 shrink-0"
+          >
+            <Pencil size={12} aria-hidden />
+            {t('projects.admin.edit')}
+          </button>
+        ) : null}
+
         <div className="tb-installation-detail-hero__content">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-start gap-3">
@@ -213,9 +224,9 @@ export default function InstallationDetailPage() {
                 <button
                   type="button"
                   onClick={() => setEditField('name')}
-                  className="text-xs tb-btn-secondary tb-installation-detail-hero__edit inline-flex items-center gap-1 shrink-0 mt-1"
+                  className="text-xs tb-btn-secondary tb-installation-detail-hero__edit tb-installation-detail-hero__edit--inline inline-flex items-center gap-1 shrink-0 mt-1"
                 >
-                  <Pencil size={12} />
+                  <Pencil size={12} aria-hidden />
                   {t('projects.admin.edit')}
                 </button>
               ) : null}
