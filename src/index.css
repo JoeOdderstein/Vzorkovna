@@ -2283,36 +2283,11 @@ html.tb-compose-resizing .taskboard.tb-messages-compose-drawer {
   margin: 0 auto;
   background: #fff;
   box-sizing: border-box;
-  max-width: 100%;
 }
 
-@media (max-width: 767px) {
-  .taskboard .installation-docx-preview-root {
-    overflow-x: hidden;
-  }
-
-  .taskboard .installation-docx-preview-root .docx-wrapper {
-    width: 100% !important;
-    min-width: 0 !important;
-    padding: 0.75rem !important;
-  }
-
-  .taskboard .installation-docx-preview-root .docx-wrapper > section.docx {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
-    box-sizing: border-box;
-  }
-
-  .taskboard .installation-docx-preview-root .docx-wrapper table {
-    max-width: 100%;
-    table-layout: fixed;
-  }
-
-  .taskboard .installation-docx-preview-root .docx-wrapper img {
-    max-width: 100%;
-    height: auto;
-  }
+.taskboard .installation-docx-preview-viewport .installation-docx-preview-root .docx-wrapper img {
+  max-width: 100%;
+  height: auto;
 }
 
 .taskboard .tb-messages-compose-collapsed {
