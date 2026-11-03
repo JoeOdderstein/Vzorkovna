@@ -30,10 +30,14 @@ export default function InstallationDocxPreview({ documentUrl }: InstallationDoc
         if (!response.ok) throw new Error('fetch failed');
         const blob = await response.blob();
         if (cancelled) return;
+        const mobile = window.matchMedia('(max-width: 767px)').matches;
         await renderAsync(blob, bodyEl, styleEl, {
           ...defaultOptions,
           className: 'installation-docx-preview',
           inWrapper: true,
+          ignoreWidth: mobile,
+          ignoreHeight: mobile,
+          breakPages: !mobile,
         });
       } catch {
         if (!cancelled) setError(t('projects.tech.docxPreviewError'));
