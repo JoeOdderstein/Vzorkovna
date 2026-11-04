@@ -57,6 +57,7 @@ function mapRow(row: Record<string, unknown>): TeamMessage {
       typeof row.feed_summary === 'string' && row.feed_summary.trim()
         ? String(row.feed_summary).trim()
         : null,
+    is_important: Boolean(row.is_important),
     thread_root_id: row.thread_root_id ? String(row.thread_root_id) : null,
     project: null,
     linked_task: null,
@@ -503,6 +504,7 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
       linked_task_id: linkedTaskId,
       linked_task_ids: linkedTaskIds,
       created_at: new Date().toISOString(),
+      is_important: Boolean(input.isImportant),
     };
     const all = loadLocalMessages();
     all.push(message);
@@ -512,6 +514,7 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
   }
 
   const initialFeedSummary = buildLocalFeedSummary(body) || null;
+  const isImportant = Boolean(input.isImportant);
 
   let insertPayload: Record<string, unknown> = {
     title,
@@ -523,6 +526,7 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
     linked_task_id: linkedTaskId,
     linked_task_ids: linkedTaskIds,
     feed_summary: initialFeedSummary,
+    is_important: isImportant,
   };
 
   let { data, error } = await (await db())
@@ -530,6 +534,15 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
     .insert(insertPayload)
     .select('*')
     .single();
+
+  if (error && /is_important|column/i.test(error.message)) {
+    delete insertPayload.is_important;
+    ({ data, error } = await (await db())
+      .from('team_messages')
+      .insert(insertPayload)
+      .select('*')
+      .single());
+  }
 
   if (error && /feed_summary|column/i.test(error.message)) {
     insertPayload = {
@@ -541,6 +554,7 @@ export async function createTeamMessage(input: CreateTeamMessageInput): Promise<
       author_display_name: input.author.displayName,
       linked_task_id: linkedTaskId,
       linked_task_ids: linkedTaskIds,
+      ...(insertPayload.is_important !== undefined ? { is_important: isImportant } : {}),
     };
     ({ data, error } = await (await db())
       .from('team_messages')
@@ -697,6 +711,7 @@ export async function updateTeamMessage(
       feed_summary: buildLocalFeedSummary(body) || null,
       project_id: input.projectId,
       category: input.category,
+      is_important: input.isImportant ?? all[index].is_important ?? false,
     };
     all[index] = updated;
     saveLocalMessages(all);
@@ -710,6 +725,7 @@ export async function updateTeamMessage(
       body,
       projectId: input.projectId,
       category: input.category,
+      isImportant: input.isImportant,
     });
     if (viaApi !== 'unavailable') {
       if (!authorUsernamesMatch(viaApi.author_username, actorUsername)) {
@@ -719,12 +735,15 @@ export async function updateTeamMessage(
     }
   }
 
-  const basePayload = {
+  const basePayload: Record<string, unknown> = {
     title,
     body,
     project_id: input.projectId,
     category: input.category,
   };
+  if (input.isImportant !== undefined) {
+    basePayload.is_important = Boolean(input.isImportant);
+  }
 
   let { data, error } = await (await db())
     .from('team_messages')
@@ -742,6 +761,24 @@ export async function updateTeamMessage(
       .maybeSingle());
   }
 
+  if (error && /is_important|column/i.test(error.message)) {
+    const { is_important: _removed, ...withoutImportant } = basePayload;
+    ({ data, error } = await (await db())
+      .from('team_messages')
+      .update({ ...withoutImportant, feed_summary: null })
+      .eq('id', messageId)
+      .select('*')
+      .maybeSingle());
+    if (error && /feed_summary|column/i.test(error.message)) {
+      ({ data, error } = await (await db())
+        .from('team_messages')
+        .update(withoutImportant)
+        .eq('id', messageId)
+        .select('*')
+        .maybeSingle());
+    }
+  }
+
   if (error) {
     throw formatTeamMessageUpdateError(error);
   }
@@ -754,6 +791,113 @@ export async function updateTeamMessage(
   if (!authorUsernamesMatch(row.author_username, actorUsername)) {
     throw new Error('You can only edit your own messages.');
   }
+  const [enriched] = await enrichMessages([row]);
+  return enriched;
+}
+
+export async function setTeamMessageImportant(
+  messageId: string,
+  isImportant: boolean,
+  actorUsername: string,
+  options: { isAdmin: boolean }
+): Promise<TeamMessage> {
+  if (!actorUsername.trim()) throw new Error('You must be logged in to update a message.');
+  if (!messageId.trim()) throw new Error('Message not found.');
+
+  if (isLocalTaskboardMode()) {
+    const all = loadLocalMessages();
+    const index = all.findIndex((m) => m.id === messageId);
+    if (index < 0) throw new Error('Message not found.');
+    if (all[index].thread_root_id) {
+      throw new Error('Only top-level messages can be marked important.');
+    }
+    const canChange =
+      options.isAdmin ||
+      authorUsernamesMatch(all[index].author_username, actorUsername);
+    if (!canChange) {
+      throw new Error('You can only update your own messages.');
+    }
+    const updated: TeamMessage = { ...all[index], is_important: isImportant };
+    all[index] = updated;
+    saveLocalMessages(all);
+    const [enriched] = await enrichMessages([updated]);
+    return enriched;
+  }
+
+  if (isSupabaseConfigured()) {
+    const viaApi = await setTeamMessageImportantViaApi(messageId, isImportant);
+    if (viaApi !== 'unavailable') {
+      return viaApi;
+    }
+  }
+
+  const target = await findTeamMessageById(messageId);
+  if (!target) throw new Error('Message not found.');
+  if (target.thread_root_id) {
+    throw new Error('Only top-level messages can be marked important.');
+  }
+  const canChange =
+    options.isAdmin || authorUsernamesMatch(target.author_username, actorUsername);
+  if (!canChange) {
+    throw new Error('You can only update your own messages.');
+  }
+
+  let { data, error } = await (await db())
+    .from('team_messages')
+    .update({ is_important: isImportant })
+    .eq('id', messageId)
+    .select('*')
+    .maybeSingle();
+
+  if (error && /is_important|column/i.test(error.message)) {
+    throw new Error(
+      'Important flag is not available yet. Run supabase/migrations/050_team_message_important.sql in Supabase.'
+    );
+  }
+  if (error) throw error;
+  if (!data) throw new Error('Message could not be saved.');
+
+  const row = mapRow(data as Record<string, unknown>);
+  const [enriched] = await enrichMessages([row]);
+  return enriched;
+}
+
+async function setTeamMessageImportantViaApi(
+  messageId: string,
+  isImportant: boolean
+): Promise<TeamMessage | 'unavailable'> {
+  let res: Response;
+  try {
+    res = await fetch('/api/messages/set-important', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, isImportant }),
+    });
+  } catch {
+    return 'unavailable';
+  }
+
+  if (res.status === 503 || res.status === 404) {
+    return 'unavailable';
+  }
+
+  const payload = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    message?: Record<string, unknown>;
+  };
+
+  if (!res.ok) {
+    throw new Error(
+      typeof payload.error === 'string' ? payload.error : 'Could not update message.'
+    );
+  }
+
+  if (!payload.message) {
+    throw new Error('Could not update message.');
+  }
+
+  const row = mapRow(payload.message);
   const [enriched] = await enrichMessages([row]);
   return enriched;
 }
@@ -774,6 +918,7 @@ async function updateTeamMessageViaApi(
         body: input.body,
         projectId: input.projectId,
         category: input.category,
+        isImportant: input.isImportant,
       }),
     });
   } catch {

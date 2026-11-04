@@ -672,6 +672,7 @@ export async function sendTeamMessageEmail({
   messageTitle,
   messageBodyHtml,
   messagesUrl,
+  isImportant = false,
 }) {
   const resend = getResend();
   const from = process.env.EMAIL_FROM;
@@ -680,7 +681,9 @@ export async function sendTeamMessageEmail({
     throw new Error('Email is not configured');
   }
 
-  const subject = `New message: ${messageTitle}`;
+  const subject = isImportant
+    ? `[IMPORTANT] New message: ${messageTitle}`
+    : `New message: ${messageTitle}`;
   const html = buildTeamMessageHtml({
     recipientName,
     authorName,

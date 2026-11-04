@@ -16,6 +16,7 @@ import invoicesNotifyUpload from './handlers/invoices-notify-upload.js';
 import invoicesNotifyForwarded from './handlers/invoices-notify-forwarded.js';
 import messagesDelete from './handlers/messages-delete.js';
 import messagesUpdate from './handlers/messages-update.js';
+import messagesSetImportant from './handlers/messages-set-important.js';
 import messagesNotifyPost from './handlers/messages-notify-post.js';
 import messagesParseActionPoints from './handlers/messages-parse-action-points.js';
 import messagesSuggestProject from './handlers/messages-suggest-project.js';
@@ -45,6 +46,7 @@ const ROUTES = {
   'invoices/notify-forwarded': invoicesNotifyForwarded,
   'messages/delete': messagesDelete,
   'messages/update': messagesUpdate,
+  'messages/set-important': messagesSetImportant,
   'messages/notify-post': messagesNotifyPost,
   'messages/parse-action-points': messagesParseActionPoints,
   'messages/suggest-project': messagesSuggestProject,

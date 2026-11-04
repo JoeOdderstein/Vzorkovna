@@ -135,6 +135,7 @@ function MessageComposeForm({
   const [suggestingAi, setSuggestingAi] = useState(false);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(false);
+  const [isImportant, setIsImportant] = useState(false);
 
   const manualComposePickRef = useRef({ project: false, category: false });
   const suggestRequestIdRef = useRef(0);
@@ -180,6 +181,7 @@ function MessageComposeForm({
         )
       );
       setActionDraftsFromAi(false);
+      setIsImportant(Boolean(stored.isImportant));
       const shouldExpand =
         stored.expanded || Boolean(stored.title.trim()) || htmlMessageHasContent(stored.body);
       setExpanded(shouldExpand);
@@ -219,6 +221,7 @@ function MessageComposeForm({
         actionDrafts,
         attachments,
         excludedNotifyUsernames,
+        isImportant,
         expanded,
         savedAt: new Date().toISOString(),
       };
@@ -238,6 +241,7 @@ function MessageComposeForm({
     actionDrafts,
     attachments,
     excludedNotifyUsernames,
+    isImportant,
     expanded,
     getTitle,
   ]);
@@ -544,6 +548,7 @@ function MessageComposeForm({
         projectId: messageProjectId,
         category: messageCategory,
         author: { username, displayName },
+        isImportant,
         actionPoints:
           enabledDrafts.length > 0
             ? enabledDrafts.map(({ draftId: _id, enabled: _en, categoryOverride, ...ap }) => ({
@@ -604,6 +609,7 @@ function MessageComposeForm({
       setActionDrafts([]);
       setAttachments([]);
       setExcludedNotifyUsernames([]);
+      setIsImportant(false);
       setActionDraftsFromAi(false);
       setMessageProjectId('');
       lastAppliedSuggestTitleRef.current = '';
@@ -673,6 +679,17 @@ function MessageComposeForm({
         onChange={setAttachments}
         disabled={submitting}
       />
+
+      <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+        <input
+          type="checkbox"
+          checked={isImportant}
+          onChange={(e) => setIsImportant(e.target.checked)}
+          disabled={submitting}
+          className="rounded border-[var(--tb-border)]"
+        />
+        <span>{t('messages.markImportant')}</span>
+      </label>
 
       <MessageComposeNotificationRecipients
         excludedUsernames={excludedNotifyUsernames}

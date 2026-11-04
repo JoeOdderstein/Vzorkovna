@@ -18,6 +18,7 @@ export type MessageComposeDraft = {
   actionDrafts: ActionPointDraft[];
   attachments: MessageComposeAttachment[];
   excludedNotifyUsernames: string[];
+  isImportant: boolean;
   expanded: boolean;
   savedAt: string;
 };
@@ -61,6 +62,7 @@ export function loadMessageComposeDraft(username: string): MessageComposeDraft |
       excludedNotifyUsernames: Array.isArray(parsed.excludedNotifyUsernames)
         ? parsed.excludedNotifyUsernames.map(String)
         : [],
+      isImportant: Boolean(parsed.isImportant),
       expanded: Boolean(parsed.expanded),
       savedAt: String(parsed.savedAt ?? ''),
     };

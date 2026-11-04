@@ -13,6 +13,7 @@ import type { TaskCategory } from '../../lib/taskboard/constants';
 import {
   createTeamMessageReply,
   deleteTeamMessage,
+  setTeamMessageImportant,
   updateTeamMessage,
 } from '../../lib/messages/teamMessageService';
 import type { TeamMessage } from '../../lib/messages/types';
@@ -73,6 +74,7 @@ function MessageRow({
   const canEdit =
     Boolean(currentUsername) &&
     authorUsernamesMatch(message.author_username, currentUsername ?? '');
+  const canMarkImportant = Boolean(currentUsername) && (canEdit || isAdmin);
 
   const [editing, setEditing] = useState(false);
   const [editTitle, setEditTitle] = useState(message.title);
@@ -81,6 +83,8 @@ function MessageRow({
   const [editCategory, setEditCategory] = useState<TaskCategory>(
     message.category ?? 'quotations'
   );
+  const [editImportant, setEditImportant] = useState(Boolean(message.is_important));
+  const [togglingImportant, setTogglingImportant] = useState(false);
   const [editCategories, setEditCategories] = useState<CategoryOption[]>(DEFAULT_CATEGORIES);
   const [loadingEditCategories, setLoadingEditCategories] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -138,8 +142,23 @@ function MessageRow({
     setEditBody(message.body);
     setEditProjectId(message.project_id ?? projects[0]?.id ?? '');
     setEditCategory(message.category ?? 'quotations');
+    setEditImportant(Boolean(message.is_important));
     setActionError('');
     setEditing(true);
+  };
+
+  const toggleImportant = async (next: boolean) => {
+    if (!currentUsername || togglingImportant || editing || saving || deleting) return;
+    setTogglingImportant(true);
+    setActionError('');
+    try {
+      await setTeamMessageImportant(message.id, next, currentUsername, { isAdmin });
+      onMutated();
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : t('messages.importantToggleError'));
+    } finally {
+      setTogglingImportant(false);
+    }
   };
 
   const cancelEdit = () => {
@@ -174,6 +193,7 @@ function MessageRow({
           body,
           projectId: editProjectId,
           category: editCategory,
+          isImportant: editImportant,
         },
         currentUsername
       );
@@ -231,8 +251,10 @@ function MessageRow({
     }
   };
 
+  const isImportant = Boolean(message.is_important);
+
   return (
-    <li>
+    <li className={isImportant ? 'tb-message-row tb-message-row--important' : 'tb-message-row'}>
       <CommentAuthorBlock username={message.author_username}>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 mb-1">
           <span className="text-sm font-semibold">{authorLabel}</span>
@@ -265,6 +287,21 @@ function MessageRow({
                   aria-label={t('messages.readLabel')}
                 />
                 <span className="tb-muted">{t('messages.readLabel')}</span>
+              </label>
+            ) : null}
+            {canMarkImportant && !editing ? (
+              <label className="inline-flex items-center gap-1.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={isImportant}
+                  onChange={(e) => void toggleImportant(e.target.checked)}
+                  disabled={togglingImportant || saving || deleting}
+                  className="rounded border-[var(--tb-border)]"
+                  aria-label={t('messages.markImportant')}
+                />
+                <span className={isImportant ? 'font-semibold text-amber-700 dark:text-amber-400' : 'tb-muted'}>
+                  {t('messages.importantLabel')}
+                </span>
               </label>
             ) : null}
             {canEdit && !editing ? (
@@ -336,6 +373,16 @@ function MessageRow({
               minHeightClassName="min-h-[5rem]"
               aria-label={t('task.description')}
             />
+            <label className="inline-flex items-center gap-2 text-sm cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={editImportant}
+                onChange={(e) => setEditImportant(e.target.checked)}
+                disabled={saving}
+                className="rounded border-[var(--tb-border)]"
+              />
+              <span>{t('messages.markImportant')}</span>
+            </label>
             {actionError ? <p className="text-xs text-red-600">{actionError}</p> : null}
             <div className="flex gap-2">
               <button
@@ -358,12 +405,17 @@ function MessageRow({
           </div>
         ) : (
           <>
-            <h3
-              ref={titleScrollAnchorRef}
-              className="text-base font-semibold min-w-0 leading-snug mb-2"
-            >
-              {displayTitle}
-            </h3>
+            <div className="flex flex-wrap items-center gap-2 mb-2 min-w-0">
+              {isImportant ? (
+                <span className="tb-message-important-badge shrink-0">{t('messages.importantBadge')}</span>
+              ) : null}
+              <h3
+                ref={titleScrollAnchorRef}
+                className="text-base font-semibold min-w-0 leading-snug flex-1"
+              >
+                {displayTitle}
+              </h3>
+            </div>
             <MessageBodyContent
               messageId={message.id}
               title={displayTitle}

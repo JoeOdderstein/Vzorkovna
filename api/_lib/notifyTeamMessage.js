@@ -68,7 +68,7 @@ export async function handleNotifyTeamMessage(req, res) {
 
   const { data: message, error: messageError } = await supabase
     .from('team_messages')
-    .select('id, title, body, author_username, author_display_name')
+    .select('id, title, body, author_username, author_display_name, is_important')
     .eq('id', messageId)
     .maybeSingle();
 
@@ -146,6 +146,7 @@ export async function handleNotifyTeamMessage(req, res) {
         messageTitle: String(message.title ?? 'Team message'),
         messageBodyHtml,
         messagesUrl,
+        isImportant: Boolean(message.is_important),
       });
       sent += 1;
     } catch (err) {

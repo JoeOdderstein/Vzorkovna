@@ -29,6 +29,8 @@ export interface TeamMessage {
   created_at: string;
   /** AI recap for chat feed (collapsed view); max ~50 words. */
   feed_summary?: string | null;
+  /** Highlight in feed and email when true (root messages only). */
+  is_important?: boolean;
   project?: TeamMessageProject | null;
   linked_task?: TeamMessageLinkedTask | null;
   linked_tasks?: TeamMessageLinkedTask[];
@@ -53,6 +55,7 @@ export interface CreateTeamMessageInput {
   projectId: string;
   category: TaskCategory;
   author: { username: string; displayName: string };
+  isImportant?: boolean;
   actionPoint?: TeamMessageActionPoint | null;
   actionPoints?: TeamMessageActionPoint[];
 }
@@ -62,6 +65,7 @@ export interface UpdateTeamMessageInput {
   body: string;
   projectId: string;
   category: TaskCategory;
+  isImportant?: boolean;
 }
 
 export type ActionPointDraft = TeamMessageActionPoint & {

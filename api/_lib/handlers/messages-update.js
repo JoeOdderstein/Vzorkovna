@@ -41,6 +41,10 @@ export default async function handler(req, res) {
   const messageBody = typeof body.body === 'string' ? body.body : '';
   const projectId = typeof body.projectId === 'string' ? body.projectId.trim() : '';
   const category = typeof body.category === 'string' ? body.category.trim() : '';
+  const isImportant =
+    body.isImportant === undefined || body.isImportant === null
+      ? undefined
+      : Boolean(body.isImportant);
 
   if (!messageId) {
     return res.status(400).json({ error: 'messageId is required' });
@@ -85,6 +89,7 @@ export default async function handler(req, res) {
       body: messageBody,
       project_id: projectId,
       category,
+      ...(isImportant !== undefined ? { is_important: isImportant } : {}),
     };
 
     let updatePayload = { ...basePayload, feed_summary: null };
@@ -102,6 +107,24 @@ export default async function handler(req, res) {
         .eq('id', messageId)
         .select('*')
         .maybeSingle());
+    }
+
+    if (updateError && /is_important|column/i.test(updateError.message)) {
+      const { is_important: _removed, ...withoutImportant } = basePayload;
+      ({ data: updated, error: updateError } = await supabase
+        .from('team_messages')
+        .update({ ...withoutImportant, feed_summary: null })
+        .eq('id', messageId)
+        .select('*')
+        .maybeSingle());
+      if (updateError && /feed_summary|column/i.test(updateError.message)) {
+        ({ data: updated, error: updateError } = await supabase
+          .from('team_messages')
+          .update(withoutImportant)
+          .eq('id', messageId)
+          .select('*')
+          .maybeSingle());
+      }
     }
 
     if (updateError) throw updateError;
