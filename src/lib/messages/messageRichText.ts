@@ -37,6 +37,9 @@ const ALLOWED_TAGS = [
 const HTML_BODY_PATTERN =
   /<\/?(?:p|br|div|span|strong|b|em|i|u|ul|ol|li|h[1-6]|font|img)\b/i;
 
+const ENTITY_ENCODED_HTML_PATTERN =
+  /&lt;\/?(?:p|br|div|span|strong|b|em|i|u|ul|ol|li|h[1-6]|font|img)\b/i;
+
 const PURIFY_CONFIG = {
   ALLOWED_TAGS,
   ALLOWED_ATTR: ['style', 'class', 'src', 'alt', 'loading', 'href', 'target', 'rel'],
@@ -44,8 +47,42 @@ const PURIFY_CONFIG = {
   ALLOW_DATA_ATTR: true,
 } as const;
 
+/** Contenteditable sometimes serializes literal `<div>` in text nodes as `&lt;div&gt;`. */
+export function decodeMessageHtmlEntities(text: string): string {
+  const trimmed = text.trim();
+  if (!trimmed || !/&lt;/i.test(trimmed)) return text;
+
+  if (typeof document !== 'undefined') {
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = trimmed;
+    return textarea.value;
+  }
+
+  return trimmed
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&nbsp;/gi, '\u00a0')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'");
+}
+
+export function prepareMessageBodyInput(raw: string): string {
+  const trimmed = raw.trim();
+  if (!trimmed) return '';
+  if (isLikelyHtmlMessageBody(trimmed)) return trimmed;
+  if (ENTITY_ENCODED_HTML_PATTERN.test(trimmed) || /&lt;\/?[a-z]/i.test(trimmed)) {
+    return decodeMessageHtmlEntities(trimmed);
+  }
+  return trimmed;
+}
+
 export function isLikelyHtmlMessageBody(body: string): boolean {
-  return HTML_BODY_PATTERN.test(body.trim());
+  const trimmed = body.trim();
+  if (HTML_BODY_PATTERN.test(trimmed)) return true;
+  return ENTITY_ENCODED_HTML_PATTERN.test(trimmed);
 }
 
 export function sanitizeMessageHtml(dirty: string): string {
@@ -98,7 +135,7 @@ export function normalizeMessageImagesInHtml(html: string): string {
 }
 
 export async function resolveMessageBodyHtml(body: string): Promise<string> {
-  const trimmed = body.trim();
+  const trimmed = prepareMessageBodyInput(body);
   if (!trimmed) return '';
   if (!isLikelyHtmlMessageBody(trimmed)) {
     return trimmed;
@@ -133,12 +170,12 @@ export async function resolveMessageBodyHtml(body: string): Promise<string> {
 }
 
 export function plainTextToEditorHtml(plain: string): string {
-  const trimmed = plain.trim();
+  const trimmed = prepareMessageBodyInput(plain);
   if (!trimmed) return '';
   if (isLikelyHtmlMessageBody(trimmed)) {
     return sanitizeMessageHtml(trimmed);
   }
-  const escaped = plain
+  const escaped = trimmed
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
@@ -146,7 +183,7 @@ export function plainTextToEditorHtml(plain: string): string {
 }
 
 export function messageBodyToPlainText(body: string): string {
-  const trimmed = body.trim();
+  const trimmed = prepareMessageBodyInput(body);
   if (!trimmed) return '';
   if (typeof document === 'undefined') {
     return trimmed.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -158,7 +195,7 @@ export function messageBodyToPlainText(body: string): string {
 
 /** Plain text with paragraph breaks — for safe display when HTML must not be shown raw. */
 export function messageBodyToPlainTextWithBreaks(body: string): string {
-  const trimmed = body.trim();
+  const trimmed = prepareMessageBodyInput(body);
   if (!trimmed) return '';
   const looksLikeHtml = isLikelyHtmlMessageBody(trimmed) || /<\/?[a-z][\s>/]/i.test(trimmed);
   if (!looksLikeHtml) return trimmed;
@@ -185,9 +222,9 @@ export function messageBodyToPlainTextWithBreaks(body: string): string {
 
 /** Feed summary / preview lines must never show HTML markup. */
 export function normalizeMessageSummaryText(text: string): string {
-  const trimmed = text.trim();
+  const trimmed = prepareMessageBodyInput(text);
   if (!trimmed) return '';
-  if (!/<[a-z/]/i.test(trimmed)) return trimmed;
+  if (!/<[a-z/]/i.test(trimmed) && !/&lt;/i.test(text)) return trimmed;
   return messageBodyToPlainText(trimmed);
 }
 
@@ -206,7 +243,7 @@ export function htmlMessageHasContent(html: string): boolean {
 
 /** Normalize body before save (plain text unchanged; rich text sanitized). */
 export function normalizeOutgoingMessageBody(raw: string): string {
-  const trimmed = raw.trim();
+  const trimmed = prepareMessageBodyInput(raw);
   if (!trimmed) return '';
   if (isLikelyHtmlMessageBody(trimmed)) {
     return normalizeMessageImagesInHtml(trimmed);

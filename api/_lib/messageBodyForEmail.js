@@ -4,6 +4,33 @@ const EMAIL_ASSET_TTL_SEC = 60 * 60 * 24 * 7;
 const HTML_BODY_PATTERN =
   /<\/?(?:p|br|div|span|strong|b|em|i|u|ul|ol|li|h[1-6]|font|img|a)\b/i;
 
+const ENTITY_ENCODED_HTML_PATTERN =
+  /&lt;\/?(?:p|br|div|span|strong|b|em|i|u|ul|ol|li|h[1-6]|font|img|a)\b/i;
+
+function decodeMessageHtmlEntities(text) {
+  const trimmed = String(text ?? '').trim();
+  if (!trimmed || !/&lt;/i.test(trimmed)) return text;
+  return trimmed
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&nbsp;/gi, '\u00a0')
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'");
+}
+
+function prepareMessageBodyInput(raw) {
+  const trimmed = String(raw ?? '').trim();
+  if (!trimmed) return '';
+  if (isLikelyHtmlMessageBody(trimmed)) return trimmed;
+  if (ENTITY_ENCODED_HTML_PATTERN.test(trimmed) || /&lt;\/?[a-z]/i.test(trimmed)) {
+    return decodeMessageHtmlEntities(trimmed);
+  }
+  return trimmed;
+}
+
 function escapeHtml(value) {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -17,7 +44,9 @@ function escapeHref(value) {
 }
 
 function isLikelyHtmlMessageBody(body) {
-  return HTML_BODY_PATTERN.test(String(body ?? '').trim());
+  const trimmed = String(body ?? '').trim();
+  if (HTML_BODY_PATTERN.test(trimmed)) return true;
+  return ENTITY_ENCODED_HTML_PATTERN.test(trimmed);
 }
 
 function readAttr(tag, name) {
@@ -102,7 +131,7 @@ function linkInnerText(tag) {
  * Build email-safe HTML for a team message body (plain or rich text, with signed asset URLs).
  */
 export async function buildMessageBodyHtmlForEmail(supabase, rawBody) {
-  const trimmed = String(rawBody ?? '').trim();
+  const trimmed = prepareMessageBodyInput(rawBody);
   if (!trimmed) {
     return '<p style="margin:0;color:#888;font-size:14px;">(No message text)</p>';
   }

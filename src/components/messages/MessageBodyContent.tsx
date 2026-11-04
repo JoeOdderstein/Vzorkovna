@@ -32,6 +32,7 @@ import {
   messageBodyToPlainTextWithBreaks,
   normalizeMessageSummaryText,
   resolveMessageBodyHtml,
+  prepareMessageBodyInput,
   sanitizeMessageHtml,
 } from '../../lib/messages/messageRichText';
 import {
@@ -124,6 +125,7 @@ function MessageBodyContent({
   onExpandedChange,
 }: MessageBodyContentProps) {
   const { t } = useTaskboardI18n();
+  const preparedBody = prepareMessageBodyInput(body);
   const containerRef = useRef<HTMLDivElement>(null);
   const resolvedForBodyRef = useRef<string | null>(null);
   const [html, setHtml] = useState<string | null>(null);
@@ -228,8 +230,8 @@ function MessageBodyContent({
       setSummary(normalizeMessageSummaryText(feedSummary) || null);
       return;
     }
-    setSummary(buildLocalFeedSummary(body) || null);
-  }, [body, expanded, feedSummary]);
+    setSummary(buildLocalFeedSummary(preparedBody) || null);
+  }, [preparedBody, expanded, feedSummary]);
 
   useEffect(() => {
     if (!expanded) {
@@ -238,31 +240,31 @@ function MessageBodyContent({
       return;
     }
 
-    if (!isLikelyHtmlMessageBody(body)) {
+    if (!isLikelyHtmlMessageBody(preparedBody)) {
       resolvedForBodyRef.current = null;
       setHtml(null);
       return;
     }
 
     let cancelled = false;
-    if (resolvedForBodyRef.current !== body) {
+    if (resolvedForBodyRef.current !== preparedBody) {
       setHtml(null);
     }
-    void resolveMessageBodyHtml(body).then((resolved) => {
+    void resolveMessageBodyHtml(preparedBody).then((resolved) => {
       if (cancelled) return;
-      const safeHtml = resolved.trim() || sanitizeMessageHtml(body);
-      if (htmlMessageHasContent(safeHtml) || htmlMessageHasContent(body)) {
-        resolvedForBodyRef.current = body;
+      const safeHtml = resolved.trim() || sanitizeMessageHtml(preparedBody);
+      if (htmlMessageHasContent(safeHtml) || htmlMessageHasContent(preparedBody)) {
+        resolvedForBodyRef.current = preparedBody;
         setHtml(safeHtml);
       } else {
-        resolvedForBodyRef.current = body;
+        resolvedForBodyRef.current = preparedBody;
         setHtml(null);
       }
     });
     return () => {
       cancelled = true;
     };
-  }, [body, expanded]);
+  }, [preparedBody, expanded]);
 
   const openLightbox = useCallback((index: number, list: MessageImageSlide[]) => {
     if (index < 0 || index >= list.length) return;
@@ -437,7 +439,7 @@ function MessageBodyContent({
     );
   }
 
-  if (isLikelyHtmlMessageBody(body) && html === null) {
+  if (isLikelyHtmlMessageBody(preparedBody) && html === null) {
     return (
       <>
         <p className={`text-sm tb-muted ${className}`}>…</p>
@@ -454,11 +456,11 @@ function MessageBodyContent({
     );
   }
 
-  const plainFallback = messageBodyToPlainTextWithBreaks(body);
+  const plainFallback = messageBodyToPlainTextWithBreaks(preparedBody);
 
   return (
     <>
-      <p className={`whitespace-pre-wrap ${className}`}>{plainFallback || body}</p>
+      <p className={`whitespace-pre-wrap ${className}`}>{plainFallback || preparedBody}</p>
       <MessageBodyActionRow
         expandToggle={
           <MessageBodyExpandToggle
