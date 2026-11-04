@@ -352,6 +352,7 @@ export default function InstallationDetailPage() {
             {installationId ? (
               <InstallationRepairsSection
                 installationId={installationId}
+                installationName={installation.name}
                 repairs={installation.repairs}
                 documents={installation.documents}
                 isAdmin={isAdmin}
@@ -381,6 +382,7 @@ export default function InstallationDetailPage() {
           {installationId ? (
             <InstallationRepairsSection
               installationId={installationId}
+              installationName={installation.name}
               repairs={installation.repairs}
               documents={installation.documents}
               isAdmin={isAdmin}
@@ -434,6 +436,7 @@ export default function InstallationDetailPage() {
         <ReportBugDialog
           open={bugDialogOpen}
           installationId={installationId}
+          installationName={installation?.name}
           onClose={() => setBugDialogOpen(false)}
           onSubmitted={() => {
             window.dispatchEvent(new Event('installations-updated'));

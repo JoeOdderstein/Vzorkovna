@@ -9,6 +9,13 @@ import {
   mergeLocalInstallationPatch,
   notifyInstallationsUpdated,
 } from './localInstallationOverrides';
+import {
+  bugReportNotesFromForm,
+  bugReportSummaryFromForm,
+  parseBugReportForm,
+  validateBugReportForm,
+  type BugReportFormV1,
+} from './bugReportForm';
 import { INSTALLATION_SEED_RECORDS } from './seedData';
 import type {
   InstallationDocument,
@@ -104,6 +111,7 @@ function normalizeRepair(row: Record<string, unknown>): InstallationRepair {
       ? row.notify_usernames.map((u) => String(u))
       : [],
     linked_task_id: row.linked_task_id ? String(row.linked_task_id) : null,
+    bug_form: parseBugReportForm(row.bug_form),
     created_at: String(row.created_at ?? ''),
   };
 }
@@ -404,10 +412,9 @@ export async function deleteInstallationRepair(repairId: string): Promise<void> 
 }
 
 export type CreateBugReportInput = {
-  title: string;
-  description: string;
+  form: BugReportFormV1;
   reportedBy: string;
-  occurredOn: string;
+  reporterDisplayName: string;
   notifyUsernames?: string[];
 };
 
@@ -415,12 +422,13 @@ export async function createInstallationBugReport(
   installationId: string,
   input: CreateBugReportInput,
 ): Promise<InstallationRepair> {
-  const title = input.title.trim();
-  const description = input.description.trim();
-  if (!title) throw new Error('Title is required');
-  if (!description) throw new Error('Description is required');
+  const formError = validateBugReportForm(input.form);
+  if (formError) throw new Error(formError);
   if (!input.reportedBy) throw new Error('You must be logged in to report a bug.');
-  if (!input.occurredOn) throw new Error('Date is required');
+
+  const title = bugReportSummaryFromForm(input.form);
+  const description = bugReportNotesFromForm(input.form, input.reporterDisplayName);
+  const occurredOn = input.form.occurredDate.trim();
 
   if (!isSupabaseConfigured()) {
     throw new Error('Bug reports require Supabase to be connected.');
@@ -433,20 +441,32 @@ export async function createInstallationBugReport(
   ];
 
   const supabase = await db();
-  const { data, error } = await supabase
+  let insertPayload: Record<string, unknown> = {
+    installation_id: installationId,
+    occurred_on: occurredOn,
+    summary: title,
+    notes: description,
+    resolved: false,
+    kind: 'bug_report',
+    reported_by: input.reportedBy,
+    notify_usernames: notifyUsernames,
+    bug_form: input.form,
+  };
+
+  let { data, error } = await supabase
     .from('installation_repairs')
-    .insert({
-      installation_id: installationId,
-      occurred_on: input.occurredOn,
-      summary: title,
-      notes: description,
-      resolved: false,
-      kind: 'bug_report',
-      reported_by: input.reportedBy,
-      notify_usernames: notifyUsernames,
-    })
+    .insert(insertPayload)
     .select('*')
     .single();
+
+  if (error && /bug_form|column/i.test(error.message)) {
+    delete insertPayload.bug_form;
+    ({ data, error } = await supabase
+      .from('installation_repairs')
+      .insert(insertPayload)
+      .select('*')
+      .single());
+  }
 
   if (error || !data) {
     throw new Error('Could not submit bug report.');
@@ -467,9 +487,8 @@ export async function createInstallationBugReport(
 }
 
 export type UpdateBugReportInput = {
-  title: string;
-  description: string;
-  occurredOn: string;
+  form: BugReportFormV1;
+  reporterDisplayName: string;
   notifyUsernames?: string[];
 };
 
@@ -477,11 +496,12 @@ export async function updateInstallationBugReport(
   repairId: string,
   input: UpdateBugReportInput,
 ): Promise<void> {
-  const title = input.title.trim();
-  const description = input.description.trim();
-  if (!title) throw new Error('Title is required');
-  if (!description) throw new Error('Description is required');
-  if (!input.occurredOn) throw new Error('Date is required');
+  const formError = validateBugReportForm(input.form);
+  if (formError) throw new Error(formError);
+
+  const title = bugReportSummaryFromForm(input.form);
+  const description = bugReportNotesFromForm(input.form, input.reporterDisplayName);
+  const occurredOn = input.form.occurredDate.trim();
 
   if (!isSupabaseConfigured()) {
     throw new Error('Bug reports require Supabase to be connected.');
@@ -504,15 +524,20 @@ export async function updateInstallationBugReport(
     throw new Error('Could not update bug report.');
   }
 
-  const { error } = await supabase
-    .from('installation_repairs')
-    .update({
-      summary: title,
-      notes: description,
-      occurred_on: input.occurredOn,
-      notify_usernames: notifyUsernames,
-    })
-    .eq('id', repairId);
+  let updatePayload: Record<string, unknown> = {
+    summary: title,
+    notes: description,
+    occurred_on: occurredOn,
+    notify_usernames: notifyUsernames,
+    bug_form: input.form,
+  };
+
+  let { error } = await supabase.from('installation_repairs').update(updatePayload).eq('id', repairId);
+
+  if (error && /bug_form|column/i.test(error.message)) {
+    delete updatePayload.bug_form;
+    ({ error } = await supabase.from('installation_repairs').update(updatePayload).eq('id', repairId));
+  }
 
   if (error) {
     throw new Error('Could not update bug report.');

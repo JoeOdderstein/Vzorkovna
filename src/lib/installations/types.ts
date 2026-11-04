@@ -1,3 +1,5 @@
+import type { BugReportFormV1 } from './bugReportForm';
+
 export type InstallationLifecycleStatus =
   | 'concept'
   | 'implementation'
@@ -36,6 +38,7 @@ export interface InstallationRepair {
   reported_by: string | null;
   notify_usernames: string[];
   linked_task_id: string | null;
+  bug_form?: BugReportFormV1 | null;
   created_at: string;
 }
 

@@ -3,6 +3,16 @@ import { Upload, X } from 'lucide-react';
 import { useTaskboardAuth } from '../../context/TaskboardAuthContext';
 import { useUserProfile } from '../../context/UserProfileContext';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
+import { defaultBoardNameForUsername } from '../../lib/taskboard/boardNameUtils';
+import {
+  BUG_FREQUENCY_ORDER,
+  BUG_INSTALLATION_ORDER,
+  BUG_PART_ORDER,
+  BUG_USABILITY_ORDER,
+  emptyBugReportForm,
+  guessInstallationKeyFromName,
+  type BugReportFormV1,
+} from '../../lib/installations/bugReportForm';
 import {
   deleteInstallationDocument,
   getInstallationDocumentUrl,
@@ -22,26 +32,20 @@ import type { InstallationDocument, InstallationRepair } from '../../lib/install
 interface ReportBugDialogProps {
   open: boolean;
   installationId: string;
+  /** Pre-select installation question from project page context. */
+  installationName?: string;
   onClose: () => void;
   onSubmitted: () => void;
-  /** When set, dialog edits an existing bug report instead of creating one. */
   repair?: InstallationRepair | null;
   existingPhotos?: InstallationDocument[];
 }
 
 const EMPTY_PHOTOS: InstallationDocument[] = [];
 
-function todayIsoDate() {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const day = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${day}`;
-}
-
 export default function ReportBugDialog({
   open,
   installationId,
+  installationName = '',
   onClose,
   onSubmitted,
   repair = null,
@@ -52,27 +56,52 @@ export default function ReportBugDialog({
   const { profile } = useUserProfile();
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
+  const [form, setForm] = useState<BugReportFormV1>(() => emptyBugReportForm());
   const [photos, setPhotos] = useState<File[]>([]);
   const [recipients, setRecipients] = useState<NotifyRecipient[]>([]);
   const [selectedUsernames, setSelectedUsernames] = useState<string[]>([]);
   const [loadingRecipients, setLoadingRecipients] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
-  const [occurredOn, setOccurredOn] = useState(todayIsoDate());
   const [attachedPhotos, setAttachedPhotos] = useState<InstallationDocument[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [removingPhotoId, setRemovingPhotoId] = useState<string | null>(null);
 
   const isEdit = Boolean(repair);
 
+  const patchForm = (patch: Partial<BugReportFormV1>) => {
+    setForm((prev) => ({ ...prev, ...patch }));
+  };
+
   useEffect(() => {
     if (!open) return;
 
-    setTitle(repair?.summary ?? '');
-    setDescription(repair?.notes ?? '');
-    setOccurredOn(repair?.occurred_on ?? todayIsoDate());
+    const guessed = installationName ? guessInstallationKeyFromName(installationName) : null;
+    const fromRepair = repair?.bug_form ?? null;
+
+    if (fromRepair) {
+      setForm(fromRepair);
+    } else if (repair) {
+      setForm({
+        ...emptyBugReportForm({
+          installation: guessed ?? 'other',
+          occurredDate: repair.occurred_on,
+        }),
+        installationOther:
+          guessed || !installationName.trim() ? '' : installationName.trim(),
+        expectedVsActual: repair.notes ?? '',
+      });
+    } else {
+      const initial = emptyBugReportForm({
+        installation: guessed ?? 'other',
+      });
+      if (!guessed && installationName.trim()) {
+        initial.installation = 'other';
+        initial.installationOther = installationName.trim();
+      }
+      setForm(initial);
+    }
+
     setPhotos([]);
     setSelectedUsernames(repair?.notify_usernames ?? []);
     setAttachedPhotos(existingPhotos);
@@ -96,8 +125,7 @@ export default function ReportBugDialog({
     return () => {
       cancelled = true;
     };
-    // Reset only when the dialog opens or switches create ↔ edit — not on every parent re-render.
-  }, [open, installationId, repair?.id]);
+  }, [open, installationId, repair?.id, installationName]);
 
   useEffect(() => {
     if (!open) return;
@@ -123,14 +151,16 @@ export default function ReportBugDialog({
     );
   };
 
+  const reporterDisplayName =
+    profile?.board_name?.trim() ||
+    (username ? defaultBoardNameForUsername(username) : '') ||
+    username ||
+    '—';
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     if (!username) {
       setError(t('projects.bug.loginRequired'));
-      return;
-    }
-    if (!title.trim() || !description.trim()) {
-      setError(t('projects.bug.requiredFields'));
       return;
     }
 
@@ -142,9 +172,8 @@ export default function ReportBugDialog({
 
       if (isEdit && repair) {
         await updateInstallationBugReport(repair.id, {
-          title: title.trim(),
-          description: description.trim(),
-          occurredOn,
+          form,
+          reporterDisplayName,
           notifyUsernames: selectedUsernames,
         });
 
@@ -166,10 +195,9 @@ export default function ReportBugDialog({
         }
       } else {
         const created = await createInstallationBugReport(installationId, {
-          title: title.trim(),
-          description: description.trim(),
+          form,
           reportedBy: username,
-          occurredOn,
+          reporterDisplayName,
           notifyUsernames: selectedUsernames,
         });
 
@@ -199,10 +227,6 @@ export default function ReportBugDialog({
     }
   };
 
-  const reporterLabel = isEdit
-    ? repair?.reported_by ?? '—'
-    : profile?.board_name?.trim() || profile?.username || username || '—';
-
   const removeAttachedPhoto = async (photo: InstallationDocument) => {
     setRemovingPhotoId(photo.id);
     try {
@@ -215,83 +239,241 @@ export default function ReportBugDialog({
     }
   };
 
+  const fieldsetClass = 'space-y-2 border-0 p-0 m-0';
+  const legendClass = 'tb-field-label block mb-2 font-semibold';
+  const hintClass = 'text-xs tb-muted mb-2';
+
   return (
     <div className="taskboard fixed inset-0 z-[90] flex items-center justify-center px-4 py-8">
       <div className="absolute inset-0 tb-overlay" onClick={onClose} aria-hidden />
       <div
         role="dialog"
         aria-labelledby="report-bug-title"
-        className="relative w-full max-w-lg tb-remote-inst-card shadow-xl max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-2xl tb-remote-inst-card shadow-xl max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 border-b border-[var(--tb-border)] px-6 py-4 flex items-center justify-between bg-[var(--tb-bg)]">
+        <div className="sticky top-0 z-10 border-b border-[var(--tb-border)] px-6 py-4 flex items-center justify-between bg-[var(--tb-bg)]">
           <h2 id="report-bug-title" className="tb-heading">
             {isEdit ? t('projects.bug.editDialogTitle') : t('projects.bug.dialogTitle')}
           </h2>
-          <button type="button" onClick={onClose} className="tb-muted hover:text-[var(--tb-text)]" aria-label={t('common.close')}>
+          <button
+            type="button"
+            onClick={onClose}
+            className="tb-muted hover:text-[var(--tb-text)]"
+            aria-label={t('common.close')}
+          >
             <X size={20} />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-5">
-          <div>
-            <label htmlFor="bug-date" className="tb-field-label block mb-1">
-              {t('projects.bug.date')}
-            </label>
-            {isEdit ? (
+        <form onSubmit={handleSubmit} className="px-6 py-6 space-y-6">
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>{t('projects.bug.form.q1Installation')}</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {BUG_INSTALLATION_ORDER.map((key) => (
+                <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="bug-installation"
+                    checked={form.installation === key}
+                    onChange={() => patchForm({ installation: key })}
+                    className="border-[var(--tb-border)]"
+                  />
+                  <span>{t(`projects.bug.form.installation.${key}`)}</span>
+                </label>
+              ))}
+            </div>
+            {form.installation === 'other' ? (
               <input
-                id="bug-date"
-                type="date"
+                type="text"
+                value={form.installationOther}
+                onChange={(e) => patchForm({ installationOther: e.target.value })}
+                className="field-input w-full mt-2 text-sm"
+                placeholder={t('projects.bug.form.installationOtherPlaceholder')}
                 required
-                value={occurredOn}
-                onChange={(e) => setOccurredOn(e.target.value)}
-                className="field-input w-full text-sm"
               />
-            ) : (
-              <p className="text-sm tb-text">{formatDisplayDate(occurredOn)}</p>
-            )}
-          </div>
+            ) : null}
+          </fieldset>
 
-          <div>
-            <label className="tb-field-label block mb-1">{t('projects.bug.reporter')}</label>
-            <p className="text-sm tb-text">{reporterLabel}</p>
-          </div>
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>{t('projects.bug.form.q2Part')}</legend>
+            <p className={hintClass}>{t('projects.bug.form.q2PartHint')}</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {BUG_PART_ORDER.map((key) => (
+                <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="bug-part"
+                    checked={form.part === key}
+                    onChange={() => patchForm({ part: key })}
+                    className="border-[var(--tb-border)]"
+                  />
+                  <span>{t(`projects.bug.form.part.${key}`)}</span>
+                </label>
+              ))}
+            </div>
+            {form.part === 'sensor' ? (
+              <input
+                type="text"
+                value={form.partSensorDetail}
+                onChange={(e) => patchForm({ partSensorDetail: e.target.value })}
+                className="field-input w-full mt-2 text-sm"
+                placeholder={t('projects.bug.form.sensorPlaceholder')}
+                required
+              />
+            ) : null}
+            {form.part === 'other' ? (
+              <input
+                type="text"
+                value={form.partOther}
+                onChange={(e) => patchForm({ partOther: e.target.value })}
+                className="field-input w-full mt-2 text-sm"
+                placeholder={t('projects.bug.form.partOtherPlaceholder')}
+                required
+              />
+            ) : null}
+          </fieldset>
 
-          <div>
-            <label htmlFor="bug-title" className="tb-field-label block mb-2">
-              {t('projects.bug.titleLabel')}
-            </label>
-            <input
-              id="bug-title"
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="field-input w-full"
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>{t('projects.bug.form.q3When')}</legend>
+            <div className="flex flex-wrap gap-3">
+              <label className="text-xs tb-muted flex flex-col gap-1">
+                {t('projects.bug.form.dateLabel')}
+                <input
+                  type="date"
+                  required
+                  value={form.occurredDate}
+                  onChange={(e) => patchForm({ occurredDate: e.target.value })}
+                  className="field-input text-sm"
+                />
+              </label>
+              <label className="text-xs tb-muted flex flex-col gap-1">
+                {t('projects.bug.form.timeLabel')}
+                <input
+                  type="time"
+                  value={form.occurredTime}
+                  onChange={(e) => patchForm({ occurredTime: e.target.value })}
+                  className="field-input text-sm"
+                />
+              </label>
+            </div>
+            <textarea
+              value={form.durationText}
+              onChange={(e) => patchForm({ durationText: e.target.value })}
+              rows={2}
               required
-              autoFocus
+              className="field-input w-full mt-2 text-sm"
+              placeholder={t('projects.bug.form.durationPlaceholder')}
+            />
+          </fieldset>
+
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>{t('projects.bug.form.q4Usability')}</legend>
+            <div className="space-y-2">
+              {BUG_USABILITY_ORDER.map((key) => (
+                <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="bug-usability"
+                    checked={form.usability === key}
+                    onChange={() => patchForm({ usability: key })}
+                    className="border-[var(--tb-border)]"
+                  />
+                  <span>{t(`projects.bug.form.usability.${key}`)}</span>
+                </label>
+              ))}
+            </div>
+          </fieldset>
+
+          <div>
+            <label htmlFor="bug-expected" className={legendClass}>
+              {t('projects.bug.form.q5Expected')}
+            </label>
+            <p className={hintClass}>{t('projects.bug.form.q5Hint')}</p>
+            <textarea
+              id="bug-expected"
+              value={form.expectedVsActual}
+              onChange={(e) => patchForm({ expectedVsActual: e.target.value })}
+              rows={5}
+              required
+              className="field-input w-full text-sm"
             />
           </div>
 
           <div>
-            <label htmlFor="bug-description" className="tb-field-label block mb-2">
-              {t('projects.bug.descriptionLabel')}
+            <label htmlFor="bug-context" className={legendClass}>
+              {t('projects.bug.form.q6Context')}
             </label>
             <textarea
-              id="bug-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              rows={4}
-              className="field-input w-full"
-              required
+              id="bug-context"
+              value={form.context}
+              onChange={(e) => patchForm({ context: e.target.value })}
+              rows={3}
+              className="field-input w-full text-sm"
+            />
+          </div>
+
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>{t('projects.bug.form.q7Frequency')}</legend>
+            <div className="space-y-2">
+              {BUG_FREQUENCY_ORDER.map((key) => (
+                <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                  <input
+                    type="radio"
+                    name="bug-frequency"
+                    checked={form.frequency === key}
+                    onChange={() => patchForm({ frequency: key })}
+                    className="border-[var(--tb-border)]"
+                  />
+                  <span>{t(`projects.bug.form.frequency.${key}`)}</span>
+                </label>
+              ))}
+            </div>
+            {form.frequency !== 'first_time' ? (
+              <input
+                type="text"
+                value={form.frequencySince}
+                onChange={(e) => patchForm({ frequencySince: e.target.value })}
+                className="field-input w-full mt-2 text-sm"
+                placeholder={t('projects.bug.form.frequencySincePlaceholder')}
+                required
+              />
+            ) : null}
+          </fieldset>
+
+          <div>
+            <label htmlFor="bug-changes" className={legendClass}>
+              {t('projects.bug.form.q8Changes')}
+            </label>
+            <textarea
+              id="bug-changes"
+              value={form.recentChanges}
+              onChange={(e) => patchForm({ recentChanges: e.target.value })}
+              rows={3}
+              className="field-input w-full text-sm"
             />
           </div>
 
           <div>
-            <label className="tb-field-label block mb-2">{t('projects.bug.photos')}</label>
+            <label htmlFor="bug-tried" className={legendClass}>
+              {t('projects.bug.form.q9Tried')}
+            </label>
+            <textarea
+              id="bug-tried"
+              value={form.triedAlready}
+              onChange={(e) => patchForm({ triedAlready: e.target.value })}
+              rows={2}
+              className="field-input w-full text-sm"
+            />
+          </div>
+
+          <div>
+            <label className={legendClass}>{t('projects.bug.form.q10Media')}</label>
+            <p className={hintClass}>{t('projects.bug.form.q10Hint')}</p>
             <input
               ref={inputRef}
               type="file"
-              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/webm,.jpg,.jpeg,.png,.webp,.mp4,.mov,.webm"
               multiple
               className="sr-only"
               onChange={(e) => {
@@ -306,7 +488,7 @@ export default function ReportBugDialog({
               className="tb-btn-secondary inline-flex items-center gap-2 text-sm"
             >
               <Upload size={16} />
-              {t('projects.admin.upload')}
+              {t('projects.bug.form.uploadMedia')}
             </button>
             {attachedPhotos.length > 0 ? (
               <ul className="mt-3 flex flex-wrap gap-2">
@@ -317,11 +499,13 @@ export default function ReportBugDialog({
                       {url ? (
                         <img
                           src={url}
-                          alt={photo.title || 'Bug photo'}
+                          alt={photo.title || 'Bug media'}
                           className="h-16 w-16 object-cover rounded-md border border-[var(--tb-border)]"
                         />
                       ) : (
-                        <span className="text-xs tb-muted block h-16 w-16">…</span>
+                        <span className="text-xs tb-muted block h-16 w-16 px-1 truncate border rounded-md">
+                          {photo.title || '…'}
+                        </span>
                       )}
                       <button
                         type="button"
@@ -346,8 +530,27 @@ export default function ReportBugDialog({
             ) : null}
           </div>
 
+          <fieldset className={fieldsetClass}>
+            <legend className={legendClass}>{t('projects.bug.form.q11Contact')}</legend>
+            <p className="text-sm tb-text mb-2">
+              {t('projects.bug.form.filledInBy')}: <strong>{reporterDisplayName}</strong>
+            </p>
+            <label htmlFor="bug-contact" className="sr-only">
+              {t('projects.bug.form.contactForGus')}
+            </label>
+            <input
+              id="bug-contact"
+              type="text"
+              required
+              value={form.contactForGus}
+              onChange={(e) => patchForm({ contactForGus: e.target.value })}
+              className="field-input w-full text-sm"
+              placeholder={t('projects.bug.form.contactForGusPlaceholder')}
+            />
+          </fieldset>
+
           <div>
-            <label className="tb-field-label block mb-2">{t('projects.bug.notifyLabel')}</label>
+            <label className={legendClass}>{t('projects.bug.notifyLabel')}</label>
             {loadingRecipients ? (
               <p className="text-sm tb-muted">{t('common.loading')}</p>
             ) : recipients.length === 0 ? (
@@ -377,7 +580,7 @@ export default function ReportBugDialog({
 
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
 
-          <div className="flex justify-end gap-3 pt-2">
+          <div className="flex justify-end gap-3 pt-2 sticky bottom-0 bg-[var(--tb-bg)] pb-1">
             <button type="button" onClick={onClose} className="tb-btn-secondary">
               {t('common.cancel')}
             </button>
@@ -393,10 +596,4 @@ export default function ReportBugDialog({
       </div>
     </div>
   );
-}
-
-function formatDisplayDate(iso: string) {
-  const date = new Date(`${iso}T12:00:00`);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }

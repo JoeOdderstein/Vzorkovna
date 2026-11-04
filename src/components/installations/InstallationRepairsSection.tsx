@@ -8,6 +8,7 @@ import {
   deleteInstallationRepair,
   updateInstallationRepair,
 } from '../../lib/installations/installationService';
+import { bugReportDisplayNotes } from '../../lib/installations/bugReportForm';
 import type { InstallationDocument, InstallationRepair } from '../../lib/installations/types';
 import { getInstallationDocumentUrl } from '../../lib/installations/installationDocumentService';
 import TranslatableText from '../../taskboard/components/TranslatableText';
@@ -19,6 +20,7 @@ const EMPTY_BUG_PHOTOS: InstallationDocument[] = [];
 
 interface InstallationRepairsSectionProps {
   installationId: string;
+  installationName?: string;
   repairs: InstallationRepair[];
   documents: InstallationDocument[];
   isAdmin: boolean;
@@ -227,6 +229,7 @@ function sortRepairs(list: InstallationRepair[]): InstallationRepair[] {
 
 export default function InstallationRepairsSection({
   installationId,
+  installationName = '',
   repairs,
   documents,
   isAdmin,
@@ -451,13 +454,13 @@ export default function InstallationRepairsSection({
                   {headerActions}
                 </div>
 
-                {repair.notes ? (
+                {repair.notes || repair.bug_form ? (
                   <p
                     className={`tb-text-secondary whitespace-pre-wrap leading-snug ${
                       isActiveBug ? 'text-xs pt-0.5' : 'text-sm'
                     }`}
                   >
-                    <TranslatableText text={repair.notes} multiline />
+                    <TranslatableText text={bugReportDisplayNotes(repair)} multiline />
                   </p>
                 ) : null}
 
@@ -497,6 +500,7 @@ export default function InstallationRepairsSection({
       <ReportBugDialog
         open={editingBug !== null}
         installationId={installationId}
+        installationName={installationName}
         repair={editingBug}
         existingPhotos={
           editingBug ? (photosByRepair.get(editingBug.id) ?? EMPTY_BUG_PHOTOS) : EMPTY_BUG_PHOTOS
