@@ -103,6 +103,66 @@ async function db() {
   return getSupabase();
 }
 
+type TimelineEntryUpsertRow = {
+  id: string;
+  project_id: string;
+  week_start: string;
+  week_end: string;
+  name: string;
+  description: string;
+  entry_kind?: 'phase' | 'visit';
+  parent_entry_id?: string | null;
+};
+
+/** Upsert timeline rows without wiping IDs (quotation lines reference entry ids). */
+async function upsertProjectTimelineEntries(
+  supabase: Awaited<ReturnType<typeof db>>,
+  rows: TimelineEntryUpsertRow[],
+): Promise<void> {
+  if (rows.length === 0) return;
+
+  let { error } = await supabase
+    .from('project_timeline_entries')
+    .upsert(rows, { onConflict: 'id' });
+
+  if (error && /entry_kind|parent_entry|column|schema cache/i.test(error.message)) {
+    ({ error } = await supabase.from('project_timeline_entries').upsert(
+      rows.map(({ entry_kind: _ek, parent_entry_id: _pe, ...row }) => row),
+      { onConflict: 'id' },
+    ));
+  }
+
+  if (error && /week_end|column|schema cache/i.test(error.message)) {
+    throw new Error(
+      'Multi-week timeline needs supabase/migrations/039_project_timeline_week_ranges.sql in Supabase.',
+    );
+  }
+
+  if (error) throw error;
+}
+
+/** Remove timeline rows dropped from the editor; deleted ids clear quotation phase links (FK). */
+async function deleteOrphanProjectTimelineEntries(
+  supabase: Awaited<ReturnType<typeof db>>,
+  projectId: string,
+  keepIds: string[],
+): Promise<void> {
+  let query = supabase.from('project_timeline_entries').delete().eq('project_id', projectId);
+  if (keepIds.length > 0) {
+    query = query.not('id', 'in', `(${keepIds.join(',')})`);
+  }
+
+  const { error } = await query;
+  if (error) {
+    if (/project_timeline_entries|relation|schema cache/i.test(error.message)) {
+      throw new Error(
+        'Project timeline needs a database update. Run supabase/migrations/038_project_timeline.sql in Supabase.',
+      );
+    }
+    throw error;
+  }
+}
+
 export async function fetchProjectTimeline(projectId: string): Promise<ProjectTimelineState> {
   if (!projectId) {
     return { timelineCompleted: false, entries: [] };
@@ -295,62 +355,24 @@ export async function saveProjectTimeline(
     throw projectError;
   }
 
-  const { error: deleteError } = await supabase
-    .from('project_timeline_entries')
-    .delete()
-    .eq('project_id', projectId);
-
-  if (deleteError) {
-    if (/project_timeline_entries|relation|schema cache/i.test(deleteError.message)) {
-      throw new Error(
-        'Project timeline needs a database update. Run supabase/migrations/038_project_timeline.sql in Supabase.'
-      );
-    }
-    throw deleteError;
-  }
-
   const phaseBlocks = blocks.filter(isTimelinePhase);
   const visitBlocks = blocks.filter(isTimelineVisit);
 
-  const phaseInserts = phaseBlocks.map((block) => ({
+  const phaseRows: TimelineEntryUpsertRow[] = phaseBlocks.map((block) => ({
     id: block.client_key,
     project_id: projectId,
     week_start: block.week_start,
     week_end: block.week_end,
     name: normalizeTimelineRichField(block.name),
     description: normalizeTimelineRichField(block.description),
-    entry_kind: 'phase' as const,
+    entry_kind: 'phase',
     parent_entry_id: null,
   }));
 
-  if (phaseInserts.length > 0) {
-    let { error: phaseError } = await supabase.from('project_timeline_entries').insert(phaseInserts);
+  await upsertProjectTimelineEntries(supabase, phaseRows);
 
-    if (phaseError && /entry_kind|parent_entry|column|schema cache/i.test(phaseError.message)) {
-      ({ error: phaseError } = await supabase.from('project_timeline_entries').insert(
-        phaseInserts.map((row) => ({
-          id: row.id,
-          project_id: row.project_id,
-          week_start: row.week_start,
-          week_end: row.week_end,
-          name: row.name,
-          description: row.description,
-        })),
-      ));
-    }
-
-    if (phaseError) {
-      if (/week_end|column|schema cache/i.test(phaseError.message)) {
-        throw new Error(
-          'Multi-week timeline needs supabase/migrations/039_project_timeline_week_ranges.sql in Supabase.'
-        );
-      }
-      throw phaseError;
-    }
-  }
-
-  const phaseIds = new Set(phaseInserts.map((row) => row.id));
-  const visitInserts = visitBlocks.map((block) => {
+  const phaseIds = new Set(phaseRows.map((row) => row.id));
+  const visitRows: TimelineEntryUpsertRow[] = visitBlocks.map((block) => {
     const parentId = block.parent_client_key ?? block.parent_entry_id ?? null;
     return {
       id: block.client_key,
@@ -359,24 +381,15 @@ export async function saveProjectTimeline(
       week_end: block.week_end,
       name: normalizeTimelineRichField(block.name),
       description: normalizeTimelineRichField(block.description),
-      entry_kind: 'visit' as const,
+      entry_kind: 'visit',
       parent_entry_id: parentId && phaseIds.has(parentId) ? parentId : null,
     };
   });
 
-  if (visitInserts.length > 0) {
-    let { error: visitError } = await supabase.from('project_timeline_entries').insert(visitInserts);
+  await upsertProjectTimelineEntries(supabase, visitRows);
 
-    if (visitError && /entry_kind|parent_entry|column|schema cache/i.test(visitError.message)) {
-      throw new Error(
-        'Timeline visits need supabase/migrations/048_project_timeline_visits.sql in Supabase.'
-      );
-    }
-
-    if (visitError) {
-      throw visitError;
-    }
-  }
+  const keepIds = [...phaseRows, ...visitRows].map((row) => row.id);
+  await deleteOrphanProjectTimelineEntries(supabase, projectId, keepIds);
 
   return fetchProjectTimeline(projectId);
 }
