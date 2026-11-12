@@ -10,6 +10,7 @@ interface InstallationDocxPreviewProps {
 export default function InstallationDocxPreview({ documentUrl }: InstallationDocxPreviewProps) {
   const { t } = useTaskboardI18n();
   const viewportRef = useRef<HTMLDivElement>(null);
+  const clipRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLDivElement>(null);
   const styleRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
@@ -17,9 +18,10 @@ export default function InstallationDocxPreview({ documentUrl }: InstallationDoc
 
   useEffect(() => {
     const viewportEl = viewportRef.current;
+    const clipEl = clipRef.current;
     const bodyEl = bodyRef.current;
     const styleEl = styleRef.current;
-    if (!viewportEl || !bodyEl || !styleEl) return;
+    if (!viewportEl || !clipEl || !bodyEl || !styleEl) return;
 
     let cancelled = false;
     let detachFit: (() => void) | undefined;
@@ -29,6 +31,11 @@ export default function InstallationDocxPreview({ documentUrl }: InstallationDoc
     styleEl.replaceChildren();
     bodyEl.style.height = '';
     bodyEl.style.overflow = '';
+    clipEl.style.width = '';
+    clipEl.style.height = '';
+    clipEl.style.marginLeft = '';
+    clipEl.style.marginRight = '';
+    clipEl.style.overflow = '';
 
     void (async () => {
       try {
@@ -41,9 +48,11 @@ export default function InstallationDocxPreview({ documentUrl }: InstallationDoc
           className: 'installation-docx-preview',
           inWrapper: true,
           breakPages: false,
+          ignoreWidth: false,
+          useBase64URL: true,
         });
         if (cancelled) return;
-        detachFit = attachDocxPreviewFitToWidth(viewportEl, bodyEl);
+        detachFit = attachDocxPreviewFitToWidth(viewportEl, clipEl, bodyEl);
       } catch {
         if (!cancelled) setError(t('projects.tech.docxPreviewError'));
       } finally {
@@ -58,11 +67,19 @@ export default function InstallationDocxPreview({ documentUrl }: InstallationDoc
       styleEl.replaceChildren();
       bodyEl.style.height = '';
       bodyEl.style.overflow = '';
+      clipEl.style.width = '';
+      clipEl.style.height = '';
+      clipEl.style.marginLeft = '';
+      clipEl.style.marginRight = '';
+      clipEl.style.overflow = '';
     };
   }, [documentUrl, t]);
 
   return (
-    <div className="relative w-full min-h-[min(72vh,40rem)] max-h-[min(72vh,40rem)] overflow-y-auto overscroll-contain bg-white installation-docx-preview-viewport">
+    <div
+      ref={viewportRef}
+      className="installation-docx-preview-viewport relative w-full min-h-[min(72vh,40rem)] max-h-[min(72vh,40rem)] overflow-y-auto overflow-x-hidden overscroll-contain bg-white px-1 sm:px-2 py-2 sm:py-4"
+    >
       {loading ? (
         <p className="absolute inset-x-0 top-8 z-[1] px-4 text-sm tb-muted text-center pointer-events-none">
           {t('projects.tech.docxPreviewLoading')}
@@ -72,8 +89,11 @@ export default function InstallationDocxPreview({ documentUrl }: InstallationDoc
         <p className="absolute inset-x-0 top-8 z-[1] px-4 text-sm text-red-600 text-center">{error}</p>
       ) : null}
       <div ref={styleRef} className="sr-only" aria-hidden />
-      <div ref={viewportRef} className="w-full overflow-x-hidden px-0 sm:px-2 py-2 sm:py-4">
-        <div ref={bodyRef} className="installation-docx-preview-root" />
+      <div
+        ref={clipRef}
+        className="installation-docx-preview-clip w-full min-w-0 max-w-full mx-auto"
+      >
+        <div ref={bodyRef} className="installation-docx-preview-root min-w-0" />
       </div>
     </div>
   );

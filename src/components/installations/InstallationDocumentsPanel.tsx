@@ -505,7 +505,7 @@ export default function InstallationDocumentsPanel({
   ) : null;
 
   const embeddedPdf = canEmbedPdf ? (
-    <div className="rounded-lg border border-[var(--tb-border)] overflow-hidden bg-[var(--tb-bg)]">
+    <div className="rounded-lg border border-[var(--tb-border)] overflow-hidden bg-[var(--tb-bg)] min-w-0 max-w-full">
       {embedded?.format === 'pdf' ? (
         <InstallationPdfEmbed pdfUrl={embedded.url} title={embedded.title} />
       ) : embedded?.format === 'docx' ? (
