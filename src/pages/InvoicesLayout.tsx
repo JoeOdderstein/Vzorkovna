@@ -47,8 +47,8 @@ function InvoicesShell() {
   return (
     <>
       <Nav activeSection="login" />
-      <div className="taskboard min-h-screen pt-24 pb-16" data-theme={theme}>
-        <div className="max-w-screen-2xl mx-auto px-6 md:px-10 py-4 flex justify-end gap-4">
+      <div className="taskboard min-h-screen pt-20 sm:pt-24 pb-[max(3.5rem,env(safe-area-inset-bottom))]" data-theme={theme}>
+        <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-10 py-3 sm:py-4 flex justify-end gap-3 sm:gap-4">
           <TaskboardThemeToggle />
           <TbIconTooltip label={t('header.profile')}>
             <button

@@ -40,6 +40,17 @@ function formatWhen(iso: string | null) {
   });
 }
 
+function formatWhenShort(iso: string | null) {
+  if (!iso) return '';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleDateString(undefined, {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 function kindMessageKey(prefix: string, kind: InvoiceDocumentKind): string {
   return `invoices.${prefix}.${kind}`;
 }
@@ -258,9 +269,9 @@ export default function InvoicesPanel() {
   };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-3 min-w-0">
       <div
-        className="tb-header-scroll-row tb-header-scroll-row--filters shrink-0"
+        className="tb-header-scroll-row tb-header-scroll-row--filters shrink-0 -mx-1 px-1 sm:mx-0 sm:px-0"
         role="group"
         aria-label={t('invoices.filterByKind')}
       >
@@ -290,9 +301,9 @@ export default function InvoicesPanel() {
       ) : null}
 
       {!isQuotationView ? (
-      <section className="tb-remote-inst-card p-6 md:p-8">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-        <div>
+      <section className="tb-remote-inst-card p-4 sm:p-6 md:p-8">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4 md:mb-6">
+        <div className="min-w-0">
           <h2 className="tb-heading text-lg">
             {isQuotationView ? t('quotations.uploadedFilesHeading') : t(kindMessageKey('listHeading', documentKind))}
           </h2>
@@ -300,10 +311,10 @@ export default function InvoicesPanel() {
             {isQuotationView ? t('invoices.uploadHint.quotation') : t('invoices.uploadHint')}
           </p>
         </div>
-        <div>
+        <div className="w-full sm:w-auto shrink-0">
           <button
             type="button"
-            className="tb-btn-primary text-sm inline-flex items-center gap-2"
+            className="tb-btn-primary text-sm inline-flex items-center justify-center gap-2 w-full sm:w-auto"
             disabled={!username}
             onClick={() => setUploadDialogOpen(true)}
           >
@@ -323,7 +334,7 @@ export default function InvoicesPanel() {
       ) : null}
 
       {!loading && filteredInvoices.length > 0 ? (
-        <div className="overflow-x-auto">
+        <div className="min-w-0">
           <div
             className={`hidden ${DESKTOP_GRID} px-3 pb-2 mb-2 text-[10px] uppercase tracking-wider tb-muted border-b border-[var(--tb-border)]`}
           >
@@ -336,7 +347,7 @@ export default function InvoicesPanel() {
               {isQuotationView ? t('invoices.colRevisionsNeeded') : t('invoices.colPayment')}
             </span>
           </div>
-          <ul className="space-y-2">
+          <ul className="space-y-1 md:space-y-2 tb-invoice-list">
             {filteredInvoices.map((invoice) => {
               const busy = savingId === invoice.id || deletingId === invoice.id;
               const opening = openingId === invoice.id;
@@ -353,178 +364,198 @@ export default function InvoicesPanel() {
                 <li
                   key={invoice.id}
                   id={`invoice-row-${invoice.id}`}
-                  className={`border rounded-lg px-3 py-3 space-y-2 ${
+                  className={`tb-invoice-row border rounded-lg p-2 md:p-3 ${
                     highlighted
                       ? 'border-[var(--tb-accent)] ring-1 ring-[var(--tb-accent)]/40'
                       : 'border-[var(--tb-border)]'
                   }`}
                 >
-                  <div className={`grid grid-cols-1 gap-3 ${DESKTOP_GRID}`}>
-                    <div className="flex justify-start md:justify-center md:items-center">
+                  <div
+                    className={`grid gap-2 md:gap-3 grid-cols-[auto_minmax(0,1fr)] grid-rows-[auto_auto] ${DESKTOP_GRID}`}
+                  >
+                    <div className="row-start-1 col-start-1 flex justify-center items-start md:justify-center md:items-center md:row-auto md:col-auto">
                       <button
                         type="button"
-                        className="flex items-center justify-center w-10 h-10 shrink-0 rounded-md border border-[var(--tb-border)] bg-[var(--tb-bg)] text-[var(--tb-accent)] hover:bg-[var(--tb-surface-hover,var(--tb-border))] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tb-accent)]"
+                        className="tb-invoice-row__open flex items-center justify-center w-9 h-9 md:w-10 md:h-10 shrink-0 rounded-md border border-[var(--tb-border)] bg-[var(--tb-bg)] text-[var(--tb-accent)] hover:bg-[var(--tb-surface-hover,var(--tb-border))] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tb-accent)]"
                         disabled={opening}
                         onClick={() => void openInvoice(invoice)}
                         aria-label={`${t('invoices.openPdf')}: ${invoice.title}`}
                       >
-                        <FileText size={22} aria-hidden />
+                        <FileText className="h-[17px] w-[17px] md:h-[22px] md:w-[22px]" aria-hidden />
                       </button>
                     </div>
 
-                    <div className="min-w-0 border-t md:border-t-0 border-[var(--tb-border)] pt-3 md:pt-0 md:py-1">
-                      <span className="text-[10px] uppercase tracking-wider tb-muted md:hidden mb-1 block">
-                        {t('invoices.colName')}
-                      </span>
-                      <div className="flex items-start gap-2 min-w-0">
+                    <div className="row-start-1 col-start-2 min-w-0 md:py-1 md:row-auto md:col-auto">
+                      <div className="flex items-start gap-1.5 md:gap-2 min-w-0">
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm tb-text font-medium truncate">{ownerName}</p>
+                          <p className="text-xs md:text-sm tb-text font-medium truncate leading-snug">
+                            {ownerName}
+                            <span className="font-normal tb-muted md:hidden">
+                              {' · '}
+                              {formatWhenShort(invoice.created_at)}
+                            </span>
+                          </p>
                           <button
                             type="button"
-                            className="mt-1 text-xs tb-muted hover:text-[var(--tb-accent)] text-left truncate max-w-full block"
+                            className="mt-px md:mt-0.5 text-xs md:text-sm tb-text hover:text-[var(--tb-accent)] text-left w-full min-w-0 leading-snug"
                             disabled={opening}
                             onClick={() => void openInvoice(invoice)}
                           >
-                            {invoice.title}
-                            {opening ? ` (${t('invoices.opening')})` : ''}
-                            {' · '}
-                            {formatWhen(invoice.created_at)}
+                            <span className="line-clamp-1 break-words md:truncate md:line-clamp-none">
+                              {invoice.title}
+                            </span>
+                            {opening ? (
+                              <span className="text-[10px] md:text-xs tb-muted">
+                                {' '}
+                                ({t('invoices.opening')})
+                              </span>
+                            ) : null}
                           </button>
+                          <p className="text-xs tb-muted mt-0.5 hidden md:block">
+                            {formatWhen(invoice.created_at)}
+                          </p>
                         </div>
-                        <div className="flex shrink-0 items-center gap-1">
+                        <div className="flex shrink-0 items-center gap-0.5 md:gap-1">
                           <button
                             type="button"
-                            className="p-2 rounded-md border border-[var(--tb-border)] text-[var(--tb-text-muted)] hover:text-[var(--tb-accent)] transition-colors disabled:opacity-50"
+                            className="p-1.5 md:p-2 rounded-md border border-[var(--tb-border)] text-[var(--tb-text-muted)] hover:text-[var(--tb-accent)] transition-colors disabled:opacity-50"
                             disabled={busy}
                             aria-label={t('invoices.shareDocument')}
                             title={t('invoices.shareDocument')}
                             onClick={() => void copyDocumentLink(invoice)}
                           >
-                            <Link2 size={16} aria-hidden />
+                            <Link2 className="h-[15px] w-[15px] md:h-4 md:w-4" aria-hidden />
                           </button>
                           {showDelete ? (
                             <button
                               type="button"
-                              className="p-2 rounded-md border border-[var(--tb-border)] text-[var(--tb-text-muted)] hover:text-red-600 hover:border-red-300 transition-colors disabled:opacity-50"
+                              className="p-1.5 md:p-2 rounded-md border border-[var(--tb-border)] text-[var(--tb-text-muted)] hover:text-red-600 hover:border-red-300 transition-colors disabled:opacity-50"
                               disabled={busy}
                               aria-label={t('invoices.delete')}
                               title={t('invoices.delete')}
                               onClick={() => void handleDelete(invoice)}
                             >
-                              <Trash2 size={16} aria-hidden />
+                              <Trash2 className="h-[15px] w-[15px] md:h-4 md:w-4" aria-hidden />
                             </button>
                           ) : null}
                         </div>
                       </div>
-                      <span className="text-xs tb-muted block mt-1 md:hidden">
-                        {t('invoices.openPdfHint')}
-                      </span>
                     </div>
 
-                    {isQuotationView ? (
-                      <>
-                        <div className="border-t md:border-t-0 border-[var(--tb-border)] pt-3 md:pt-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
-                          <span className="text-[10px] uppercase tracking-wider tb-muted md:hidden mb-2 block">
-                            {t('invoices.colApproved')}
-                          </span>
-                          <input
-                            type="checkbox"
-                            className="tb-invoice-checkbox"
-                            checked={invoice.quotation_status === 'approved'}
-                            disabled={busy}
-                            aria-label={t('invoices.quotationApproved')}
-                            onChange={(e) =>
-                              void toggleQuotationStatus(invoice, 'approved', e.target.checked)
-                            }
-                          />
-                          {invoice.quotation_status === 'approved' && invoice.quotation_status_by ? (
-                            <span className="text-[10px] tb-muted leading-snug mt-2 text-left md:text-center md:max-w-[10.5rem] md:hidden">
-                              {t('invoices.markedBy', {
-                                name: labelForUser(invoice.quotation_status_by),
-                                when: formatWhen(invoice.quotation_status_at),
-                              })}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="border-t md:border-t-0 border-[var(--tb-border)] pt-3 md:pt-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
-                          <span className="text-[10px] uppercase tracking-wider tb-muted md:hidden mb-2 block">
-                            {t('invoices.colRevisionsNeeded')}
-                          </span>
-                          <input
-                            type="checkbox"
-                            className="tb-invoice-checkbox"
-                            checked={invoice.quotation_status === 'revisions_needed'}
-                            disabled={busy}
-                            aria-label={t('invoices.quotationRevisionsNeeded')}
-                            onChange={(e) =>
-                              void toggleQuotationStatus(
-                                invoice,
-                                'revisions_needed',
-                                e.target.checked,
-                              )
-                            }
-                          />
-                          {invoice.quotation_status === 'revisions_needed' &&
-                          invoice.quotation_status_by ? (
-                            <span className="text-[10px] tb-muted leading-snug mt-2 text-left md:text-center md:max-w-[10.5rem] md:hidden">
-                              {t('invoices.markedBy', {
-                                name: labelForUser(invoice.quotation_status_by),
-                                when: formatWhen(invoice.quotation_status_at),
-                              })}
-                            </span>
-                          ) : null}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="border-t md:border-t-0 border-[var(--tb-border)] pt-3 md:pt-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
-                          <span className="text-[10px] uppercase tracking-wider tb-muted md:hidden mb-2 block">
-                            {t('invoices.colFinance')}
-                          </span>
-                          <input
-                            type="checkbox"
-                            className="tb-invoice-checkbox"
-                            checked={invoice.forwarded_to_finance}
-                            disabled={busy}
-                            aria-label={t('invoices.forwardedToFinance')}
-                            onChange={(e) =>
-                              void toggleField(invoice, 'forwarded_to_finance', e.target.checked)
-                            }
-                          />
-                          {invoice.forwarded_to_finance && invoice.forwarded_to_finance_by ? (
-                            <span className="text-[10px] tb-muted leading-snug mt-2 text-left md:text-center md:max-w-[10.5rem] md:hidden">
-                              {t('invoices.markedBy', {
-                                name: labelForUser(invoice.forwarded_to_finance_by),
-                                when: formatWhen(invoice.forwarded_to_finance_at),
-                              })}
-                            </span>
-                          ) : null}
-                        </div>
-                        <div className="border-t md:border-t-0 border-[var(--tb-border)] pt-3 md:pt-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
-                          <span className="text-[10px] uppercase tracking-wider tb-muted md:hidden mb-2 block">
-                            {t('invoices.colPayment')}
-                          </span>
-                          <input
-                            type="checkbox"
-                            className="tb-invoice-checkbox"
-                            checked={invoice.payment_received}
-                            disabled={busy}
-                            aria-label={t('invoices.paymentReceived')}
-                            onChange={(e) =>
-                              void toggleField(invoice, 'payment_received', e.target.checked)
-                            }
-                          />
-                          {invoice.payment_received && invoice.payment_received_by ? (
-                            <span className="text-[10px] tb-muted leading-snug mt-2 text-left md:text-center md:max-w-[10.5rem] md:hidden">
-                              {t('invoices.markedBy', {
-                                name: labelForUser(invoice.payment_received_by),
-                                when: formatWhen(invoice.payment_received_at),
-                              })}
-                            </span>
-                          ) : null}
-                        </div>
-                      </>
-                    )}
+                    <div className="tb-invoice-row__status row-start-2 col-span-2 grid grid-cols-2 gap-1.5 p-1.5 rounded-md border border-[var(--tb-border)] bg-[color-mix(in_srgb,var(--tb-text)_4%,var(--tb-surface))] md:col-span-1 md:row-start-auto md:contents md:p-0 md:border-0 md:bg-transparent md:rounded-none md:gap-0">
+                      {isQuotationView ? (
+                        <>
+                          <div className="min-w-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
+                            <label className="flex items-center gap-1.5 min-w-0 md:flex-col md:items-center md:gap-0">
+                              <input
+                                type="checkbox"
+                                className="tb-invoice-checkbox"
+                                checked={invoice.quotation_status === 'approved'}
+                                disabled={busy}
+                                aria-label={t('invoices.quotationApproved')}
+                                onChange={(e) =>
+                                  void toggleQuotationStatus(invoice, 'approved', e.target.checked)
+                                }
+                              />
+                              <span className="text-[10px] leading-tight tb-muted md:hidden line-clamp-2">
+                                {t('invoices.colApproved')}
+                              </span>
+                            </label>
+                            {invoice.quotation_status === 'approved' && invoice.quotation_status_by ? (
+                              <span className="text-[9px] tb-muted leading-tight mt-0.5 line-clamp-2 md:col-span-1 md:text-center md:max-w-[10.5rem] md:mt-2 md:text-[10px] md:hidden">
+                                {t('invoices.markedBy', {
+                                  name: labelForUser(invoice.quotation_status_by),
+                                  when: formatWhenShort(invoice.quotation_status_at),
+                                })}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
+                            <label className="flex items-center gap-1.5 min-w-0 md:flex-col md:items-center md:gap-0">
+                              <input
+                                type="checkbox"
+                                className="tb-invoice-checkbox"
+                                checked={invoice.quotation_status === 'revisions_needed'}
+                                disabled={busy}
+                                aria-label={t('invoices.quotationRevisionsNeeded')}
+                                onChange={(e) =>
+                                  void toggleQuotationStatus(
+                                    invoice,
+                                    'revisions_needed',
+                                    e.target.checked,
+                                  )
+                                }
+                              />
+                              <span className="text-[10px] leading-tight tb-muted md:hidden line-clamp-2">
+                                {t('invoices.colRevisionsNeeded')}
+                              </span>
+                            </label>
+                            {invoice.quotation_status === 'revisions_needed' &&
+                            invoice.quotation_status_by ? (
+                              <span className="text-[9px] tb-muted leading-tight mt-0.5 line-clamp-2 md:text-center md:max-w-[10.5rem] md:mt-2 md:text-[10px] md:hidden">
+                                {t('invoices.markedBy', {
+                                  name: labelForUser(invoice.quotation_status_by),
+                                  when: formatWhenShort(invoice.quotation_status_at),
+                                })}
+                              </span>
+                            ) : null}
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="min-w-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
+                            <label className="flex items-center gap-1.5 min-w-0 md:flex-col md:items-center md:gap-0">
+                              <input
+                                type="checkbox"
+                                className="tb-invoice-checkbox"
+                                checked={invoice.forwarded_to_finance}
+                                disabled={busy}
+                                aria-label={t('invoices.forwardedToFinance')}
+                                onChange={(e) =>
+                                  void toggleField(invoice, 'forwarded_to_finance', e.target.checked)
+                                }
+                              />
+                              <span className="text-[10px] leading-tight tb-muted md:hidden line-clamp-2">
+                                {t('invoices.colFinance')}
+                              </span>
+                            </label>
+                            {invoice.forwarded_to_finance && invoice.forwarded_to_finance_by ? (
+                              <span className="text-[9px] tb-muted leading-tight mt-0.5 line-clamp-2 md:text-center md:max-w-[10.5rem] md:mt-2 md:text-[10px] md:hidden">
+                                {t('invoices.markedBy', {
+                                  name: labelForUser(invoice.forwarded_to_finance_by),
+                                  when: formatWhenShort(invoice.forwarded_to_finance_at),
+                                })}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="min-w-0 md:flex md:flex-col md:items-center md:justify-center md:min-h-[2.5rem]">
+                            <label className="flex items-center gap-1.5 min-w-0 md:flex-col md:items-center md:gap-0">
+                              <input
+                                type="checkbox"
+                                className="tb-invoice-checkbox"
+                                checked={invoice.payment_received}
+                                disabled={busy}
+                                aria-label={t('invoices.paymentReceived')}
+                                onChange={(e) =>
+                                  void toggleField(invoice, 'payment_received', e.target.checked)
+                                }
+                              />
+                              <span className="text-[10px] leading-tight tb-muted md:hidden line-clamp-2">
+                                {t('invoices.colPayment')}
+                              </span>
+                            </label>
+                            {invoice.payment_received && invoice.payment_received_by ? (
+                              <span className="text-[9px] tb-muted leading-tight mt-0.5 line-clamp-2 md:text-center md:max-w-[10.5rem] md:mt-2 md:text-[10px] md:hidden">
+                                {t('invoices.markedBy', {
+                                  name: labelForUser(invoice.payment_received_by),
+                                  when: formatWhenShort(invoice.payment_received_at),
+                                })}
+                              </span>
+                            ) : null}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
 
                   {showMeta ? (

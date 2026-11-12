@@ -10,8 +10,8 @@ export default function InvoicesPage() {
   const [accessDialogOpen, setAccessDialogOpen] = useState(false);
 
   return (
-    <div className="max-w-screen-2xl mx-auto px-6 md:px-10">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between mb-8">
+    <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 md:px-10 min-w-0">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between mb-5 sm:mb-8">
         <div>
           <span className="tb-label block mb-2">{t('nav.invoices')}</span>
           <p className="text-sm tb-muted">{t('invoices.pageDescription')}</p>
@@ -19,7 +19,7 @@ export default function InvoicesPage() {
         {isAdmin ? (
           <button
             type="button"
-            className="tb-btn-secondary text-sm shrink-0"
+            className="tb-btn-secondary text-sm shrink-0 w-full sm:w-auto"
             onClick={() => setAccessDialogOpen(true)}
           >
             {t('invoices.addMembers')}

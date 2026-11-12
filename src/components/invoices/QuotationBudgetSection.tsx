@@ -362,68 +362,68 @@ export default function QuotationBudgetSection({
             <>
               <button
                 type="button"
-                className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+                className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 p-2 sm:px-3"
                 disabled={busy}
                 onClick={() => void handleDuplicate(row)}
                 title={t('quotations.budgetDuplicateHint')}
               >
                 <Copy size={14} aria-hidden />
-                {t('quotations.budgetDuplicate')}
+                <span className="hidden sm:inline">{t('quotations.budgetDuplicate')}</span>
               </button>
               <button
                 type="button"
-                className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+                className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 p-2 sm:px-3"
                 disabled={busy}
                 onClick={() => void openEditor(row.id, false)}
               >
                 <Pencil size={14} aria-hidden />
-                {t('common.edit')}
+                <span className="hidden sm:inline">{t('common.edit')}</span>
               </button>
             </>
           ) : (
             <button
               type="button"
-              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 p-2 sm:px-3"
               disabled={busy}
               onClick={() => void openEditor(row.id, true)}
             >
               <Eye size={14} aria-hidden />
-              {t('quotations.viewBudget')}
+              <span className="hidden sm:inline">{t('quotations.viewBudget')}</span>
             </button>
           )}
           {canEditQuotations && !isArchived ? (
             <button
               type="button"
-              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 p-2 sm:px-3"
               disabled={busy}
               onClick={() => void handleArchive(row)}
               title={t('quotations.budgetArchiveHint')}
             >
               <Archive size={14} aria-hidden />
-              {t('quotations.budgetArchive')}
+              <span className="hidden sm:inline">{t('quotations.budgetArchive')}</span>
             </button>
           ) : null}
           {canEditQuotations && isArchived ? (
             <button
               type="button"
-              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 p-2 sm:px-3"
               disabled={busy}
               onClick={() => void handleRestore(row)}
               title={t('quotations.budgetRestoreHint')}
             >
               <ArchiveRestore size={14} aria-hidden />
-              {t('quotations.budgetRestore')}
+              <span className="hidden sm:inline">{t('quotations.budgetRestore')}</span>
             </button>
           ) : null}
           {canEditQuotations ? (
             <button
               type="button"
-              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 text-red-700"
+              className="tb-btn-secondary text-sm inline-flex items-center gap-1.5 text-red-700 p-2 sm:px-3"
               disabled={busy}
               onClick={() => void handleDelete(row)}
             >
               <Trash2 size={14} aria-hidden />
-              {t('common.delete')}
+              <span className="hidden sm:inline">{t('common.delete')}</span>
             </button>
           ) : null}
         </div>
@@ -433,7 +433,7 @@ export default function QuotationBudgetSection({
 
   return (
     <>
-      <section className="tb-remote-inst-card p-6 md:p-8 mb-6">
+      <section className="tb-remote-inst-card p-4 sm:p-6 md:p-8 mb-4 sm:mb-6">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between mb-4">
           <div>
             <h2 className="tb-heading text-lg">{t('quotations.budgetHeading')}</h2>
