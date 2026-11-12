@@ -329,9 +329,15 @@ export default function QuotationBudgetSection({
         }`}
       >
         <div className="min-w-0 flex-1">
-          <p className="font-medium tb-text truncate">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void openEditor(row.id, true)}
+            className="font-medium tb-text truncate text-left w-full min-w-0 hover:text-[var(--tb-accent)] underline-offset-2 hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--tb-accent)] rounded-sm disabled:opacity-50"
+            title={t('quotations.viewBudget')}
+          >
             {row.title.trim() || t('quotations.budgetTitlePlaceholder')}
-          </p>
+          </button>
           <p className="text-xs tb-muted truncate">
             {row.project?.name ?? t('task.project')} ·{' '}
             {total != null ? formatQuotationMoney(total, row.currency) : t('quotations.totalPending')}
