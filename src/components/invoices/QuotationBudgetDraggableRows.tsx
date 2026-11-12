@@ -1,7 +1,7 @@
 import { useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, GripVertical, Trash2 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useTaskboardI18n } from '../../hooks/useTaskboardI18n';
 import type { MessageKey } from '../../lib/taskboard/i18n/messages';
@@ -10,11 +10,24 @@ import type { QuotationLineWithDragKey } from '../../lib/quotations/quotationLin
 
 export function SectionDropRow({
   sectionIndex,
+  canMoveUp,
+  canMoveDown,
+  canRemove,
+  onMoveUp,
+  onMoveDown,
+  onRemove,
   children,
 }: {
   sectionIndex: number;
+  canMoveUp: boolean;
+  canMoveDown: boolean;
+  canRemove: boolean;
+  onMoveUp: () => void;
+  onMoveDown: () => void;
+  onRemove: () => void;
   children: ReactNode;
 }) {
+  const { t } = useTaskboardI18n();
   const { setNodeRef, isOver } = useDroppable({
     id: `section-${sectionIndex}`,
   });
@@ -26,7 +39,43 @@ export function SectionDropRow({
         isOver ? 'ring-2 ring-inset ring-[var(--tb-accent)]' : ''
       }`}
     >
+      <td className="py-0.5 md:py-1 pr-0.5 md:pr-1 align-top w-7 lg:w-8">
+        <div className="flex flex-col items-center gap-0.5">
+          <button
+            type="button"
+            disabled={!canMoveUp}
+            onClick={onMoveUp}
+            className="p-0.5 rounded tb-muted hover:tb-text disabled:opacity-30 disabled:pointer-events-none"
+            aria-label={t('quotations.moveSectionUp')}
+          >
+            <ChevronUp size={16} aria-hidden />
+          </button>
+          <button
+            type="button"
+            disabled={!canMoveDown}
+            onClick={onMoveDown}
+            className="p-0.5 rounded tb-muted hover:tb-text disabled:opacity-30 disabled:pointer-events-none"
+            aria-label={t('quotations.moveSectionDown')}
+          >
+            <ChevronDown size={16} aria-hidden />
+          </button>
+        </div>
+      </td>
       {children}
+      <td className="quotation-budget-total-col quotation-budget-total-col--section py-0.5 md:py-1 align-top">
+        <div className="flex justify-end">
+          <button
+            type="button"
+            disabled={!canRemove}
+            onClick={onRemove}
+            className="p-1 rounded tb-muted hover:text-red-600 disabled:opacity-30 disabled:pointer-events-none"
+            aria-label={t('quotations.removeSection')}
+            title={canRemove ? undefined : t('quotations.cannotRemoveLastSection')}
+          >
+            <Trash2 size={15} aria-hidden />
+          </button>
+        </div>
+      </td>
     </tr>
   );
 }

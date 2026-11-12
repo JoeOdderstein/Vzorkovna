@@ -25,7 +25,11 @@ import {
   attachDragKeys,
   lineSortableIds,
   moveQuotationLine,
+  moveQuotationSection,
+  quotationSectionCanMove,
+  countQuotationSections,
   removeQuotationLineAt,
+  removeQuotationSectionAt,
   stripDragKeys,
   type QuotationLineWithDragKey,
 } from '../../lib/quotations/quotationLineDrag';
@@ -119,6 +123,14 @@ export default function QuotationBudgetEditor({
 
   const removeLine = useCallback((index: number) => {
     setLines((prev) => removeQuotationLineAt(prev, index));
+  }, []);
+
+  const removeSection = useCallback((sectionHeaderIndex: number) => {
+    setLines((prev) => removeQuotationSectionAt(prev, sectionHeaderIndex));
+  }, []);
+
+  const moveSection = useCallback((sectionHeaderIndex: number, direction: -1 | 1) => {
+    setLines((prev) => moveQuotationSection(prev, sectionHeaderIndex, direction));
   }, []);
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -441,9 +453,20 @@ export default function QuotationBudgetEditor({
                     {computedLines.map((row, index) => {
                       const lineState = lines[index];
                       if (row.kind === 'section') {
+                        const plainForSection = stripDragKeys(lines);
+                        const canRemoveSection = countQuotationSections(plainForSection) > 1;
                         return (
-                          <SectionDropRow key={`${lineState?.dragKey ?? index}-section`} sectionIndex={index}>
-                            <td colSpan={6} className="py-1 md:py-2 pr-1 md:pr-2 quotation-budget-section-cell">
+                          <SectionDropRow
+                            key={`${lineState?.dragKey ?? index}-section`}
+                            sectionIndex={index}
+                            canMoveUp={quotationSectionCanMove(plainForSection, index, -1)}
+                            canMoveDown={quotationSectionCanMove(plainForSection, index, 1)}
+                            canRemove={canRemoveSection}
+                            onMoveUp={() => moveSection(index, -1)}
+                            onMoveDown={() => moveSection(index, 1)}
+                            onRemove={() => removeSection(index)}
+                          >
+                            <td colSpan={5} className="py-1 md:py-2 pr-1 md:pr-2 quotation-budget-section-cell">
                               <input
                                 value={lineState?.label ?? ''}
                                 onChange={(e) => updateLine(index, { label: e.target.value })}
@@ -452,7 +475,6 @@ export default function QuotationBudgetEditor({
                               />
                               <span className="sr-only">{t('quotations.sectionDropTarget')}</span>
                             </td>
-                            <td className="quotation-budget-total-col quotation-budget-total-col--section" aria-hidden />
                           </SectionDropRow>
                         );
                       }

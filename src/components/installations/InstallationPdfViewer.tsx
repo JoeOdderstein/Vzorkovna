@@ -29,36 +29,29 @@ export default function InstallationPdfViewer({
 
   return createPortal(
     <div
-      className="taskboard fixed inset-0 z-[90] flex flex-col"
+      className="taskboard tb-pdf-viewer-overlay fixed inset-0 z-[90] flex flex-col min-h-0 bg-[var(--tb-bg)]"
       role="dialog"
       aria-modal="true"
       aria-label={title}
     >
-      <button
-        type="button"
-        className="absolute inset-0 tb-overlay cursor-default"
-        aria-label="Close document"
-        onClick={onClose}
-      />
-
-      <div className="relative z-10 flex items-center justify-between gap-3 px-4 pt-4 pb-2">
-        <p className="text-sm text-white/90 truncate drop-shadow-md min-w-0 flex-1">{title}</p>
+      <div className="shrink-0 flex items-center justify-between gap-3 px-3 py-2 md:px-4 border-b border-[var(--tb-border)] bg-[var(--tb-surface)]">
+        <p className="text-sm tb-text font-medium truncate min-w-0 flex-1">{title}</p>
         <button
           type="button"
           onClick={onClose}
-          className="pointer-events-auto shrink-0 rounded-full p-2 text-white/90 hover:text-white hover:bg-white/10 transition-colors"
+          className="shrink-0 rounded-md p-2 tb-muted hover:tb-text hover:bg-[var(--tb-border)]/30 transition-colors"
           aria-label="Close"
         >
           <X size={22} />
         </button>
       </div>
 
-      <div className="relative z-10 flex flex-1 justify-center px-4 pb-6 min-h-0 w-full max-w-5xl mx-auto">
+      <div className="flex-1 min-h-0 w-full overflow-hidden">
         <InstallationPdfEmbed
           pdfUrl={pdfUrl}
           title={title}
           showMobileOpenLink={false}
-          className="pointer-events-auto w-full h-full min-h-[70vh] rounded-lg bg-white shadow-2xl border-0"
+          fill
         />
       </div>
     </div>,
